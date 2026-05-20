@@ -86,6 +86,14 @@ const headerContextEl = document.querySelector("#header-context");
 let studyTimerId = null;
 const ANSWER_FEEDBACK_MS = 230;
 
+function icon(name, extraClass = "") {
+  return `<svg class="icon${extraClass ? ` ${extraClass}` : ""}" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
+}
+
+function iconLabel(name, label) {
+  return `<span class="button-content">${icon(name)}<span>${escapeHtml(label)}</span></span>`;
+}
+
 function showToast(message) {
   toastEl.textContent = message;
   toastEl.classList.add("show");
@@ -204,7 +212,7 @@ function renderHeader() {
   headerUserEl.hidden = false;
   headerUserEl.innerHTML = `
     ${ddayMarkup}
-    <button class="ghost-button small-button" type="button" data-action="logout">로그아웃</button>
+    <button class="ghost-button small-button" type="button" data-action="logout">${iconLabel("log-out", "로그아웃")}</button>
   `;
 }
 
@@ -335,7 +343,7 @@ function buildBulkPreview(groupId, text) {
 function renderSearchInput({ id, value, placeholder }) {
   return `
     <div class="search-field">
-      <span class="search-icon" aria-hidden="true"></span>
+      <span class="search-icon" aria-hidden="true">${icon("search")}</span>
       <input id="${id}" class="input" type="search" value="${escapeHtml(value)}" placeholder="${escapeHtml(
         placeholder,
       )}" aria-label="${escapeHtml(placeholder)}" autocomplete="off" />
@@ -343,7 +351,7 @@ function renderSearchInput({ id, value, placeholder }) {
         value
           ? `<button class="search-clear" type="button" data-action="clear-search" data-target="${id}" aria-label="${escapeHtml(
               placeholder,
-            )} 지우기">×</button>`
+            )} 지우기">${icon("x")}</button>`
           : ""
       }
     </div>
@@ -565,7 +573,7 @@ function renderAuth() {
             DEFAULT_LOGIN.accessCode,
           )}" placeholder="숫자 6자리" required maxlength="6" pattern="[0-9]{6}" />
         </label>
-        <button class="primary-button full" type="submit">들어가기</button>
+        <button class="primary-button full" type="submit">${iconLabel("log-in", "들어가기")}</button>
       </form>
       <p class="meta">처음 쓰는 닉네임이면 이 코드로 바로 시작합니다.</p>
     </div>
@@ -574,6 +582,7 @@ function renderAuth() {
 
 function renderConfirmDialog({ eyebrow, title, message, confirmLabel, confirmAction, tone = "danger" }) {
   const buttonClass = tone === "primary" ? "primary-button" : "danger-button";
+  const confirmIcon = tone === "primary" ? "check" : "alert-triangle";
   dialogRoot.innerHTML = `
     <div class="dialog-backdrop" role="presentation">
       <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title" aria-describedby="study-dialog-message">
@@ -581,8 +590,8 @@ function renderConfirmDialog({ eyebrow, title, message, confirmLabel, confirmAct
         <h2 id="study-dialog-title">${escapeHtml(title)}</h2>
         <p id="study-dialog-message" class="meta">${escapeHtml(message)}</p>
         <div class="button-row">
-          <button class="ghost-button" type="button" data-action="close-dialog">취소</button>
-          <button class="${buttonClass}" type="button" data-action="${confirmAction}">${escapeHtml(confirmLabel)}</button>
+          <button class="ghost-button" type="button" data-action="close-dialog">${iconLabel("x", "취소")}</button>
+          <button class="${buttonClass}" type="button" data-action="${confirmAction}">${iconLabel(confirmIcon, confirmLabel)}</button>
         </div>
       </section>
     </div>
@@ -639,7 +648,7 @@ function renderDialog() {
                 : `<div class="empty-state">이 그룹에는 카드가 없습니다.</div>`
             }
           </div>
-          <button class="primary-button full" type="button" data-action="close-dialog">닫기</button>
+          <button class="primary-button full" type="button" data-action="close-dialog">${iconLabel("check", "닫기")}</button>
         </section>
       </div>
     `;
@@ -816,7 +825,7 @@ function renderStudy() {
         <p class="eyebrow">학습</p>
         <h2 id="study-title">그룹 선택</h2>
         <div class="empty-state">그룹을 먼저 만들면 학습을 시작할 수 있어요.</div>
-        <button class="primary-button full" type="button" data-action="go-groups">그룹 만들기</button>
+        <button class="primary-button full" type="button" data-action="go-groups">${iconLabel("plus", "그룹 만들기")}</button>
       </div>
     `;
     return;
@@ -902,7 +911,7 @@ function renderTodayStudyPanel(recentGroup) {
           <button class="primary-button full" type="button" data-action="choose-study-group" ${
             recentGroup ? `data-group-id="${recentGroup.id}"` : "disabled"
           }>
-            ${recentGroup ? "이어가기" : "그룹 선택"}
+            ${iconLabel(recentGroup ? "play" : "folder", recentGroup ? "이어가기" : "그룹 선택")}
           </button>
         </article>
         <article class="today-action-card weak">
@@ -914,12 +923,16 @@ function renderTodayStudyPanel(recentGroup) {
           ${
             weakCards.length
               ? `<div class="today-action-buttons">
-                  <button class="secondary-button full" type="button" data-action="start-weak-study">복습</button>
-                  <button class="ghost-button full" type="button" data-action="toggle-weak-panel">${
-                    state.weakPanelOpen ? "접기" : "목록"
-                  }</button>
+                  <button class="secondary-button full" type="button" data-action="start-weak-study">${iconLabel(
+                    "rotate-ccw",
+                    "복습",
+                  )}</button>
+                  <button class="ghost-button full" type="button" data-action="toggle-weak-panel">${iconLabel(
+                    state.weakPanelOpen ? "chevron-up" : "list",
+                    state.weakPanelOpen ? "접기" : "목록",
+                  )}</button>
                 </div>`
-              : `<button class="secondary-button full" type="button" disabled>복습 없음</button>`
+              : `<button class="secondary-button full" type="button" disabled>${iconLabel("rotate-ccw", "복습 없음")}</button>`
           }
         </article>
       </div>
@@ -936,7 +949,7 @@ function renderRecentStudyGroupCallout(group) {
         <span>마지막 ${formatDate(group.last_studied_at)} · ${number(group.completed_rounds)}회독</span>
       </div>
       <button class="secondary-button small-button" type="button" data-action="choose-study-group" data-group-id="${group.id}">
-        이어가기
+        ${iconLabel("play", "이어가기")}
       </button>
     </div>
   `;
@@ -959,7 +972,10 @@ function renderWeakCardsPanel() {
       </div>
       <p class="meta">기준 ${threshold}회 이상 · 누적 오답 ${totalWrong}회 · 오답이 많은 순서</p>
       <div class="weak-card-list">${weakCards.map(renderWeakCardItem).join("")}</div>
-      <button class="secondary-button full" type="button" data-action="start-weak-study">약점 카드만 학습</button>
+      <button class="secondary-button full" type="button" data-action="start-weak-study">${iconLabel(
+        "rotate-ccw",
+        "약점 카드만 학습",
+      )}</button>
     </section>
   `;
 }
@@ -1038,7 +1054,10 @@ function renderStudyGroupChoiceItem(group) {
       ${
         cardCount
           ? ""
-          : `<button class="secondary-button full group-choice-empty-action" type="button" data-action="add-card-to-study-group" data-group-id="${group.id}">카드 등록</button>`
+          : `<button class="secondary-button full group-choice-empty-action" type="button" data-action="add-card-to-study-group" data-group-id="${group.id}">${iconLabel(
+              "plus",
+              "카드 등록",
+            )}</button>`
       }
     </article>
   `;
@@ -1057,7 +1076,10 @@ function renderStudySetup(selected) {
       </div>
       <div class="row">
         <p class="meta">${escapeHtml(selected.description || "설명 없음")}</p>
-        <button class="ghost-button small-button" type="button" data-action="open-study-groups">그룹 선택</button>
+        <button class="ghost-button small-button" type="button" data-action="open-study-groups">${iconLabel(
+          "arrow-left",
+          "그룹 선택",
+        )}</button>
       </div>
       ${renderStudyStartPanel(selected)}
       ${renderStudyOptionsPanel()}
@@ -1082,10 +1104,10 @@ function renderStudyStartPanel(group) {
       </div>
       <div class="study-start-actions">
         <button class="primary-button full" type="button" data-action="start-study" ${canStart ? "" : "disabled"}>
-          ${nextRoundNo}회독 시작
+          ${iconLabel("play", `${nextRoundNo}회독 시작`)}
         </button>
         <button class="ghost-button full" type="button" data-action="preview-study-cards" ${canStart ? "" : "disabled"}>
-          카드 미리보기
+          ${iconLabel("eye", "카드 미리보기")}
         </button>
       </div>
     </section>
@@ -1198,7 +1220,10 @@ function renderRecentRoundsPanel(rounds) {
         ${
           rounds.length > 1
             ? `<button class="ghost-button small-button" type="button" data-action="toggle-recent-rounds">
-                ${state.recentRoundsOpen ? "접기" : `더 보기 ${rounds.length - 1}`}
+                ${iconLabel(
+                  state.recentRoundsOpen ? "chevron-up" : "chevron-down",
+                  state.recentRoundsOpen ? "접기" : `더 보기 ${rounds.length - 1}`,
+                )}
               </button>`
             : ""
         }
@@ -1252,11 +1277,17 @@ function renderStudySession() {
         ${renderRoundTime(round)}
         ${
           summary.wrongCardSummaries.length
-            ? `<button class="secondary-button full" type="button" data-action="jump-wrong-review">틀린 카드만 바로 보기</button>`
+            ? `<button class="secondary-button full" type="button" data-action="jump-wrong-review">${iconLabel(
+                "target",
+                "틀린 카드만 바로 보기",
+              )}</button>`
             : ""
         }
         ${renderCompletionDetails(summary, session)}
-        <button class="primary-button full" type="button" data-action="end-study">돌아가기</button>
+        <button class="primary-button full" type="button" data-action="end-study">${iconLabel(
+          "arrow-left",
+          "돌아가기",
+        )}</button>
       </div>
     `;
     return;
@@ -1280,7 +1311,7 @@ function renderStudySession() {
         <div class="study-session-controls">
           <button class="ghost-button small-button" type="button" data-action="quit-study" ${
             session.isAnswering ? "disabled" : ""
-          }>포기</button>
+          }>${iconLabel("x", "포기")}</button>
           <span id="study-elapsed" class="timer-pill">${formatDuration(elapsedSeconds(session))}</span>
           <span class="pill">${session.passNo}차 ${session.index + 1}/${total}</span>
         </div>
@@ -1311,10 +1342,13 @@ function renderStudySession() {
           session.showingBack
             ? `<div class="study-actions"><button class="answer-wrong" type="button" data-action="answer-card" data-result="wrong" ${
                 session.isAnswering ? "disabled" : ""
-              }>틀림</button><button class="answer-correct" type="button" data-action="answer-card" data-result="correct" ${
+              }>${iconLabel("x", "틀림")}</button><button class="answer-correct" type="button" data-action="answer-card" data-result="correct" ${
                 session.isAnswering ? "disabled" : ""
-              }>알맞음</button></div>`
-            : `<button class="secondary-button full reveal-button" type="button" data-action="flip-card">뜻 보기</button>`
+              }>${iconLabel("check", "알맞음")}</button></div>`
+            : `<button class="secondary-button full reveal-button" type="button" data-action="flip-card">${iconLabel(
+                "eye",
+                "뜻 보기",
+              )}</button>`
         }
       </div>
     </div>
@@ -1532,7 +1566,10 @@ function renderCardBack(card, examplesExpanded = false) {
           ${
             examples.length > 1
               ? `<button class="ghost-button full example-toggle" type="button" data-action="toggle-examples">${
-                  examplesExpanded ? "예문 접기" : `예문 ${examples.length - 1}개 더 보기`
+                  iconLabel(
+                    examplesExpanded ? "chevron-up" : "chevron-down",
+                    examplesExpanded ? "예문 접기" : `예문 ${examples.length - 1}개 더 보기`,
+                  )
                 }</button>`
               : ""
           }
@@ -1576,7 +1613,10 @@ function renderCardEditorPanel(editing, formGroupId) {
           <p class="eyebrow">카드</p>
           <h2 id="cards-title">${editing ? "카드 수정" : "카드 등록"}</h2>
         </div>
-        <button class="ghost-button small-button" type="button" data-action="show-card-list">목록</button>
+        <button class="ghost-button small-button" type="button" data-action="show-card-list">${iconLabel(
+          "list",
+          "목록",
+        )}</button>
       </div>
       ${
         editing
@@ -1591,7 +1631,10 @@ function renderCardEditorPanel(editing, formGroupId) {
           ? state.cardEntryMode === "bulk" && !editing
             ? renderBulkCardForm(formGroupId)
             : renderCardForm(editing, formGroupId)
-          : `<div class="empty-state">카드를 등록하려면 그룹이 필요해요.</div><button class="primary-button full" type="button" data-action="go-groups">그룹 만들기</button>`
+          : `<div class="empty-state">카드를 등록하려면 그룹이 필요해요.</div><button class="primary-button full" type="button" data-action="go-groups">${iconLabel(
+              "plus",
+              "그룹 만들기",
+            )}</button>`
       }
     </div>
   `;
@@ -1609,7 +1652,7 @@ function renderCardListPanel(visibleCards) {
       </div>
       <button class="primary-button full" type="button" data-action="open-card-form" ${
         state.groups.length ? "" : "disabled"
-      }>카드 등록</button>
+      }>${iconLabel("plus", "카드 등록")}</button>
       ${
         state.groups.length
           ? `<select id="card-filter" class="select" aria-label="카드 그룹 필터">
@@ -1666,10 +1709,10 @@ function renderCardForm(card, groupId) {
           .map((example, index) => renderExampleEditorRow(example, index))
           .join("")}</div>
       </div>
-      <button class="ghost-button full" type="button" data-action="add-example">예문 추가</button>
+      <button class="ghost-button full" type="button" data-action="add-example">${iconLabel("plus", "예문 추가")}</button>
       <div class="form-actions">
-        <button class="ghost-button" type="button" data-action="show-card-list">취소</button>
-        <button class="primary-button" type="submit">${card ? "저장" : "등록"}</button>
+        <button class="ghost-button" type="button" data-action="show-card-list">${iconLabel("x", "취소")}</button>
+        <button class="primary-button" type="submit">${iconLabel("save", card ? "저장" : "등록")}</button>
       </div>
     </form>
   `;
@@ -1690,7 +1733,7 @@ function renderBulkCardForm(groupId) {
         )}</textarea>
       </label>
       <p class="form-hint">예문에서 강조할 부분은 [[이렇게]] 감싸면 학습 화면에서만 하이라이트됩니다.</p>
-      <button class="secondary-button full" type="submit">미리보기</button>
+      <button class="secondary-button full" type="submit">${iconLabel("eye", "미리보기")}</button>
       ${preview ? renderBulkPreview(preview) : ""}
     </form>
   `;
@@ -1719,7 +1762,7 @@ function renderBulkPreview(preview) {
       </div>
       <button class="primary-button full" type="button" data-action="confirm-bulk-cards" ${
         canCreate ? "" : "disabled"
-      }>미리보기대로 등록</button>
+      }>${iconLabel("check", "미리보기대로 등록")}</button>
     </section>
   `;
 }
@@ -1750,9 +1793,10 @@ function renderExampleEditorRow(example = {}, index = 0, collapsed = index > 0) 
     <div class="example-row ${collapsed ? "collapsed" : ""}">
       <div class="example-row-header">
         <strong>예문 ${index + 1}</strong>
-        <button class="ghost-button small-button" type="button" data-action="toggle-example-row">${
-          collapsed ? "펼치기" : "접기"
-        }</button>
+        <button class="ghost-button small-button" type="button" data-action="toggle-example-row">${iconLabel(
+          collapsed ? "chevron-down" : "chevron-up",
+          collapsed ? "펼치기" : "접기",
+        )}</button>
       </div>
       <div class="example-row-body">
         <textarea class="textarea" name="example_japanese" placeholder="緊張の[[あまり]]、声が震えた。">${escapeHtml(
@@ -1761,7 +1805,7 @@ function renderExampleEditorRow(example = {}, index = 0, collapsed = index > 0) 
         <textarea class="textarea" name="example_korean" placeholder="긴장한 나머지 목소리가 떨렸다.">${escapeHtml(
           example.korean || "",
         )}</textarea>
-        <button class="ghost-button" type="button" data-action="remove-example">예문 삭제</button>
+        <button class="ghost-button" type="button" data-action="remove-example">${iconLabel("trash", "예문 삭제")}</button>
         <p class="form-hint">강조할 문법 조각은 [[ ]]로 감싸세요.</p>
       </div>
     </div>
@@ -1788,8 +1832,14 @@ function renderCardListItem(card) {
         card.wrong_count,
       )} · 총 ${total}</p>
       <div class="card-actions">
-        <button class="secondary-button" type="button" data-action="edit-card" data-card-id="${card.id}">수정</button>
-        <button class="danger-button" type="button" data-action="delete-card" data-card-id="${card.id}">삭제</button>
+        <button class="secondary-button" type="button" data-action="edit-card" data-card-id="${card.id}">${iconLabel(
+          "pencil",
+          "수정",
+        )}</button>
+        <button class="danger-button" type="button" data-action="delete-card" data-card-id="${card.id}">${iconLabel(
+          "trash",
+          "삭제",
+        )}</button>
       </div>
     </article>
   `;
@@ -1810,7 +1860,10 @@ function renderGroupEditorPanel(editing) {
           <p class="eyebrow">그룹</p>
           <h2 id="groups-title">${editing ? "그룹 수정" : "그룹 등록"}</h2>
         </div>
-        <button class="ghost-button small-button" type="button" data-action="show-group-list">목록</button>
+        <button class="ghost-button small-button" type="button" data-action="show-group-list">${iconLabel(
+          "list",
+          "목록",
+        )}</button>
       </div>
       ${editing ? `<p class="meta">그룹명과 설명만 바뀌고, 카드와 학습 기록은 유지됩니다.</p>` : ""}
       <form id="group-form" class="stack">
@@ -1821,8 +1874,8 @@ function renderGroupEditorPanel(editing) {
           editing?.description || "",
         )}</textarea></label>
         <div class="form-actions">
-          <button class="ghost-button" type="button" data-action="show-group-list">취소</button>
-          <button class="primary-button" type="submit">${editing ? "저장" : "등록"}</button>
+          <button class="ghost-button" type="button" data-action="show-group-list">${iconLabel("x", "취소")}</button>
+          <button class="primary-button" type="submit">${iconLabel("save", editing ? "저장" : "등록")}</button>
         </div>
       </form>
     </div>
@@ -1839,7 +1892,10 @@ function renderGroupListPanel(visibleGroups) {
         </div>
         <span class="pill">${visibleGroups.length}개</span>
       </div>
-      <button class="primary-button full" type="button" data-action="open-group-form">그룹 등록</button>
+      <button class="primary-button full" type="button" data-action="open-group-form">${iconLabel(
+        "plus",
+        "그룹 등록",
+      )}</button>
       ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "그룹 검색" })}
       <div class="group-list">
         ${
@@ -1861,20 +1917,24 @@ function renderBackupPanel() {
           <p class="eyebrow">데이터</p>
           <h2>백업</h2>
         </div>
-        <button class="ghost-button small-button" type="button" data-action="toggle-data-panel">${
-          state.dataPanelOpen ? "접기" : "열기"
-        }</button>
+        <button class="ghost-button small-button" type="button" data-action="toggle-data-panel">${iconLabel(
+          state.dataPanelOpen ? "chevron-up" : "chevron-down",
+          state.dataPanelOpen ? "접기" : "열기",
+        )}</button>
       </div>
       ${
         state.dataPanelOpen
           ? `
             <div class="button-row">
-              <button class="secondary-button" type="button" data-action="export-backup">백업 파일 만들기</button>
-              <label class="ghost-button file-button">파일 선택<input id="backup-file-input" type="file" accept="application/json,.json" /></label>
+              <button class="secondary-button" type="button" data-action="export-backup">${iconLabel(
+                "download",
+                "백업 파일 만들기",
+              )}</button>
+              <label class="ghost-button file-button">${iconLabel("upload", "파일 선택")}<input id="backup-file-input" type="file" accept="application/json,.json" /></label>
             </div>
             <form id="backup-import-form" class="stack">
               <textarea class="textarea backup-textarea" name="backup_json" placeholder="백업 JSON"></textarea>
-              <button class="danger-button full" type="submit">백업 복원</button>
+              <button class="danger-button full" type="submit">${iconLabel("alert-triangle", "백업 복원")}</button>
             </form>
           `
           : `<p class="meta">카드 ${state.cards.length}개 · 그룹 ${state.groups.length}개</p>`
@@ -1914,8 +1974,8 @@ function renderSettings() {
         <div class="form-actions">
           <button class="ghost-button" type="button" data-action="clear-exam-date" ${
             state.settings?.jlpt_exam_date || state.settings?.jlpt_level ? "" : "disabled"
-          }>초기화</button>
-          <button class="primary-button" type="submit">저장</button>
+          }>${iconLabel("rotate-ccw", "초기화")}</button>
+          <button class="primary-button" type="submit">${iconLabel("save", "저장")}</button>
         </div>
       </form>
     </div>
@@ -2015,10 +2075,16 @@ function renderGroupListItem(group) {
       </div>
       <button class="ghost-button full reset-history-button" type="button" data-action="reset-history" data-group-id="${group.id}" ${
         hasHistory ? "" : "disabled"
-      }>기록 초기화</button>
+      }>${iconLabel("rotate-ccw", "기록 초기화")}</button>
       <div class="card-actions">
-        <button class="secondary-button" type="button" data-action="edit-group" data-group-id="${group.id}">수정</button>
-        <button class="danger-button" type="button" data-action="delete-group" data-group-id="${group.id}">삭제</button>
+        <button class="secondary-button" type="button" data-action="edit-group" data-group-id="${group.id}">${iconLabel(
+          "pencil",
+          "수정",
+        )}</button>
+        <button class="danger-button" type="button" data-action="delete-group" data-group-id="${group.id}">${iconLabel(
+          "trash",
+          "삭제",
+        )}</button>
       </div>
     </article>
   `;
@@ -2661,7 +2727,8 @@ document.addEventListener("click", async (event) => {
     if (action === "toggle-example-row") {
       const row = actionEl.closest(".example-row");
       row.classList.toggle("collapsed");
-      actionEl.textContent = row.classList.contains("collapsed") ? "펼치기" : "접기";
+      const isCollapsed = row.classList.contains("collapsed");
+      actionEl.innerHTML = iconLabel(isCollapsed ? "chevron-down" : "chevron-up", isCollapsed ? "펼치기" : "접기");
     }
     if (action === "remove-example") {
       const list = document.querySelector("#example-editor-list");

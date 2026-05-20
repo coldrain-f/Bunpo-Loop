@@ -82,6 +82,40 @@ button:disabled {
   opacity: 0.5;
 }
 
+.icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  flex-shrink: 0;
+}
+
+.button-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  gap: 6px;
+  line-height: 1.15;
+}
+
+.button-content span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .app-shell {
   width: min(100%, 520px);
   min-height: 100vh;
@@ -519,40 +553,34 @@ h3 {
   top: 50%;
   left: 13px;
   z-index: 1;
-  width: 15px;
-  height: 15px;
-  border: 2px solid var(--muted);
-  border-radius: 999px;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
   transform: translateY(-50%);
   pointer-events: none;
-}
-
-.search-icon::after {
-  position: absolute;
-  right: -5px;
-  bottom: -4px;
-  width: 7px;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--muted);
-  content: "";
-  transform: rotate(45deg);
 }
 
 .search-clear {
   position: absolute;
   top: 50%;
   right: 7px;
-  display: inline-grid;
+  display: inline-flex;
   width: 32px;
   height: 32px;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   background: #e7efeb;
   color: var(--muted);
-  font-size: 1.18rem;
-  font-weight: 850;
   transform: translateY(-50%);
+}
+
+.search-clear .icon {
+  width: 16px;
+  height: 16px;
 }
 
 .textarea {
@@ -1800,6 +1828,7 @@ button:active,
 .nav-button {
   display: grid;
   justify-items: center;
+  align-content: center;
   gap: 3px;
   min-height: 56px;
   border-radius: 8px;
@@ -1815,8 +1844,16 @@ button:active,
 }
 
 .nav-icon {
-  font-family: "Hiragino Mincho ProN", serif;
-  font-size: 1.1rem;
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-icon .icon {
+  width: 21px;
+  height: 21px;
 }
 
 .toast {
