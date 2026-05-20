@@ -132,6 +132,22 @@ button:disabled {
   margin-bottom: 18px;
 }
 
+.app-header.compact-study-header {
+  position: sticky;
+  top: calc(8px + env(safe-area-inset-top));
+  z-index: 30;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  margin: -4px 0 12px;
+  padding: 9px 10px;
+  border: 1px solid rgba(214, 224, 219, 0.92);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 28px rgba(27, 48, 43, 0.12);
+  backdrop-filter: blur(18px);
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -143,6 +159,16 @@ button:disabled {
 
 .header-brand {
   min-width: 0;
+}
+
+.compact-study-header .header-brand {
+  flex: 1;
+}
+
+.compact-study-header .header-brand > .eyebrow,
+.compact-study-header .header-brand > h1,
+.compact-study-header .header-greeting {
+  display: none;
 }
 
 .eyebrow {
@@ -171,6 +197,16 @@ h1 {
   font-size: 0.78rem;
   font-weight: 780;
   line-height: 1.3;
+}
+
+.compact-study-header .header-context {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 920;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-greeting {
@@ -223,6 +259,16 @@ h3 {
 
 .header-user[hidden] {
   display: none;
+}
+
+.compact-study-header .header-actions,
+.compact-study-header .header-user {
+  flex-wrap: nowrap;
+}
+
+.compact-timer {
+  min-height: 30px;
+  padding: 0 10px;
 }
 
 .header-user .small-button {
