@@ -1905,7 +1905,6 @@ function renderGroupListPanel(visibleGroups) {
         }
       </div>
     </div>
-    ${renderBackupPanel()}
   `;
 }
 
@@ -1915,7 +1914,7 @@ function renderBackupPanel() {
       <div class="row">
         <div>
           <p class="eyebrow">데이터</p>
-          <h2>백업</h2>
+          <h2>데이터 백업</h2>
         </div>
         <button class="ghost-button small-button" type="button" data-action="toggle-data-panel">${iconLabel(
           state.dataPanelOpen ? "chevron-up" : "chevron-down",
@@ -1937,7 +1936,7 @@ function renderBackupPanel() {
               <button class="danger-button full" type="submit">${iconLabel("alert-triangle", "백업 복원")}</button>
             </form>
           `
-          : `<p class="meta">카드 ${state.cards.length}개 · 그룹 ${state.groups.length}개</p>`
+          : `<p class="meta">카드 ${state.cards.length}개 · 그룹 ${state.groups.length}개 · 예문과 회독 기록 포함</p>`
       }
     </div>
   `;
@@ -1979,6 +1978,7 @@ function renderSettings() {
         </div>
       </form>
     </div>
+    ${renderBackupPanel()}
   `;
 }
 
@@ -2685,7 +2685,7 @@ document.addEventListener("click", async (event) => {
     if (action === "confirm-bulk-cards") await confirmBulkCards();
     if (action === "toggle-data-panel") {
       state.dataPanelOpen = !state.dataPanelOpen;
-      renderGroups();
+      renderSettings();
     }
     if (action === "clear-exam-date") {
       state.activeDialog = "clear-exam-date";
