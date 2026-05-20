@@ -312,6 +312,10 @@ def validate_weak_card_threshold(value: object) -> int:
     return threshold
 
 
+def secure_text_compare(left: str, right: str) -> bool:
+    return hmac.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
+
+
 def normalize_timestamp(value: object) -> str:
     text = str(value or "").strip()
     if not text:
@@ -1285,11 +1289,11 @@ class AppHandler(BaseHTTPRequestHandler):
         username, separator, password = decoded.partition(":")
         if not separator:
             return False
-        return hmac.compare_digest(username, APP_USER) and hmac.compare_digest(password, APP_PASSWORD)
+        return secure_text_compare(username, APP_USER) and secure_text_compare(password, APP_PASSWORD)
 
     def require_auth(self) -> None:
         self.send_response(HTTPStatus.UNAUTHORIZED)
-        self.send_header("WWW-Authenticate", 'Basic realm="JLPT Cards"')
+        self.send_header("WWW-Authenticate", 'Basic realm="Bunpo Loop", charset="UTF-8"')
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
         self.wfile.write("인증이 필요합니다.".encode("utf-8"))
