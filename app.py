@@ -1138,6 +1138,15 @@ class AppHandler(BaseHTTPRequestHandler):
             "SELECT COUNT(*) + 1 FROM study_rounds WHERE group_id = ?",
             (group_id,),
         ).fetchone()[0]
+        previous_round = conn.execute(
+            """
+            SELECT * FROM study_rounds
+            WHERE group_id = ? AND round_no = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (group_id, round_no - 1),
+        ).fetchone()
         cur = conn.execute(
             """
             INSERT INTO study_rounds (
@@ -1183,7 +1192,13 @@ class AppHandler(BaseHTTPRequestHandler):
             "SELECT * FROM study_rounds WHERE id = ?",
             (round_id,),
         ).fetchone()
-        self.send_json({"round": row_to_dict(round_row)}, HTTPStatus.CREATED)
+        self.send_json(
+            {
+                "round": row_to_dict(round_row),
+                "previous_round": row_to_dict(previous_round) if previous_round else None,
+            },
+            HTTPStatus.CREATED,
+        )
 
     def complete_weak_round(self, conn: sqlite3.Connection) -> None:
         body = parse_body(self)

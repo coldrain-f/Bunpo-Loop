@@ -1276,6 +1276,7 @@ function renderStudySession() {
         <p class="eyebrow">완료</p>
         <h2 id="study-title">${completionTitle}</h2>
         ${renderCompletionScoreboard(summary, round)}
+        ${renderDurationComparison(round, session)}
         <p class="meta">${escapeHtml(session.group.name)} · ${getSessionOrderLabel(session)} · ${
           session.passNo
         }차 통과</p>
@@ -1416,6 +1417,49 @@ function renderCompletionScoreboard(summary, round) {
         <div><strong>${attemptRate}%</strong><span>풀이 정답률</span></div>
       </div>
     </div>
+  `;
+}
+
+function getPreviousRoundForComparison(round, session) {
+  if (session.studyMode === "weak" || !round?.group_id) return null;
+  if (session.previousRound) return session.previousRound;
+  const previousRoundNo = number(round.round_no) - 1;
+  return (
+    state.rounds.find(
+      (item) => Number(item.group_id) === Number(round.group_id) && number(item.round_no) === previousRoundNo,
+    ) || null
+  );
+}
+
+function renderDurationComparison(round, session) {
+  const previousRound = getPreviousRoundForComparison(round, session);
+  if (session.studyMode === "weak") return "";
+  if (!previousRound) {
+    return `
+      <section class="duration-comparison neutral">
+        <span>소요시간 비교</span>
+        <strong>비교할 이전 회독이 아직 없어요.</strong>
+        <p>다음 회독부터 바로 이전 회독과 걸린 시간을 비교합니다.</p>
+      </section>
+    `;
+  }
+  const currentDuration = number(round.duration_seconds);
+  const previousDuration = number(previousRound.duration_seconds);
+  const diff = currentDuration - previousDuration;
+  const tone = diff < 0 ? "faster" : diff > 0 ? "slower" : "neutral";
+  const title =
+    diff < 0
+      ? `이전 회독보다 ${formatDuration(Math.abs(diff))} 단축됐어요.`
+      : diff > 0
+        ? `이전 회독보다 ${formatDuration(diff)} 더 걸렸어요.`
+        : "이전 회독과 소요시간이 같아요.";
+  const detail = `이번 ${formatDuration(currentDuration)} · 이전 ${formatDuration(previousDuration)}`;
+  return `
+    <section class="duration-comparison ${tone}">
+      <span>소요시간 비교</span>
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(detail)}</p>
+    </section>
   `;
 }
 
@@ -2117,6 +2161,7 @@ async function startStudy() {
     answerFeedback: null,
     isAnswering: false,
     results: [],
+    previousRound: null,
     savedRound: null,
   };
   render();
@@ -2143,6 +2188,7 @@ function startWeakStudy() {
     answerFeedback: null,
     isAnswering: false,
     results: [],
+    previousRound: null,
     savedRound: null,
   };
   state.weakCardOpenId = null;
@@ -2196,6 +2242,7 @@ async function answerCard(result) {
       method: "POST",
       body: JSON.stringify(payload),
     });
+    session.previousRound = data.previous_round || null;
     session.savedRound = data.round;
     await loadData();
     render();

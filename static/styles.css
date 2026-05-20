@@ -1182,6 +1182,44 @@ button:active,
   font-weight: 800;
 }
 
+.duration-comparison {
+  display: grid;
+  gap: 5px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.duration-comparison.faster {
+  border-left-color: var(--teal);
+}
+
+.duration-comparison.slower {
+  border-left-color: var(--gold);
+}
+
+.duration-comparison span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.duration-comparison strong {
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.duration-comparison p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 760;
+  line-height: 1.4;
+}
+
 .completion-details {
   display: grid;
   gap: 12px;
