@@ -78,7 +78,6 @@ const views = {
   groups: document.querySelector("#view-groups"),
   settings: document.querySelector("#view-settings"),
 };
-const appHeaderEl = document.querySelector(".app-header");
 const toastEl = document.querySelector("#toast");
 const dialogRoot = document.querySelector("#dialog-root");
 const headerUserEl = document.querySelector("#header-user");
@@ -189,15 +188,7 @@ function getJlptTargetLabel() {
   return state.settings?.jlpt_level ? `JLPT ${state.settings.jlpt_level}` : "JLPT";
 }
 
-function getActiveStudyHeaderContext() {
-  const session = state.session;
-  if (!session || session.savedRound) return getHeaderContext();
-  if (session.studyMode === "weak") return `약점 복습 · ${session.passNo}차`;
-  return `${session.group.name} · ${session.roundNo}회독 · ${session.passNo}차`;
-}
-
 function renderHeader() {
-  const inActiveStudy = Boolean(state.user && state.activeTab === "study" && state.session && !state.session.savedRound);
   const examInfo = getExamDateInfo();
   const ddayMarkup =
     state.user && (state.settings?.jlpt_level || examInfo)
@@ -205,10 +196,9 @@ function renderHeader() {
           examInfo ? ` ${escapeHtml(examInfo.label)}` : ""
         }</strong>`
       : "";
-  appHeaderEl?.classList.toggle("compact-study-header", inActiveStudy);
-  if (headerContextEl) headerContextEl.textContent = inActiveStudy ? getActiveStudyHeaderContext() : getHeaderContext();
+  if (headerContextEl) headerContextEl.textContent = getHeaderContext();
   if (headerGreetingEl) {
-    headerGreetingEl.hidden = !state.user || inActiveStudy;
+    headerGreetingEl.hidden = !state.user;
     headerGreetingEl.innerHTML = state.user
       ? `<span>${escapeHtml(state.user.nickname)}님, 오늘도 한 회독 가볍게 가볼까요?</span>`
       : "";
@@ -220,12 +210,6 @@ function renderHeader() {
     return;
   }
   headerUserEl.hidden = false;
-  if (inActiveStudy) {
-    headerUserEl.innerHTML = `<span id="header-study-elapsed" class="timer-pill compact-timer">${formatDuration(
-      elapsedSeconds(state.session),
-    )}</span>`;
-    return;
-  }
   headerUserEl.innerHTML = `
     ${ddayMarkup}
     <button class="ghost-button small-button" type="button" data-action="logout">${iconLabel("log-out", "로그아웃")}</button>
@@ -540,9 +524,8 @@ function syncStudyTimer() {
 
 function updateStudyTimer() {
   if (!state.session || state.session.savedRound) return;
-  document.querySelectorAll("#study-elapsed, #header-study-elapsed").forEach((timerEl) => {
-    timerEl.textContent = formatDuration(elapsedSeconds(state.session));
-  });
+  const timerEl = document.querySelector("#study-elapsed");
+  if (timerEl) timerEl.textContent = formatDuration(elapsedSeconds(state.session));
 }
 
 function render() {
