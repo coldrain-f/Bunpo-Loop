@@ -1234,13 +1234,18 @@ function renderRecentRoundsPanel(rounds) {
 }
 
 function renderRoundItem(round) {
+  const firstAttemptTotal = number(round.first_attempt_total || round.total_cards);
+  const firstAttemptCorrect = number(round.first_attempt_correct_count);
+  const answerRate = number(round.total_cards) ? Math.round((number(round.correct_count) / number(round.total_cards)) * 100) : 0;
   return `
     <div class="round-item">
       <div class="item-title">
         <strong>${round.round_no}회독</strong>
         <span class="pill">${ORDER_LABELS[round.order_mode] || round.order_mode}</span>
       </div>
-      <p class="meta">정답 ${round.correct_count} · 오답 ${round.wrong_count}</p>
+      <p class="meta">첫 시도 ${firstAttemptCorrect}/${firstAttemptTotal} · 풀이 정답률 ${answerRate}% · 오답 ${number(
+        round.wrong_count,
+      )}</p>
       ${renderRoundTime(round)}
     </div>
   `;

@@ -1257,9 +1257,26 @@ class AppHandler(BaseHTTPRequestHandler):
         where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = conn.execute(
             f"""
-            SELECT sr.*, g.name AS group_name
+            SELECT
+                sr.*,
+                g.name AS group_name,
+                COALESCE(first_attempts.first_attempt_total, sr.total_cards) AS first_attempt_total,
+                COALESCE(first_attempts.first_attempt_correct_count, sr.correct_count) AS first_attempt_correct_count
             FROM study_rounds sr
             JOIN groups g ON g.id = sr.group_id
+            LEFT JOIN (
+                SELECT
+                    first_reviews.round_id,
+                    COUNT(*) AS first_attempt_total,
+                    SUM(CASE WHEN first_reviews.result = 'correct' THEN 1 ELSE 0 END) AS first_attempt_correct_count
+                FROM reviews first_reviews
+                JOIN (
+                    SELECT round_id, card_id, MIN(id) AS first_review_id
+                    FROM reviews
+                    GROUP BY round_id, card_id
+                ) first_ids ON first_ids.first_review_id = first_reviews.id
+                GROUP BY first_reviews.round_id
+            ) first_attempts ON first_attempts.round_id = sr.id
             {where_sql}
             ORDER BY sr.completed_at DESC, sr.id DESC
             LIMIT 30
