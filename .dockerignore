@@ -1,0 +1,12 @@
+.git
+.DS_Store
+__pycache__/
+*.pyc
+
+data/
+*.sqlite3
+*.sqlite3-*
+
+.env
+.env.*
+!.env.example

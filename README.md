@@ -1,8 +1,65 @@
 # Bunpo Loop
 
-모바일 위주의 JLPT 문법 플래시 카드 웹앱입니다. 닉네임과 숫자 6자리 코드로 간단히 들어갈 수 있고, Python 표준 라이브러리와 SQLite만 사용해서 우분투 서버에 가볍게 배포할 수 있습니다.
+모바일 위주의 JLPT 문법 플래시 카드 웹앱입니다. 닉네임과 숫자 6자리 코드로 간단히 들어갈 수 있고, Python 표준 라이브러리와 SQLite만 사용해서 Docker Compose로 가볍게 배포할 수 있습니다.
 
-## 실행
+## Docker 실행
+
+```bash
+git clone https://github.com/coldrain-f/Bunpo-Loop.git
+cd Bunpo-Loop
+docker compose up -d --build
+```
+
+기본 주소는 `http://서버IP:8000`입니다.
+
+SQLite 데이터는 Docker named volume인 `bunpo-loop-data`에 저장됩니다. 컨테이너를 다시 만들어도 학습 데이터는 유지됩니다.
+
+포트나 기본 인증을 바꾸려면 `.env.example`을 복사해서 `.env`를 만듭니다.
+
+```bash
+cp .env.example .env
+```
+
+`.env`:
+
+```env
+BUNPO_LOOP_PORT=8000
+APP_USER=myname
+APP_PASSWORD=strong-password
+```
+
+변경 후 다시 올립니다.
+
+```bash
+docker compose up -d --build
+```
+
+업데이트할 때는 서버에서 다음처럼 실행합니다.
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+로그 확인:
+
+```bash
+docker compose logs -f
+```
+
+중지:
+
+```bash
+docker compose down
+```
+
+볼륨까지 지우면 SQLite 학습 데이터도 삭제되므로 주의하세요.
+
+```bash
+docker compose down -v
+```
+
+## 로컬 실행
 
 ```bash
 python3 app.py
@@ -25,7 +82,7 @@ APP_USER=myname APP_PASSWORD='strong-password' HOST=0.0.0.0 PORT=8000 python3 ap
 SQLite 파일은 기본으로 `data/jlpt_cards.sqlite3`에 생성됩니다. 다른 위치를 쓰려면 `JLPT_DB`를 지정하세요.
 
 ```bash
-JLPT_DB=/var/lib/jlpt-cards/jlpt_cards.sqlite3 HOST=0.0.0.0 PORT=8000 python3 app.py
+JLPT_DB=/var/lib/bunpo-loop/bunpo-loop.sqlite3 HOST=0.0.0.0 PORT=8000 python3 app.py
 ```
 
 ## 기능
@@ -53,6 +110,7 @@ JLPT_DB=/var/lib/jlpt-cards/jlpt_cards.sqlite3 HOST=0.0.0.0 PORT=8000 python3 ap
 - 그룹별 학습기록 초기화
 - JSON 백업 파일 만들기 및 복원
 - 알맞음/틀림 누적 통계
+- 약점 카드 기준 설정 및 약점 카드만 복습
 
 ## 카드 대량 등록 형식
 
@@ -65,42 +123,14 @@ JLPT_DB=/var/lib/jlpt-cards/jlpt_cards.sqlite3 HOST=0.0.0.0 PORT=8000 python3 ap
 
 탭으로 구분해도 되고, 예문은 `;`로 여러 개를 이어 쓸 수 있습니다.
 
-## 우분투 배포 예시
+## 우분투 배포 메모
 
-앱 파일을 서버의 `/opt/jlpt-cards`에 두고, 데이터 디렉터리를 만듭니다.
+개인 서버에서는 Docker Compose로 실행하고, Nginx나 Caddy 뒤에 붙여 HTTPS를 적용하는 구성을 추천합니다.
 
-```bash
-sudo mkdir -p /var/lib/jlpt-cards
-sudo chown -R $USER:$USER /var/lib/jlpt-cards
+프록시 대상:
+
+```text
+http://127.0.0.1:8000
 ```
 
-`/etc/systemd/system/jlpt-cards.service`:
-
-```ini
-[Unit]
-Description=JLPT grammar review cards
-After=network.target
-
-[Service]
-WorkingDirectory=/opt/jlpt-cards
-Environment=HOST=127.0.0.1
-Environment=PORT=8000
-Environment=JLPT_DB=/var/lib/jlpt-cards/jlpt_cards.sqlite3
-Environment=APP_USER=myname
-Environment=APP_PASSWORD=strong-password
-ExecStart=/usr/bin/python3 /opt/jlpt-cards/app.py
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-```
-
-서비스를 켭니다.
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now jlpt-cards
-```
-
-Nginx 뒤에 붙일 때는 HTTPS를 적용하고 `127.0.0.1:8000`으로 프록시하면 됩니다.
+서버 방화벽을 직접 열어 접속할 경우에는 `BUNPO_LOOP_PORT`로 지정한 포트만 열면 됩니다.

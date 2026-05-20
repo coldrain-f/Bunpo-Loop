@@ -1,0 +1,21 @@
+name: bunpo-loop
+
+services:
+  bunpo-loop:
+    build: .
+    container_name: bunpo-loop
+    restart: unless-stopped
+    ports:
+      - "${BUNPO_LOOP_PORT:-8000}:8000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+      JLPT_DB: /data/bunpo-loop.sqlite3
+      APP_USER: ${APP_USER:-}
+      APP_PASSWORD: ${APP_PASSWORD:-}
+    volumes:
+      - bunpo-loop-data:/data
+
+volumes:
+  bunpo-loop-data:
+    name: bunpo-loop-data
