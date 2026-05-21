@@ -414,29 +414,69 @@ def duplicate_card_exists(
 def groups_payload(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         """
+        WITH card_stats AS (
+            SELECT
+                group_id,
+                COUNT(id) AS card_count,
+                COALESCE(SUM(correct_count), 0) AS correct_total,
+                COALESCE(SUM(wrong_count), 0) AS wrong_total
+            FROM cards
+            GROUP BY group_id
+        ),
+        round_stats AS (
+            SELECT
+                group_id,
+                COUNT(*) AS completed_rounds
+            FROM study_rounds
+            GROUP BY group_id
+        ),
+        latest_rounds AS (
+            SELECT *
+            FROM (
+                SELECT
+                    sr.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY sr.group_id
+                        ORDER BY sr.completed_at DESC, sr.id DESC
+                    ) AS row_no
+                FROM study_rounds sr
+            )
+            WHERE row_no = 1
+        ),
+        first_attempts AS (
+            SELECT
+                first_reviews.round_id,
+                COUNT(*) AS first_attempt_total,
+                SUM(CASE WHEN first_reviews.result = 'correct' THEN 1 ELSE 0 END) AS first_attempt_correct_count
+            FROM reviews first_reviews
+            JOIN (
+                SELECT round_id, card_id, MIN(id) AS first_review_id
+                FROM reviews
+                GROUP BY round_id, card_id
+            ) first_ids ON first_ids.first_review_id = first_reviews.id
+            GROUP BY first_reviews.round_id
+        )
         SELECT
             g.id,
             g.name,
             g.description,
             g.created_at,
-            COUNT(c.id) AS card_count,
-            COALESCE(SUM(c.correct_count), 0) AS correct_total,
-            COALESCE(SUM(c.wrong_count), 0) AS wrong_total,
-            COALESCE((
-                SELECT COUNT(*)
-                FROM study_rounds sr
-                WHERE sr.group_id = g.id
-            ), 0) AS completed_rounds,
-            (
-                SELECT sr.completed_at
-                FROM study_rounds sr
-                WHERE sr.group_id = g.id
-                ORDER BY sr.completed_at DESC
-                LIMIT 1
-            ) AS last_studied_at
+            COALESCE(cs.card_count, 0) AS card_count,
+            COALESCE(cs.correct_total, 0) AS correct_total,
+            COALESCE(cs.wrong_total, 0) AS wrong_total,
+            COALESCE(rs.completed_rounds, 0) AS completed_rounds,
+            lr.completed_at AS last_studied_at,
+            lr.round_no AS latest_round_no,
+            lr.total_cards AS latest_total_cards,
+            lr.correct_count AS latest_correct_count,
+            lr.wrong_count AS latest_wrong_count,
+            COALESCE(fa.first_attempt_total, lr.total_cards) AS latest_first_attempt_total,
+            COALESCE(fa.first_attempt_correct_count, lr.correct_count) AS latest_first_attempt_correct_count
         FROM groups g
-        LEFT JOIN cards c ON c.group_id = g.id
-        GROUP BY g.id
+        LEFT JOIN card_stats cs ON cs.group_id = g.id
+        LEFT JOIN round_stats rs ON rs.group_id = g.id
+        LEFT JOIN latest_rounds lr ON lr.group_id = g.id
+        LEFT JOIN first_attempts fa ON fa.round_id = lr.id
         ORDER BY g.created_at ASC, g.id ASC
         """
     ).fetchall()

@@ -458,6 +458,26 @@ function dateMs(value) {
   return date ? date.getTime() : 0;
 }
 
+function getGroupRecentAccuracy(group) {
+  const total = number(group.latest_first_attempt_total);
+  if (!total) return null;
+  const correct = number(group.latest_first_attempt_correct_count);
+  return Math.round((correct / total) * 100);
+}
+
+function getAccuracyTone(rate) {
+  if (rate === null) return "";
+  if (rate >= 80) return "good";
+  if (rate >= 50) return "warn";
+  return "bad";
+}
+
+function renderGroupRecentAccuracy(group) {
+  const rate = getGroupRecentAccuracy(group);
+  if (rate === null) return "";
+  return `<span class="accuracy-pill ${getAccuracyTone(rate)}">최근 정답률 ${rate}%</span>`;
+}
+
 function compareGroupName(left, right) {
   return String(left.name || "").localeCompare(String(right.name || ""), "ko") || number(left.id) - number(right.id);
 }
@@ -1102,6 +1122,7 @@ function renderStudyGroupChoiceItem(group) {
         </div>
         <div class="group-choice-footer">
           <span>${number(group.completed_rounds)}회독</span>
+          ${renderGroupRecentAccuracy(group)}
           <span>오답 ${number(group.wrong_total)}</span>
         </div>
       </button>
