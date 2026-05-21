@@ -673,15 +673,20 @@ function renderDialog() {
     });
     return;
   }
-  if (state.activeDialog === "preview" && group) {
-    const previewCards = getPreviewCards(group.id);
+  const previewGroup =
+    state.pendingAction?.type === "preview-group-cards"
+      ? state.groups.find((item) => item.id === Number(state.pendingAction.id))
+      : group;
+  if (state.activeDialog === "preview" && previewGroup) {
+    const previewMode = state.pendingAction?.type === "preview-group-cards" ? "sequence" : state.orderMode;
+    const previewCards = getPreviewCards(previewGroup.id, previewMode);
     dialogRoot.innerHTML = `
       <div class="dialog-backdrop" role="presentation">
         <section class="dialog-panel preview-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title">
           <p class="eyebrow">미리보기</p>
-          <h2 id="study-dialog-title">${escapeHtml(group.name)} 카드</h2>
+          <h2 id="study-dialog-title">${escapeHtml(previewGroup.name)} 카드</h2>
           <p class="meta">${previewCards.length}개 · ${
-            state.orderMode === "random" ? "기본 순서" : ORDER_LABELS[state.orderMode]
+            previewMode === "random" ? "기본 순서" : ORDER_LABELS[previewMode]
           }</p>
           <div class="preview-list">
             ${
@@ -831,9 +836,9 @@ function closeDialog() {
   renderDialog();
 }
 
-function getPreviewCards(groupId) {
+function getPreviewCards(groupId, orderMode = state.orderMode) {
   const cards = state.cards.filter((card) => Number(card.group_id) === Number(groupId));
-  if (state.orderMode === "wrong") {
+  if (orderMode === "wrong") {
     return [...cards].sort((a, b) => {
       const aTotal = number(a.correct_count) + number(a.wrong_count);
       const bTotal = number(b.correct_count) + number(b.wrong_count);
@@ -2227,7 +2232,11 @@ function renderGroupListItem(group) {
     <article class="group-item ${group.id === state.selectedGroupId ? "active" : ""}">
       <div class="item-title">
         <strong>${escapeHtml(group.name)}</strong>
-        <span class="pill">${number(group.card_count)}개</span>
+        <button class="pill group-card-count" type="button" data-action="preview-group-cards" data-group-id="${
+          group.id
+        }" aria-label="${escapeHtml(`${group.name} 카드 ${number(group.card_count)}개 미리보기`)}">${number(
+          group.card_count,
+        )}개</button>
       </div>
       <p class="meta">${escapeHtml(group.description || "설명 없음")}</p>
       <div class="stat-grid">
@@ -2782,6 +2791,12 @@ document.addEventListener("click", async (event) => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "preview-study-cards") {
+      state.pendingAction = null;
+      state.activeDialog = "preview";
+      renderDialog();
+    }
+    if (action === "preview-group-cards") {
+      state.pendingAction = { type: "preview-group-cards", id: Number(actionEl.dataset.groupId) };
       state.activeDialog = "preview";
       renderDialog();
     }
