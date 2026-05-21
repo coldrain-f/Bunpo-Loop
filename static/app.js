@@ -1677,9 +1677,9 @@ function renderCompletionSection(title, items, tone, options = {}) {
         <div class="completion-header-actions">
           <span class="pill ${tone}">${items.length}개</span>
           ${
-            options.collapsible && items.length
+            options.collapsible && items.length && options.open
               ? `<button class="ghost-button small-button" type="button" data-action="toggle-completion-correct">
-                  ${iconLabel(options.open ? "chevron-up" : "chevron-down", options.open ? "접기" : "보기")}
+                  ${iconLabel("chevron-up", "목록 접기")}
                 </button>`
               : ""
           }
