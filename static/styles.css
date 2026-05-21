@@ -143,11 +143,10 @@ button:disabled {
 }
 
 .app-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
   margin-bottom: 18px;
 }
 
@@ -157,6 +156,8 @@ button:disabled {
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
+  justify-self: end;
+  max-width: min(54vw, 210px);
   flex-shrink: 0;
 }
 
@@ -219,6 +220,7 @@ h1 {
   color: var(--teal);
   font-size: 0.74rem;
   font-weight: 950;
+  white-space: nowrap;
 }
 
 h2 {
@@ -237,6 +239,7 @@ h3 {
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
+  max-width: 100%;
   flex-shrink: 0;
 }
 
