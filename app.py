@@ -20,9 +20,9 @@ DATA_DIR = ROOT / "data"
 DB_PATH = Path(os.environ.get("JLPT_DB", DATA_DIR / "jlpt_cards.sqlite3"))
 APP_USER = os.environ.get("APP_USER")
 APP_PASSWORD = os.environ.get("APP_PASSWORD")
-DEFAULT_WEAK_CARD_THRESHOLD = 5
+DEFAULT_WEAK_CARD_THRESHOLD = 16
 DEFAULT_WEAK_RECENT_ROUNDS = 3
-DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 2
+DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8
 
 
 def utc_now_sql() -> str:
@@ -54,9 +54,9 @@ def init_db() -> None:
                 access_code TEXT NOT NULL,
                 jlpt_exam_date TEXT NOT NULL DEFAULT '',
                 jlpt_level TEXT NOT NULL DEFAULT '',
-                weak_card_threshold INTEGER NOT NULL DEFAULT 5,
+                weak_card_threshold INTEGER NOT NULL DEFAULT 16,
                 weak_recent_rounds INTEGER NOT NULL DEFAULT 3,
-                weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 2,
+                weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 8,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 last_login_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -136,7 +136,7 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN jlpt_level TEXT NOT NULL DEFAULT ''")
     if "weak_card_threshold" not in user_columns:
         conn.execute(
-            "ALTER TABLE users ADD COLUMN weak_card_threshold INTEGER NOT NULL DEFAULT 5"
+            "ALTER TABLE users ADD COLUMN weak_card_threshold INTEGER NOT NULL DEFAULT 16"
         )
     if "weak_recent_rounds" not in user_columns:
         conn.execute(
@@ -144,7 +144,7 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         )
     if "weak_recent_wrong_threshold" not in user_columns:
         conn.execute(
-            "ALTER TABLE users ADD COLUMN weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 2"
+            "ALTER TABLE users ADD COLUMN weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 8"
         )
 
 
