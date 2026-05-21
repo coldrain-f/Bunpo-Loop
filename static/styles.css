@@ -776,7 +776,7 @@ button:active,
 }
 
 .management-list-scroll {
-  max-height: min(58vh, 540px);
+  max-height: min(74vh, 660px);
 }
 
 .recent-round-scroll {
