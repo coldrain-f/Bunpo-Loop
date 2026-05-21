@@ -1157,7 +1157,7 @@ function renderStudyStartPanel(group) {
           ${iconLabel("play", `${nextRoundNo}회독 시작`)}
         </button>
         <button class="ghost-button full" type="button" data-action="preview-study-cards" ${canStart ? "" : "disabled"}>
-          ${iconLabel("eye", "카드 미리보기")}
+          ${iconLabel("eye", "미리보기")}
         </button>
       </div>
     </section>
