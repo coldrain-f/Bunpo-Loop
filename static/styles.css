@@ -1054,7 +1054,7 @@ button:active,
 .group-choice-main {
   display: block;
   width: 100%;
-  padding: 14px;
+  padding: 14px 86px 14px 14px;
   border-radius: 8px;
   background: transparent;
   color: var(--ink);
@@ -1093,6 +1093,13 @@ button:active,
 .group-choice-empty-action {
   width: calc(100% - 28px);
   margin: 0 14px 14px;
+}
+
+.group-choice-card-count {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
 }
 
 .user-strip {

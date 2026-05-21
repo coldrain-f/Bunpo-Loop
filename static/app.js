@@ -1092,7 +1092,6 @@ function renderStudyGroupChoiceItem(group) {
       <button class="group-choice-main" type="button" data-action="choose-study-group" data-group-id="${group.id}">
         <div class="item-title">
           <strong>${escapeHtml(group.name)}</strong>
-          <span class="pill">${cardCount ? `${cardCount}개` : "카드 없음"}</span>
         </div>
         <p class="meta">${escapeHtml(group.description || "설명 없음")}</p>
         <div class="group-choice-status">
@@ -1106,6 +1105,13 @@ function renderStudyGroupChoiceItem(group) {
           <span>오답 ${number(group.wrong_total)}</span>
         </div>
       </button>
+      ${
+        cardCount
+          ? `<button class="pill group-card-count group-choice-card-count" type="button" data-action="preview-group-cards" data-group-id="${
+              group.id
+            }" aria-label="${escapeHtml(`${group.name} 카드 ${cardCount}개 미리보기`)}">${cardCount}개</button>`
+          : `<span class="pill group-choice-card-count">카드 없음</span>`
+      }
       ${
         cardCount
           ? ""
