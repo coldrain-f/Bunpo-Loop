@@ -260,6 +260,14 @@ function renderMarkedText(value) {
   return html;
 }
 
+function renderJapaneseText(value) {
+  return `<span class="jp-text">${escapeHtml(value)}</span>`;
+}
+
+function renderMarkedJapaneseText(value) {
+  return `<span class="jp-text">${renderMarkedText(value)}</span>`;
+}
+
 function parseBulkExampleText(value) {
   const examples = [];
   String(value || "")
@@ -841,7 +849,7 @@ function renderPreviewCard(card) {
   return `
     <article class="preview-card">
       <div class="item-title">
-        <strong>${escapeHtml(card.front)}</strong>
+        <strong>${renderJapaneseText(card.front)}</strong>
         <span class="pill">${card.examples?.length || 0}예문</span>
       </div>
       <p>${escapeHtml(card.back)}</p>
@@ -1032,7 +1040,7 @@ function renderWeakCardItem(card) {
         isOpen ? "true" : "false"
       }">
         <div class="item-title">
-          <strong>${escapeHtml(card.front)}</strong>
+          <strong>${renderJapaneseText(card.front)}</strong>
           <span class="pill bad">최근 ${recentWrong} · 전체 ${totalWrong}</span>
         </div>
         <p>${escapeHtml(card.back)}</p>
@@ -1054,7 +1062,7 @@ function renderWeakCardItem(card) {
                       .map(
                         (example) => `
                           <li>
-                            <p class="example-jp">${renderMarkedText(example.japanese)}</p>
+                            <p class="example-jp">${renderMarkedJapaneseText(example.japanese)}</p>
                             ${example.korean ? `<p class="example-ko">${renderMarkedText(example.korean)}</p>` : ""}
                           </li>
                         `,
@@ -1545,7 +1553,7 @@ function renderCompletionFocus(summary, session) {
   return `
     <section class="completion-focus bad">
       <p class="eyebrow">다시 볼 카드</p>
-      <h3>${escapeHtml(hardest.card.front)}</h3>
+      <h3>${renderJapaneseText(hardest.card.front)}</h3>
       <p>${escapeHtml(hardest.card.back)}</p>
       <p class="meta">${hardest.wrongCount}번 틀리고 ${lastAttempt.passNo}차에서 통과했어요.</p>
     </section>
@@ -1589,7 +1597,7 @@ function renderWrongReviewCard(summary) {
   return `
     <article class="wrong-review-card">
       <div class="item-title">
-        <strong>${escapeHtml(summary.card.front)}</strong>
+        <strong>${renderJapaneseText(summary.card.front)}</strong>
         <span class="pill bad">${summary.wrongCount}오답</span>
       </div>
       <p class="wrong-review-meaning">${escapeHtml(summary.card.back)}</p>
@@ -1605,7 +1613,7 @@ function renderWrongReviewCard(summary) {
               .map(
                 (example) => `
                   <li>
-                    <p class="example-jp">${renderMarkedText(example.japanese)}</p>
+                    <p class="example-jp">${renderMarkedJapaneseText(example.japanese)}</p>
                     ${example.korean ? `<p class="example-ko">${renderMarkedText(example.korean)}</p>` : ""}
                   </li>
                 `,
@@ -1658,7 +1666,7 @@ function renderResultItem(item, tone) {
   return `
     <article class="result-item ${tone}">
       <div class="item-title">
-        <strong>${escapeHtml(item.card.front)}</strong>
+        <strong>${renderJapaneseText(item.card.front)}</strong>
         <span class="pill">${item.passNo}차 ${item.position}번</span>
       </div>
       <p>${escapeHtml(item.card.back)}</p>
@@ -1670,7 +1678,7 @@ function renderCardBack(card, examplesExpanded = false) {
   const examples = card.examples || [];
   const visibleExamples = examplesExpanded ? examples : examples.slice(0, 1);
   return `
-    ${renderStudyCardMeta(card.front, card)}
+    ${renderStudyCardMeta(card.front, card, true)}
     <div class="meaning">${escapeHtml(card.back)}</div>
     ${card.memo ? `<p class="study-note">${escapeHtml(card.memo)}</p>` : ""}
     ${
@@ -1684,7 +1692,7 @@ function renderCardBack(card, examplesExpanded = false) {
             .map(
               (example) => `
                 <li class="example">
-                  <p class="example-jp">${renderMarkedText(example.japanese)}</p>
+                  <p class="example-jp">${renderMarkedJapaneseText(example.japanese)}</p>
                   ${example.korean ? `<p class="example-ko">${renderMarkedText(example.korean)}</p>` : ""}
                 </li>
               `,
@@ -1706,10 +1714,10 @@ function renderCardBack(card, examplesExpanded = false) {
   `;
 }
 
-function renderStudyCardMeta(label, card) {
+function renderStudyCardMeta(label, card, japanese = false) {
   return `
     <div class="study-card-meta">
-      <p class="meta">${escapeHtml(label)}</p>
+      <p class="meta ${japanese ? "jp-text" : ""}">${escapeHtml(label)}</p>
       ${isWeakCard(card) ? `<span class="study-weak-badge">${icon("target")}<span>약점</span></span>` : ""}
     </div>
   `;
@@ -1907,14 +1915,14 @@ function renderBulkPreviewItem(item) {
   return `
     <article class="bulk-preview-item ${item.warnings.length ? "warn" : ""}">
       <div class="item-title">
-        <strong>${escapeHtml(item.front || "앞면 없음")}</strong>
+        <strong>${item.front ? renderJapaneseText(item.front) : "앞면 없음"}</strong>
         <span class="pill">${item.lineNo}줄</span>
       </div>
       <p class="meaning">${escapeHtml(item.back || "뒷면 없음")}</p>
       <p class="meta">메모 ${item.memo ? "있음" : "없음"} · 예문 ${item.examples.length}개</p>
       ${
         item.examples[0]
-          ? `<div class="card-preview-example"><p class="example-jp">${renderMarkedText(
+          ? `<div class="card-preview-example"><p class="example-jp">${renderMarkedJapaneseText(
               item.examples[0].japanese,
             )}</p>${item.examples[0].korean ? `<p class="example-ko">${renderMarkedText(item.examples[0].korean)}</p>` : ""}</div>`
           : ""
@@ -1953,13 +1961,13 @@ function renderCardListItem(card) {
   return `
     <article class="card-item">
       <div class="item-title">
-        <strong>${escapeHtml(card.front)}</strong>
+        <strong>${renderJapaneseText(card.front)}</strong>
         <span class="pill">${escapeHtml(card.group_name)}</span>
       </div>
       <p class="meaning">${escapeHtml(card.back)}</p>
       ${
         card.examples?.[0]
-          ? `<div class="card-preview-example"><p class="example-jp">${renderMarkedText(
+          ? `<div class="card-preview-example"><p class="example-jp">${renderMarkedJapaneseText(
               card.examples[0].japanese,
             )}</p>${card.examples[0].korean ? `<p class="example-ko">${renderMarkedText(card.examples[0].korean)}</p>` : ""}</div>`
           : ""
