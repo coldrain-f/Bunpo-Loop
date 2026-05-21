@@ -1517,6 +1517,47 @@ button:active,
   font-weight: 800;
 }
 
+.study-card-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.study-card.back .study-card-meta {
+  justify-content: flex-start;
+}
+
+.study-card-meta .meta {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.study-weak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(178, 70, 62, 0.2);
+  border-radius: 999px;
+  background: rgba(246, 222, 217, 0.52);
+  color: var(--red);
+  font-size: 0.73rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.study-weak-badge .icon {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2.3;
+}
+
 .grammar {
   margin: 20px 0 12px;
   overflow-wrap: anywhere;

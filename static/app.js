@@ -528,11 +528,13 @@ function cardRecentWrongCount(card) {
   return number(card.recent_wrong_count);
 }
 
+function isWeakCard(card) {
+  return cardRecentWrongCount(card) >= getWeakRecentWrongThreshold() || cardRoundWrongCount(card) >= getWeakCardThreshold();
+}
+
 function getWeakCards() {
-  const totalThreshold = getWeakCardThreshold();
-  const recentThreshold = getWeakRecentWrongThreshold();
   return [...state.cards]
-    .filter((card) => cardRecentWrongCount(card) >= recentThreshold || cardRoundWrongCount(card) >= totalThreshold)
+    .filter(isWeakCard)
     .sort(
       (left, right) =>
         cardRecentWrongCount(right) - cardRecentWrongCount(left) ||
@@ -1377,7 +1379,7 @@ function renderStudySession() {
         ${
           session.showingBack
             ? renderCardBack(card, examplesExpanded)
-            : `<p class="meta">${escapeHtml(card.group_name)}</p><div class="grammar">${escapeHtml(
+            : `${renderStudyCardMeta(card.group_name, card)}<div class="grammar">${escapeHtml(
                 card.front,
               )}</div><p class="study-hint">탭해서 뜻 보기</p>`
         }
@@ -1631,7 +1633,7 @@ function renderCardBack(card, examplesExpanded = false) {
   const examples = card.examples || [];
   const visibleExamples = examplesExpanded ? examples : examples.slice(0, 1);
   return `
-    <p class="meta">${escapeHtml(card.front)}</p>
+    ${renderStudyCardMeta(card.front, card)}
     <div class="meaning">${escapeHtml(card.back)}</div>
     ${card.memo ? `<p class="study-note">${escapeHtml(card.memo)}</p>` : ""}
     ${
@@ -1664,6 +1666,15 @@ function renderCardBack(card, examplesExpanded = false) {
         `
         : `<p class="meta">예문 없음</p>`
     }
+  `;
+}
+
+function renderStudyCardMeta(label, card) {
+  return `
+    <div class="study-card-meta">
+      <p class="meta">${escapeHtml(label)}</p>
+      ${isWeakCard(card) ? `<span class="study-weak-badge">${icon("target")}<span>약점</span></span>` : ""}
+    </div>
   `;
 }
 
