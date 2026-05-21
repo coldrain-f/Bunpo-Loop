@@ -2236,12 +2236,16 @@ button:active,
 
 .round-detail-dialog {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: min(86vh, 760px);
   max-height: min(86vh, 760px);
   gap: 12px;
+  overflow: hidden;
 }
 
 .round-detail-body {
   display: grid;
+  min-height: 0;
   gap: 12px;
   overflow-y: auto;
   padding-right: 4px;
@@ -2282,11 +2286,8 @@ button:active,
 
 .round-detail-list {
   display: grid;
-  max-height: min(32vh, 320px);
+  min-height: 0;
   gap: 8px;
-  overflow-y: auto;
-  padding-right: 4px;
-  overscroll-behavior: contain;
 }
 
 .round-detail-card {
