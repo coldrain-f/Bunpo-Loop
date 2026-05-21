@@ -20,7 +20,9 @@ DATA_DIR = ROOT / "data"
 DB_PATH = Path(os.environ.get("JLPT_DB", DATA_DIR / "jlpt_cards.sqlite3"))
 APP_USER = os.environ.get("APP_USER")
 APP_PASSWORD = os.environ.get("APP_PASSWORD")
-DEFAULT_WEAK_CARD_THRESHOLD = 2
+DEFAULT_WEAK_CARD_THRESHOLD = 5
+DEFAULT_WEAK_RECENT_ROUNDS = 3
+DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 2
 
 
 def utc_now_sql() -> str:
@@ -52,7 +54,9 @@ def init_db() -> None:
                 access_code TEXT NOT NULL,
                 jlpt_exam_date TEXT NOT NULL DEFAULT '',
                 jlpt_level TEXT NOT NULL DEFAULT '',
-                weak_card_threshold INTEGER NOT NULL DEFAULT 2,
+                weak_card_threshold INTEGER NOT NULL DEFAULT 5,
+                weak_recent_rounds INTEGER NOT NULL DEFAULT 3,
+                weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 2,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 last_login_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -132,7 +136,15 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN jlpt_level TEXT NOT NULL DEFAULT ''")
     if "weak_card_threshold" not in user_columns:
         conn.execute(
-            "ALTER TABLE users ADD COLUMN weak_card_threshold INTEGER NOT NULL DEFAULT 2"
+            "ALTER TABLE users ADD COLUMN weak_card_threshold INTEGER NOT NULL DEFAULT 5"
+        )
+    if "weak_recent_rounds" not in user_columns:
+        conn.execute(
+            "ALTER TABLE users ADD COLUMN weak_recent_rounds INTEGER NOT NULL DEFAULT 3"
+        )
+    if "weak_recent_wrong_threshold" not in user_columns:
+        conn.execute(
+            "ALTER TABLE users ADD COLUMN weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 2"
         )
 
 
@@ -312,6 +324,26 @@ def validate_weak_card_threshold(value: object) -> int:
     return threshold
 
 
+def validate_weak_recent_rounds(value: object) -> int:
+    try:
+        rounds = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("최근 회독 범위는 숫자로 입력하세요.") from exc
+    if rounds < 1 or rounds > 20:
+        raise ValueError("최근 회독 범위는 1~20회 사이로 입력하세요.")
+    return rounds
+
+
+def validate_weak_recent_wrong_threshold(value: object) -> int:
+    try:
+        threshold = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("최근 오답 기준은 숫자로 입력하세요.") from exc
+    if threshold < 1 or threshold > 20:
+        raise ValueError("최근 오답 기준은 1~20회 사이로 입력하세요.")
+    return threshold
+
+
 def secure_text_compare(left: str, right: str) -> bool:
     return hmac.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
 
@@ -400,6 +432,7 @@ def cards_payload(
     group_id: int | None = None,
     query: str | None = None,
     order_mode: str = "created",
+    recent_round_window: int = DEFAULT_WEAK_RECENT_ROUNDS,
 ) -> list[dict]:
     clauses: list[str] = []
     params: list[object] = []
@@ -435,6 +468,27 @@ def cards_payload(
             c.memo,
             c.correct_count,
             c.wrong_count,
+            COALESCE((
+                SELECT COUNT(*)
+                FROM reviews rv
+                WHERE rv.card_id = c.id
+                  AND rv.result = 'wrong'
+            ), 0) AS round_wrong_count,
+            COALESCE((
+                SELECT COUNT(*)
+                FROM reviews recent_rv
+                JOIN study_rounds recent_sr ON recent_sr.id = recent_rv.round_id
+                WHERE recent_rv.card_id = c.id
+                  AND recent_rv.result = 'wrong'
+                  AND recent_sr.group_id = c.group_id
+                  AND recent_sr.id IN (
+                      SELECT sr2.id
+                      FROM study_rounds sr2
+                      WHERE sr2.group_id = c.group_id
+                      ORDER BY sr2.round_no DESC, sr2.completed_at DESC, sr2.id DESC
+                      LIMIT ?
+                  )
+            ), 0) AS recent_wrong_count,
             c.created_at,
             c.updated_at,
             g.name AS group_name
@@ -443,7 +497,7 @@ def cards_payload(
         {where_sql}
         ORDER BY {order_sql}
         """,
-        params,
+        [recent_round_window, *params],
     ).fetchall()
     cards = [row_to_dict(row) for row in rows]
     examples = get_examples(conn, [int(card["id"]) for card in cards])
@@ -808,7 +862,16 @@ class AppHandler(BaseHTTPRequestHandler):
                 if method == "GET":
                     group_id = int(query["group_id"][0]) if query.get("group_id") else None
                     q = query["q"][0].strip() if query.get("q") else None
-                    self.send_json({"cards": cards_payload(conn, group_id=group_id, query=q)})
+                    self.send_json(
+                        {
+                            "cards": cards_payload(
+                                conn,
+                                group_id=group_id,
+                                query=q,
+                                recent_round_window=int(user["weak_recent_rounds"] or DEFAULT_WEAK_RECENT_ROUNDS),
+                            )
+                        }
+                    )
                     return
                 if method == "POST":
                     self.create_card(conn)
@@ -889,8 +952,23 @@ class AppHandler(BaseHTTPRequestHandler):
         ).fetchone()
         if user is None:
             cur = conn.execute(
-                "INSERT INTO users (nickname, access_code) VALUES (?, ?)",
-                (nickname, access_code),
+                """
+                INSERT INTO users (
+                    nickname,
+                    access_code,
+                    weak_card_threshold,
+                    weak_recent_rounds,
+                    weak_recent_wrong_threshold
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    nickname,
+                    access_code,
+                    DEFAULT_WEAK_CARD_THRESHOLD,
+                    DEFAULT_WEAK_RECENT_ROUNDS,
+                    DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+                ),
             )
             user = conn.execute(
                 "SELECT * FROM users WHERE id = ?",
@@ -944,6 +1022,10 @@ class AppHandler(BaseHTTPRequestHandler):
             "jlpt_exam_date": str(user["jlpt_exam_date"] or ""),
             "jlpt_level": str(user["jlpt_level"] or ""),
             "weak_card_threshold": int(user["weak_card_threshold"] or DEFAULT_WEAK_CARD_THRESHOLD),
+            "weak_recent_rounds": int(user["weak_recent_rounds"] or DEFAULT_WEAK_RECENT_ROUNDS),
+            "weak_recent_wrong_threshold": int(
+                user["weak_recent_wrong_threshold"] or DEFAULT_WEAK_RECENT_WRONG_THRESHOLD
+            ),
         }
 
     def update_settings(self, conn: sqlite3.Connection, user: sqlite3.Row) -> None:
@@ -963,9 +1045,27 @@ class AppHandler(BaseHTTPRequestHandler):
             if "weak_card_threshold" in body
             else int(user["weak_card_threshold"] or DEFAULT_WEAK_CARD_THRESHOLD)
         )
+        weak_recent_rounds = (
+            validate_weak_recent_rounds(body.get("weak_recent_rounds"))
+            if "weak_recent_rounds" in body
+            else int(user["weak_recent_rounds"] or DEFAULT_WEAK_RECENT_ROUNDS)
+        )
+        weak_recent_wrong_threshold = (
+            validate_weak_recent_wrong_threshold(body.get("weak_recent_wrong_threshold"))
+            if "weak_recent_wrong_threshold" in body
+            else int(user["weak_recent_wrong_threshold"] or DEFAULT_WEAK_RECENT_WRONG_THRESHOLD)
+        )
         conn.execute(
-            "UPDATE users SET jlpt_exam_date = ?, jlpt_level = ?, weak_card_threshold = ? WHERE id = ?",
-            (exam_date, jlpt_level, weak_card_threshold, user["id"]),
+            """
+            UPDATE users
+            SET jlpt_exam_date = ?,
+                jlpt_level = ?,
+                weak_card_threshold = ?,
+                weak_recent_rounds = ?,
+                weak_recent_wrong_threshold = ?
+            WHERE id = ?
+            """,
+            (exam_date, jlpt_level, weak_card_threshold, weak_recent_rounds, weak_recent_wrong_threshold, user["id"]),
         )
         updated = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
         self.send_json({"settings": self.settings_payload(updated)})

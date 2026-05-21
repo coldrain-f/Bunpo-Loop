@@ -34,7 +34,9 @@ const STUDY_GROUP_SORT_LABELS = {
 };
 
 const JLPT_LEVELS = ["N1", "N2", "N3", "N4", "N5"];
-const DEFAULT_WEAK_CARD_THRESHOLD = 2;
+const DEFAULT_WEAK_CARD_THRESHOLD = 5;
+const DEFAULT_WEAK_RECENT_ROUNDS = 3;
+const DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 2;
 
 const state = {
   activeTab: "study",
@@ -42,7 +44,13 @@ const state = {
   groups: [],
   cards: [],
   rounds: [],
-  settings: { jlpt_exam_date: "", jlpt_level: "", weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD },
+  settings: {
+    jlpt_exam_date: "",
+    jlpt_level: "",
+    weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
+    weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
+    weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+  },
   selectedGroupId: null,
   cardFilterGroupId: "",
   cardSearchQuery: "",
@@ -128,6 +136,8 @@ async function loadData() {
     jlpt_exam_date: "",
     jlpt_level: "",
     weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
+    weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
+    weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
     ...(settingsData.settings || {}),
   };
   if (!state.groups.some((group) => group.id === state.selectedGroupId)) {
@@ -498,13 +508,35 @@ function getWeakCardThreshold() {
   return Math.min(20, Math.max(1, Math.round(threshold)));
 }
 
+function getWeakRecentRounds() {
+  const rounds = Number(state.settings?.weak_recent_rounds);
+  if (!Number.isFinite(rounds)) return DEFAULT_WEAK_RECENT_ROUNDS;
+  return Math.min(20, Math.max(1, Math.round(rounds)));
+}
+
+function getWeakRecentWrongThreshold() {
+  const threshold = Number(state.settings?.weak_recent_wrong_threshold);
+  if (!Number.isFinite(threshold)) return DEFAULT_WEAK_RECENT_WRONG_THRESHOLD;
+  return Math.min(20, Math.max(1, Math.round(threshold)));
+}
+
+function cardRoundWrongCount(card) {
+  return number(card.round_wrong_count ?? card.wrong_count);
+}
+
+function cardRecentWrongCount(card) {
+  return number(card.recent_wrong_count);
+}
+
 function getWeakCards() {
-  const threshold = getWeakCardThreshold();
+  const totalThreshold = getWeakCardThreshold();
+  const recentThreshold = getWeakRecentWrongThreshold();
   return [...state.cards]
-    .filter((card) => number(card.wrong_count) >= threshold)
+    .filter((card) => cardRecentWrongCount(card) >= recentThreshold || cardRoundWrongCount(card) >= totalThreshold)
     .sort(
       (left, right) =>
-        number(right.wrong_count) - number(left.wrong_count) ||
+        cardRecentWrongCount(right) - cardRecentWrongCount(left) ||
+        cardRoundWrongCount(right) - cardRoundWrongCount(left) ||
         cardWrongRate(right) - cardWrongRate(left) ||
         number(left.correct_count) - number(right.correct_count) ||
         compareGroupName({ name: left.group_name, id: left.group_id }, { name: right.group_name, id: right.group_id }) ||
@@ -620,11 +652,10 @@ function renderDialog() {
   }
   if (state.activeDialog === "start-weak") {
     const weakCards = getWeakCards();
-    const threshold = getWeakCardThreshold();
     renderConfirmDialog({
       eyebrow: "복습",
       title: `약점 카드 ${weakCards.length}개를 복습할까요?`,
-      message: `${threshold}회 이상 틀린 카드만 모아 오답이 많은 순서로 봅니다.`,
+      message: `최근 ${getWeakRecentRounds()}회독 ${getWeakRecentWrongThreshold()}회 이상 또는 전체 ${getWeakCardThreshold()}회 이상 틀린 카드를 봅니다.`,
       confirmLabel: "시작",
       confirmAction: "confirm-start-weak-study",
       tone: "primary",
@@ -891,14 +922,16 @@ function renderStudyGroupSortOptions() {
 
 function renderTodayStudyPanel(recentGroup) {
   const weakCards = getWeakCards();
-  const threshold = getWeakCardThreshold();
+  const totalThreshold = getWeakCardThreshold();
+  const recentRounds = getWeakRecentRounds();
+  const recentThreshold = getWeakRecentWrongThreshold();
   const nextRoundNo = recentGroup ? number(recentGroup.completed_rounds) + 1 : 1;
   const recentMeta = recentGroup
     ? `${nextRoundNo}회독 준비 · 마지막 ${formatDate(recentGroup.last_studied_at)}`
     : "아래에서 그룹을 선택해 첫 회독을 시작하세요.";
   const weakMeta = weakCards.length
-    ? `기준 ${threshold}회 이상 · 오답 많은 순`
-    : `기준 ${threshold}회 이상 · 복습할 카드 없음`;
+    ? `최근 ${recentRounds}회독 ${recentThreshold}회 이상 또는 전체 ${totalThreshold}회 이상`
+    : `최근 ${recentRounds}회독 ${recentThreshold}회 이상 또는 전체 ${totalThreshold}회 이상 · 복습할 카드 없음`;
   return `
     <section class="today-study-panel">
       <div class="today-action-grid">
@@ -957,10 +990,13 @@ function renderRecentStudyGroupCallout(group) {
 
 function renderWeakCardsPanel() {
   if (!state.weakPanelOpen || !state.cards.length) return "";
-  const threshold = getWeakCardThreshold();
+  const totalThreshold = getWeakCardThreshold();
+  const recentRounds = getWeakRecentRounds();
+  const recentThreshold = getWeakRecentWrongThreshold();
   const weakCards = getWeakCards();
   if (!weakCards.length) return "";
-  const totalWrong = weakCards.reduce((sum, card) => sum + number(card.wrong_count), 0);
+  const recentWrong = weakCards.reduce((sum, card) => sum + cardRecentWrongCount(card), 0);
+  const totalWrong = weakCards.reduce((sum, card) => sum + cardRoundWrongCount(card), 0);
   return `
     <section class="weak-card-panel open">
       <div class="row">
@@ -970,7 +1006,7 @@ function renderWeakCardsPanel() {
         </div>
         <span class="pill ${weakCards.length ? "bad" : ""}">${weakCards.length}개</span>
       </div>
-      <p class="meta">기준 ${threshold}회 이상 · 누적 오답 ${totalWrong}회 · 오답이 많은 순서</p>
+      <p class="meta">최근 ${recentRounds}회독 ${recentThreshold}회 이상 또는 전체 ${totalThreshold}회 이상 · 최근 오답 ${recentWrong}회 · 전체 오답 ${totalWrong}회</p>
       <div class="weak-card-list">${weakCards.map(renderWeakCardItem).join("")}</div>
       <button class="secondary-button full" type="button" data-action="start-weak-study">${iconLabel(
         "rotate-ccw",
@@ -985,6 +1021,8 @@ function renderWeakCardItem(card) {
   const attempts = cardAttemptCount(card);
   const wrongRate = attempts ? Math.round(cardWrongRate(card) * 100) : 0;
   const examples = card.examples || [];
+  const recentWrong = cardRecentWrongCount(card);
+  const totalWrong = cardRoundWrongCount(card);
   return `
     <article class="weak-card-item ${isOpen ? "open" : ""}">
       <button class="weak-card-main" type="button" data-action="toggle-weak-card" data-card-id="${card.id}" aria-expanded="${
@@ -992,12 +1030,13 @@ function renderWeakCardItem(card) {
       }">
         <div class="item-title">
           <strong>${escapeHtml(card.front)}</strong>
-          <span class="pill bad">${number(card.wrong_count)}오답</span>
+          <span class="pill bad">최근 ${recentWrong} · 전체 ${totalWrong}</span>
         </div>
         <p>${escapeHtml(card.back)}</p>
         <div class="weak-card-meta">
           <span>${escapeHtml(card.group_name)}</span>
-          <span>정답 ${number(card.correct_count)}</span>
+          <span>최근 ${getWeakRecentRounds()}회독 오답 ${recentWrong}</span>
+          <span>전체 회독 오답 ${totalWrong}</span>
           <span>오답률 ${wrongRate}%</span>
         </div>
       </button>
@@ -2032,17 +2071,33 @@ function renderSettings() {
 }
 
 function renderWeakThresholdSetting() {
-  const threshold = getWeakCardThreshold();
+  const totalThreshold = getWeakCardThreshold();
+  const recentRounds = getWeakRecentRounds();
+  const recentThreshold = getWeakRecentWrongThreshold();
   return `
     <section class="settings-subsection">
       <div>
         <span class="field-label">약점 카드 기준</span>
-        <p class="form-hint">누적 틀림이 이 횟수 이상이면 약점 카드에 모입니다.</p>
+        <p class="form-hint">최근 기준이나 전체 기준 중 하나라도 해당하면 약점 카드에 모입니다.</p>
       </div>
-      <label class="number-setting">
-        <input class="input" type="number" name="weak_card_threshold" min="1" max="20" step="1" value="${threshold}" inputmode="numeric" required />
-        <span>회 이상</span>
-      </label>
+      <div class="weak-rule-grid">
+        <label class="number-setting weak-rule-setting">
+          <span>최근</span>
+          <input class="input" type="number" name="weak_recent_rounds" min="1" max="20" step="1" value="${recentRounds}" inputmode="numeric" required />
+          <span>회독 중</span>
+        </label>
+        <label class="number-setting weak-rule-setting">
+          <span>오답</span>
+          <input class="input" type="number" name="weak_recent_wrong_threshold" min="1" max="20" step="1" value="${recentThreshold}" inputmode="numeric" required />
+          <span>회 이상</span>
+        </label>
+        <label class="number-setting weak-rule-setting total">
+          <span>전체 회독 오답</span>
+          <input class="input" type="number" name="weak_card_threshold" min="1" max="20" step="1" value="${totalThreshold}" inputmode="numeric" required />
+          <span>회 이상</span>
+        </label>
+      </div>
+      <p class="form-hint">약점 복습에서 틀린 횟수는 최근/전체 회독 기준에는 넣지 않습니다.</p>
     </section>
   `;
 }
@@ -2380,8 +2435,11 @@ async function saveSettings(form) {
   const examDate = getExamDateFromSettingsForm(form);
   const jlptLevel = form.elements.jlpt_level.value;
   const weakCardThreshold = Number(form.elements.weak_card_threshold.value);
-  if (!Number.isInteger(weakCardThreshold) || weakCardThreshold < 1 || weakCardThreshold > 20) {
-    throw new Error("약점 카드 기준은 1~20회 사이로 입력하세요.");
+  const weakRecentRounds = Number(form.elements.weak_recent_rounds.value);
+  const weakRecentWrongThreshold = Number(form.elements.weak_recent_wrong_threshold.value);
+  const weakValues = [weakCardThreshold, weakRecentRounds, weakRecentWrongThreshold];
+  if (weakValues.some((value) => !Number.isInteger(value) || value < 1 || value > 20)) {
+    throw new Error("약점 카드 기준은 1~20 사이로 입력하세요.");
   }
   const data = await request("/api/settings", {
     method: "PATCH",
@@ -2389,9 +2447,12 @@ async function saveSettings(form) {
       jlpt_exam_date: examDate,
       jlpt_level: jlptLevel,
       weak_card_threshold: weakCardThreshold,
+      weak_recent_rounds: weakRecentRounds,
+      weak_recent_wrong_threshold: weakRecentWrongThreshold,
     }),
   });
   state.settings = data.settings;
+  await loadData();
   render();
   showToast("설정을 저장했습니다.");
 }
@@ -2431,7 +2492,13 @@ function logout() {
     groups: [],
     cards: [],
     rounds: [],
-    settings: { jlpt_exam_date: "", jlpt_level: "", weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD },
+    settings: {
+      jlpt_exam_date: "",
+      jlpt_level: "",
+      weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
+      weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
+      weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+    },
     selectedGroupId: null,
     session: null,
     activeDialog: null,

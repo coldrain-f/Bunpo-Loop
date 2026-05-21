@@ -1808,6 +1808,20 @@ button:active,
   white-space: nowrap;
 }
 
+.weak-rule-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.weak-rule-setting {
+  grid-template-columns: auto minmax(72px, 1fr) auto;
+  min-height: 44px;
+}
+
+.weak-rule-setting.total {
+  grid-template-columns: minmax(0, 1fr) minmax(72px, 0.7fr) auto;
+}
+
 .level-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
