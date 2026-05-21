@@ -435,11 +435,23 @@ h3 {
 }
 
 .study-options-toggle em {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #b9d6cf;
+  border-radius: 999px;
+  background: var(--teal-soft);
   color: var(--teal);
-  font-size: 0.82rem;
   font-style: normal;
-  font-weight: 900;
+}
+
+.study-options-toggle em .icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.4;
 }
 
 .study-options-body {

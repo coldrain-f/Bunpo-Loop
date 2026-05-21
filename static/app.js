@@ -1185,7 +1185,7 @@ function renderStudyOptionsPanel() {
           <strong>학습 옵션</strong>
           <small>${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]}</small>
         </span>
-        <em>${state.studyOptionsOpen ? "접기" : "변경"}</em>
+        <em aria-hidden="true">${icon(state.studyOptionsOpen ? "chevron-up" : "chevron-down")}</em>
       </button>
       ${
         state.studyOptionsOpen
