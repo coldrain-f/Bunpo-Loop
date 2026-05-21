@@ -1278,7 +1278,9 @@ function renderRecentRoundsPanel(rounds) {
             : ""
         }
       </div>
-      <div class="round-list">${visibleRounds.map(renderRoundItem).join("")}</div>
+      <div class="round-list ${state.recentRoundsOpen ? "scroll-list recent-round-scroll" : ""}">${visibleRounds
+        .map(renderRoundItem)
+        .join("")}</div>
     </div>
   `;
 }
@@ -1813,7 +1815,7 @@ function renderCardListPanel(visibleCards) {
           : ""
       }
       ${renderSearchInput({ id: "card-search", value: state.cardSearchQuery, placeholder: "카드 검색" })}
-      <div class="card-list">
+      <div class="card-list scroll-list management-list-scroll">
       ${
         visibleCards.length
           ? visibleCards.map(renderCardListItem).join("")
@@ -2041,7 +2043,7 @@ function renderGroupListPanel(visibleGroups) {
         "그룹 등록",
       )}</button>
       ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "그룹 검색" })}
-      <div class="group-list">
+      <div class="group-list scroll-list management-list-scroll">
         ${
           visibleGroups.length
             ? visibleGroups.map(renderGroupListItem).join("")
