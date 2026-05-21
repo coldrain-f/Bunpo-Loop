@@ -1126,6 +1126,7 @@ button:active,
 
 .completion-panel {
   gap: 14px;
+  padding-bottom: 88px;
 }
 
 #completion-summary,
@@ -1506,21 +1507,26 @@ button:active,
   line-height: 1.42;
 }
 
-.completion-top-button {
-  position: sticky;
-  bottom: calc(84px + env(safe-area-inset-bottom));
-  z-index: 14;
-  justify-self: end;
-  min-height: 38px;
-  padding: 0 11px;
-  border: 1px solid rgba(22, 107, 98, 0.24);
-  border-radius: 999px;
+.completion-sticky-actions {
+  position: fixed;
+  bottom: calc(82px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 18;
+  display: grid;
+  grid-template-columns: 0.86fr 1.14fr;
+  width: min(calc(100% - 32px), 488px);
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(214, 224, 219, 0.92);
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
-  color: var(--teal);
-  font-size: 0.8rem;
-  font-weight: 900;
-  box-shadow: 0 12px 30px rgba(27, 48, 43, 0.18);
-  backdrop-filter: blur(14px);
+  box-shadow: 0 16px 38px rgba(27, 48, 43, 0.18);
+  transform: translateX(-50%);
+  backdrop-filter: blur(18px);
+}
+
+.completion-sticky-actions .full {
+  min-height: 48px;
 }
 
 .study-session-controls {

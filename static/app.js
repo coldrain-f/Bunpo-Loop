@@ -1325,13 +1325,15 @@ function renderStudySession() {
         <section id="completion-time">${renderRoundTime(round)}</section>
         ${renderCompletionNav(summary)}
         ${renderCompletionDetails(summary, session)}
-        <button class="completion-top-button" type="button" data-action="scroll-completion-section" data-target="completion-summary">
-          ${iconLabel("chevron-up", "요약으로")}
-        </button>
-        <button class="primary-button full" type="button" data-action="end-study">${iconLabel(
-          "arrow-left",
-          "돌아가기",
-        )}</button>
+        <div class="completion-sticky-actions" aria-label="결과 화면 작업">
+          <button class="ghost-button full" type="button" data-action="scroll-completion-section" data-target="completion-summary">
+            ${iconLabel("chevron-up", "요약으로")}
+          </button>
+          <button class="primary-button full" type="button" data-action="end-study">${iconLabel(
+            "arrow-left",
+            "돌아가기",
+          )}</button>
+        </div>
       </div>
     `;
     return;
