@@ -1322,8 +1322,7 @@ function renderStudySession() {
         <p class="meta">${escapeHtml(session.group.name)} · ${getSessionOrderLabel(session)} · ${
           session.passNo
         }차 통과</p>
-        <section id="completion-time">${renderRoundTime(round)}</section>
-        ${renderCompletionNav(summary)}
+        ${renderRoundTime(round)}
         ${renderCompletionDetails(summary, session)}
         <div class="completion-sticky-actions" aria-label="결과 화면 작업">
           <button class="ghost-button full" type="button" data-action="scroll-completion-section" data-target="completion-summary">
@@ -1500,25 +1499,6 @@ function renderDurationComparison(round, session) {
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(detail)}</p>
     </section>
-  `;
-}
-
-function renderCompletionNav(summary) {
-  return `
-    <nav class="completion-nav" aria-label="결과 섹션 이동">
-      <button type="button" data-action="scroll-completion-section" data-target="completion-summary">
-        ${iconLabel("target", "요약")}
-      </button>
-      <button type="button" data-action="scroll-completion-section" data-target="wrong-review">
-        ${iconLabel("x", `오답 ${summary.wrongCardSummaries.length}`)}
-      </button>
-      <button type="button" data-action="scroll-completion-section" data-target="correct-review">
-        ${iconLabel("check", `정답 ${summary.firstPassCorrectCount}`)}
-      </button>
-      <button type="button" data-action="scroll-completion-section" data-target="completion-time">
-        ${iconLabel("clock", "시간")}
-      </button>
-    </nav>
   `;
 }
 
