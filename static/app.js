@@ -74,6 +74,7 @@ const state = {
   completionCorrectOpen: false,
   session: null,
   activeDialog: null,
+  roundDetail: null,
   pendingTab: null,
   pendingAction: null,
   editingCardId: null,
@@ -721,6 +722,10 @@ function renderDialog() {
     `;
     return;
   }
+  if (state.activeDialog === "round-detail") {
+    renderRoundDetailDialog();
+    return;
+  }
   if (state.activeDialog === "enter-group") {
     const target = state.groups.find((item) => item.id === Number(state.pendingAction?.id));
     if (!target) return closeDialog();
@@ -851,6 +856,7 @@ function renderDialog() {
 
 function closeDialog() {
   state.activeDialog = null;
+  state.roundDetail = null;
   state.pendingTab = null;
   state.pendingAction = null;
   renderDialog();
@@ -1322,16 +1328,122 @@ function renderRoundItem(round) {
   const firstAttemptCorrect = number(round.first_attempt_correct_count);
   const answerRate = number(round.total_cards) ? Math.round((number(round.correct_count) / number(round.total_cards)) * 100) : 0;
   return `
-    <div class="round-item">
+    <button class="round-item round-item-button" type="button" data-action="open-round-detail" data-round-id="${
+      round.id
+    }" aria-label="${number(round.round_no)}회독 자세히 보기">
       <div class="item-title">
         <strong>${round.round_no}회독</strong>
-        <span class="pill">${ORDER_LABELS[round.order_mode] || round.order_mode}</span>
+        <span class="round-title-actions">
+          <span class="pill">${ORDER_LABELS[round.order_mode] || round.order_mode}</span>
+          <span class="round-detail-indicator" aria-hidden="true">${icon("chevron-right")}</span>
+        </span>
       </div>
       <p class="meta">첫 시도 ${firstAttemptCorrect}/${firstAttemptTotal} · 풀이 정답률 ${answerRate}% · 오답 ${number(
         round.wrong_count,
       )}</p>
       ${renderRoundTime(round)}
+    </button>
+  `;
+}
+
+function roundDetailMetricValue(value, fallback = 0) {
+  return value === null || value === undefined ? fallback : number(value);
+}
+
+function getRoundDetailStats(detail) {
+  const round = detail?.round || {};
+  const cards = detail?.cards || [];
+  const firstPassCards = cards.filter((card) => card.first_result === "correct");
+  const wrongCards = cards.filter((card) => number(card.wrong_count) > 0);
+  const totalAttempts = roundDetailMetricValue(
+    round.total_attempts,
+    cards.reduce((sum, card) => sum + (card.attempts?.length || 0), 0),
+  );
+  return {
+    firstAttemptTotal: roundDetailMetricValue(round.first_attempt_total, cards.length),
+    firstAttemptCorrect: roundDetailMetricValue(round.first_attempt_correct_count, firstPassCards.length),
+    totalAttempts,
+    wrongCards,
+    firstPassCards,
+    answerRate: totalAttempts ? Math.round((number(round.correct_count) / totalAttempts) * 100) : 0,
+  };
+}
+
+function renderRoundDetailDialog() {
+  const detail = state.roundDetail;
+  const round = detail?.round || {};
+  if (!detail || detail.loading) {
+    dialogRoot.innerHTML = `
+      <div class="dialog-backdrop" role="presentation">
+        <section class="dialog-panel round-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title">
+          <p class="eyebrow">회독 기록</p>
+          <h2 id="study-dialog-title">자세히 불러오는 중</h2>
+          <p class="meta">최근 회독의 풀이 기록을 정리하고 있습니다.</p>
+        </section>
+      </div>
+    `;
+    return;
+  }
+  const stats = getRoundDetailStats(detail);
+  dialogRoot.innerHTML = `
+    <div class="dialog-backdrop" role="presentation">
+      <section class="dialog-panel round-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title">
+        <div>
+          <p class="eyebrow">회독 기록</p>
+          <h2 id="study-dialog-title">${number(round.round_no)}회독 자세히</h2>
+          <p class="meta">${escapeHtml(round.group_name || "그룹")} · ${escapeHtml(
+            ORDER_LABELS[round.order_mode] || round.order_mode || "학습",
+          )} · ${escapeHtml(formatDate(round.completed_at))}</p>
+        </div>
+        <div class="round-detail-body">
+          <div class="round-detail-metrics">
+            <div><strong>${stats.firstAttemptCorrect}/${stats.firstAttemptTotal}</strong><span>첫 시도 정답</span></div>
+            <div><strong>${stats.totalAttempts}</strong><span>총 풀이</span></div>
+            <div><strong>${number(round.wrong_count)}</strong><span>오답</span></div>
+            <div><strong>${stats.answerRate}%</strong><span>풀이 정답률</span></div>
+          </div>
+          ${renderRoundTime(round)}
+          ${renderRoundDetailSection("틀린 카드", stats.wrongCards, "bad")}
+          ${renderRoundDetailSection("한 번에 맞은 카드", stats.firstPassCards, "good")}
+        </div>
+        <button class="primary-button full" type="button" data-action="close-dialog">${iconLabel("check", "닫기")}</button>
+      </section>
     </div>
+  `;
+}
+
+function renderRoundDetailSection(title, cards, tone) {
+  const emptyText = tone === "bad" ? "이 회독에서는 다시 볼 오답 카드가 없었습니다." : "첫 시도에서 바로 맞은 카드가 없습니다.";
+  return `
+    <section class="round-detail-section">
+      <div class="completion-header">
+        <h3>${title}</h3>
+        <span class="pill ${tone}">${cards.length}개</span>
+      </div>
+      ${
+        cards.length
+          ? `<div class="round-detail-list">${cards.map((card) => renderRoundDetailCard(card, tone)).join("")}</div>`
+          : `<p class="meta">${emptyText}</p>`
+      }
+    </section>
+  `;
+}
+
+function renderRoundDetailCard(card, tone) {
+  const attempts = card.attempts || [];
+  const detail =
+    tone === "bad"
+      ? `${number(card.wrong_count)}오답 · ${number(card.passed_attempt_no || attempts.length)}차 통과`
+      : "첫 시도";
+  return `
+    <article class="round-detail-card ${tone}">
+      <div class="item-title">
+        <strong>${renderJapaneseText(card.front)}</strong>
+        <span class="pill ${tone}">${escapeHtml(detail)}</span>
+      </div>
+      <p>${escapeHtml(card.back)}</p>
+      <div class="attempt-timeline">${attempts.map(renderAttemptChip).join("")}</div>
+    </article>
   `;
 }
 
@@ -1663,7 +1775,7 @@ function renderWrongReviewCard(summary) {
 function renderAttemptChip(item) {
   const label = item.result === "correct" ? "알맞음" : "틀림";
   const tone = item.result === "correct" ? "good" : "bad";
-  return `<span class="attempt-chip ${tone}">${item.passNo}차 ${label}</span>`;
+  return `<span class="attempt-chip ${tone}">${number(item.passNo || item.attempt_no || 1)}차 ${label}</span>`;
 }
 
 function renderCompletionSection(title, items, tone, options = {}) {
@@ -2597,6 +2709,7 @@ function logout() {
     selectedGroupId: null,
     session: null,
     activeDialog: null,
+    roundDetail: null,
     pendingTab: null,
     pendingAction: null,
     cardFilterGroupId: "",
@@ -2684,6 +2797,17 @@ async function deletePendingGroup() {
   await loadData();
   render();
   showToast("그룹을 삭제했습니다.");
+}
+
+async function openRoundDetail(roundId) {
+  const cachedRound = state.rounds.find((round) => Number(round.id) === Number(roundId));
+  state.roundDetail = { loading: true, id: roundId, round: cachedRound || null, cards: [] };
+  state.activeDialog = "round-detail";
+  renderDialog();
+  const data = await request(`/api/rounds/${roundId}`);
+  if (state.activeDialog !== "round-detail" || Number(state.roundDetail?.id) !== Number(roundId)) return;
+  state.roundDetail = { ...data, loading: false, id: roundId };
+  renderDialog();
 }
 
 document.addEventListener("click", async (event) => {
@@ -2795,6 +2919,9 @@ document.addEventListener("click", async (event) => {
     if (action === "toggle-recent-rounds") {
       state.recentRoundsOpen = !state.recentRoundsOpen;
       renderStudy();
+    }
+    if (action === "open-round-detail") {
+      await openRoundDetail(Number(actionEl.dataset.roundId));
     }
     if (action === "set-card-entry-mode") {
       state.cardEntryMode = actionEl.dataset.mode;

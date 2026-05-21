@@ -989,6 +989,49 @@ button:active,
   background: var(--surface);
 }
 
+.round-item-button {
+  display: block;
+  width: 100%;
+  color: var(--ink);
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.round-item-button:hover,
+.round-item-button:focus-visible {
+  border-color: #b9d6cf;
+  background: var(--surface-strong);
+}
+
+.round-item-button:active {
+  transform: translateY(1px);
+}
+
+.round-title-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.round-detail-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.round-detail-indicator .icon {
+  width: 16px;
+  height: 16px;
+}
+
 .round-time-grid {
   display: grid;
   gap: 6px;
@@ -2189,6 +2232,89 @@ button:active,
 .preview-dialog {
   display: grid;
   gap: 12px;
+}
+
+.round-detail-dialog {
+  display: grid;
+  max-height: min(86vh, 760px);
+  gap: 12px;
+}
+
+.round-detail-body {
+  display: grid;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+}
+
+.round-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.round-detail-metrics div {
+  min-height: 68px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.round-detail-metrics strong {
+  display: block;
+  font-size: 1.1rem;
+}
+
+.round-detail-metrics span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 850;
+}
+
+.round-detail-section {
+  display: grid;
+  gap: 8px;
+}
+
+.round-detail-list {
+  display: grid;
+  max-height: min(32vh, 320px);
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+}
+
+.round-detail-card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.round-detail-card.good {
+  border-left-color: var(--teal);
+}
+
+.round-detail-card.bad {
+  border-left-color: var(--red);
+}
+
+.round-detail-card p {
+  margin: 0 0 9px;
+  color: var(--teal);
+  font-size: 0.95rem;
+  font-weight: 850;
+  line-height: 1.36;
+}
+
+.round-detail-card .attempt-timeline {
+  margin-bottom: 0;
 }
 
 .preview-list {

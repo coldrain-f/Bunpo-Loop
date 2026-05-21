@@ -984,6 +984,15 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.complete_round(conn)
                     return
 
+            if len(parts) == 3 and parts[:2] == ["api", "rounds"] and method == "GET":
+                round_id = int(parts[2])
+                detail = self.round_detail_payload(conn, round_id)
+                if detail is None:
+                    self.send_json({"error": "회독 기록을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+                    return
+                self.send_json(detail)
+                return
+
             if parts == ["api", "weak-rounds"] and method == "POST":
                 self.complete_weak_round(conn)
                 return
@@ -1418,6 +1427,77 @@ class AppHandler(BaseHTTPRequestHandler):
             },
             HTTPStatus.CREATED,
         )
+
+    def round_detail_payload(self, conn: sqlite3.Connection, round_id: int) -> dict | None:
+        round_row = conn.execute(
+            """
+            SELECT sr.*, g.name AS group_name
+            FROM study_rounds sr
+            JOIN groups g ON g.id = sr.group_id
+            WHERE sr.id = ?
+            """,
+            (round_id,),
+        ).fetchone()
+        if round_row is None:
+            return None
+
+        review_rows = conn.execute(
+            """
+            SELECT
+                rv.id,
+                rv.card_id,
+                rv.result,
+                rv.reviewed_at,
+                c.front,
+                c.back,
+                c.memo
+            FROM reviews rv
+            JOIN cards c ON c.id = rv.card_id
+            WHERE rv.round_id = ?
+            ORDER BY rv.id ASC
+            """,
+            (round_id,),
+        ).fetchall()
+        cards_by_id: dict[int, dict] = {}
+        for row in review_rows:
+            card_id = int(row["card_id"])
+            if card_id not in cards_by_id:
+                cards_by_id[card_id] = {
+                    "id": card_id,
+                    "front": row["front"],
+                    "back": row["back"],
+                    "memo": row["memo"],
+                    "attempts": [],
+                }
+            attempts = cards_by_id[card_id]["attempts"]
+            attempts.append(
+                {
+                    "id": row["id"],
+                    "result": row["result"],
+                    "reviewed_at": row["reviewed_at"],
+                    "attempt_no": len(attempts) + 1,
+                }
+            )
+
+        cards = list(cards_by_id.values())
+        for card in cards:
+            attempts = card["attempts"]
+            card["wrong_count"] = sum(1 for item in attempts if item["result"] == "wrong")
+            card["correct_count"] = sum(1 for item in attempts if item["result"] == "correct")
+            card["first_result"] = attempts[0]["result"] if attempts else ""
+            card["passed_attempt_no"] = len(attempts)
+
+        first_attempt_total = len(cards)
+        first_attempt_correct_count = sum(1 for card in cards if card["first_result"] == "correct")
+        has_reviews = bool(review_rows)
+        round_payload = row_to_dict(round_row)
+        round_payload["first_attempt_total"] = first_attempt_total if has_reviews else int(round_row["total_cards"] or 0)
+        round_payload["first_attempt_correct_count"] = (
+            first_attempt_correct_count if has_reviews else int(round_row["correct_count"] or 0)
+        )
+        round_payload["total_attempts"] = len(review_rows) or int(round_row["total_cards"] or 0)
+        round_payload["repeated_card_count"] = sum(1 for card in cards if card["wrong_count"] > 0)
+        return {"round": round_payload, "cards": cards}
 
     def rounds_payload(self, conn: sqlite3.Connection, group_id: int | None) -> list[dict]:
         clauses = []
