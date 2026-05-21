@@ -146,6 +146,22 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE users ADD COLUMN weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 8"
         )
+    conn.execute(
+        """
+        UPDATE users
+        SET weak_card_threshold = ?,
+            weak_recent_rounds = ?,
+            weak_recent_wrong_threshold = ?
+        WHERE weak_recent_rounds = 3
+          AND weak_recent_wrong_threshold = 2
+          AND weak_card_threshold IN (5, 8)
+        """,
+        (
+            DEFAULT_WEAK_CARD_THRESHOLD,
+            DEFAULT_WEAK_RECENT_ROUNDS,
+            DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+        ),
+    )
 
 
 def seed_data(conn: sqlite3.Connection) -> None:
