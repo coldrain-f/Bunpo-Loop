@@ -146,7 +146,8 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: 12px;
+  column-gap: 12px;
+  row-gap: 7px;
   margin-bottom: 18px;
 }
 
@@ -194,15 +195,16 @@ h1 {
 }
 
 .header-greeting {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin: 7px 0 0;
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: -2px 0 0;
+  overflow: hidden;
   color: var(--teal);
   font-size: 0.84rem;
   font-weight: 850;
   line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-greeting[hidden] {
