@@ -1685,6 +1685,45 @@ button:active,
   padding-bottom: 88px;
 }
 
+.completion-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.completion-title-row h2 {
+  margin-bottom: 0;
+}
+
+.completion-record-note {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(23, 111, 102, 0.2);
+  border-radius: 8px;
+  background: var(--teal-soft);
+}
+
+.completion-record-note.practice {
+  border-color: var(--line);
+  background: var(--surface-strong);
+}
+
+.completion-record-note strong {
+  color: var(--ink);
+  font-size: 0.94rem;
+}
+
+.completion-record-note p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.83rem;
+  font-weight: 760;
+  line-height: 1.45;
+}
+
 #completion-summary,
 #wrong-review,
 #correct-review {
@@ -1703,6 +1742,11 @@ button:active,
   background: var(--teal-soft);
 }
 
+.completion-scoreboard.practice .completion-main-score {
+  border-color: var(--line);
+  background: var(--surface-strong);
+}
+
 .completion-main-score strong {
   display: block;
   color: var(--teal);
@@ -1712,10 +1756,23 @@ button:active,
 
 .completion-main-score span {
   display: block;
-  margin-top: 6px;
   color: var(--teal);
   font-size: 0.86rem;
   font-weight: 850;
+}
+
+.completion-main-score p {
+  margin: 7px 0 0;
+  color: var(--teal);
+  font-size: 0.84rem;
+  font-weight: 760;
+  line-height: 1.38;
+}
+
+.completion-scoreboard.practice .completion-main-score strong,
+.completion-scoreboard.practice .completion-main-score span,
+.completion-scoreboard.practice .completion-main-score p {
+  color: var(--ink);
 }
 
 .completion-metric-grid {
@@ -1817,6 +1874,10 @@ button:active,
   gap: 8px;
 }
 
+.completion-section-copy {
+  margin: 0;
+}
+
 .completion-header {
   display: flex;
   align-items: center;
@@ -1881,25 +1942,32 @@ button:active,
 }
 
 .wrong-review-card {
+  display: grid;
+  gap: 10px;
   padding: 13px;
   border: 1px solid var(--line);
+  border-left: 4px solid rgba(185, 74, 67, 0.34);
   border-radius: 8px;
   background: var(--surface);
 }
 
+.wrong-review-block {
+  display: grid;
+  gap: 7px;
+}
+
 .wrong-review-meaning {
-  margin: 0 0 10px;
-  color: var(--teal);
-  font-size: 1.14rem;
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.08rem;
   font-weight: 850;
-  line-height: 1.36;
+  line-height: 1.42;
 }
 
 .attempt-timeline {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 10px;
 }
 
 .attempt-chip {
@@ -1933,7 +2001,7 @@ button:active,
 .review-examples li {
   padding: 10px;
   border: 1px solid var(--line);
-  border-left: 3px solid var(--line-strong);
+  border-left: 3px solid rgba(23, 111, 102, 0.28);
   border-radius: 8px;
   background: var(--surface-strong);
 }
@@ -2025,25 +2093,25 @@ button:active,
 }
 
 .completion-sticky-actions {
-  position: fixed;
-  bottom: calc(82px + env(safe-area-inset-bottom));
-  left: 50%;
+  position: sticky;
+  bottom: calc(72px + env(safe-area-inset-bottom));
   z-index: 18;
   display: grid;
-  grid-template-columns: 0.86fr 1.14fr;
-  width: min(calc(100% - 32px), 488px);
+  grid-template-columns: 0.66fr 1fr 1.2fr;
+  width: 100%;
   gap: 8px;
-  padding: 8px;
+  padding: 6px;
   border: 1px solid rgba(214, 224, 219, 0.92);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--shadow);
-  transform: translateX(-50%);
   backdrop-filter: blur(18px);
 }
 
 .completion-sticky-actions .full {
-  min-height: 48px;
+  min-height: 44px;
+  padding-right: 10px;
+  padding-left: 10px;
 }
 
 .study-session-controls {
@@ -2877,5 +2945,13 @@ button:active,
   .study-card {
     min-height: 300px;
     padding: 18px;
+  }
+
+  .completion-sticky-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .completion-panel {
+    padding-bottom: 190px;
   }
 }

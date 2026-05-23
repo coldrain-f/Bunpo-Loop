@@ -2092,24 +2092,22 @@ function renderStudySession() {
           : `${round.round_no}회독 완료`;
     views.study.innerHTML = `
       <div id="completion-summary" class="panel stack completion-panel">
-        <p class="eyebrow">완료</p>
-        <h2 id="study-title">${completionTitle}</h2>
-        ${renderCompletionScoreboard(summary, round)}
+        <div class="completion-title-row">
+          <div>
+            <p class="eyebrow">완료</p>
+            <h2 id="study-title">${completionTitle}</h2>
+          </div>
+          ${renderCompletionRecordBadge(session)}
+        </div>
+        ${renderCompletionRecordNote(session)}
+        ${renderCompletionScoreboard(summary, round, session)}
         ${renderDurationComparison(round, session)}
         <p class="meta">${escapeHtml(session.group.name)} · ${getSessionOrderLabel(session)} · ${
           session.passNo
         }차 통과</p>
         ${renderRoundTime(round)}
         ${renderCompletionDetails(summary, session)}
-        <div class="completion-sticky-actions" aria-label="결과 화면 작업">
-          <button class="ghost-button full" type="button" data-action="scroll-completion-section" data-target="completion-summary">
-            ${iconLabel("chevron-up", "요약 보기")}
-          </button>
-          <button class="primary-button full" type="button" data-action="end-study">${iconLabel(
-            "arrow-left",
-            "돌아가기",
-          )}</button>
-        </div>
+        ${renderCompletionStickyActions(session)}
       </div>
     `;
     return;
@@ -2220,19 +2218,56 @@ function getCompletionSummary(session) {
   };
 }
 
-function renderCompletionScoreboard(summary, round) {
-  const attemptRate = round.total_cards ? Math.round((round.correct_count / round.total_cards) * 100) : 0;
+function getCompletionModeLabel(session) {
+  if (session.studyMode === "practice") return "기록 없는 연습";
+  if (session.studyMode === "weak") return "약점 복습";
+  return "공식 회독";
+}
+
+function renderCompletionRecordBadge(session) {
+  const label = getCompletionModeLabel(session);
+  const tone = session.studyMode === "practice" ? "muted" : "done";
+  return `<span class="status-pill ${tone}">${label}</span>`;
+}
+
+function renderCompletionRecordNote(session) {
+  if (session.studyMode === "practice") {
+    return `
+      <section class="completion-record-note practice">
+        <strong>공식 기록에 저장하지 않았습니다.</strong>
+        <p>묶음 연습은 지금 선택한 소그룹 카드만 임시로 합쳐 본 결과입니다. 회독 수, 정답률, 학습 이력에는 반영되지 않습니다.</p>
+      </section>
+    `;
+  }
+  if (session.studyMode === "weak") {
+    return `
+      <section class="completion-record-note">
+        <strong>약점 복습을 완료했습니다.</strong>
+        <p>오답 기준에 걸린 카드를 따로 훑어본 결과입니다. 소그룹 공식 회독 흐름과는 구분해서 보여줍니다.</p>
+      </section>
+    `;
+  }
+  return "";
+}
+
+function renderCompletionScoreboard(summary, round, session) {
+  const answerRate = summary.totalAttempts ? Math.round((number(round.correct_count) / summary.totalAttempts) * 100) : 0;
+  const firstAttemptRate = summary.uniqueCardCount
+    ? Math.round((summary.firstPassCorrectCount / summary.uniqueCardCount) * 100)
+    : 0;
+  const modeLabel = getCompletionModeLabel(session);
   return `
-    <div class="completion-scoreboard">
+    <div class="completion-scoreboard ${session.studyMode === "practice" ? "practice" : ""}">
       <div class="completion-main-score">
-        <strong>${summary.firstPassCorrectCount}/${summary.uniqueCardCount}</strong>
-        <span>첫 시도 정답</span>
+        <span>${modeLabel} 결과</span>
+        <strong>${firstAttemptRate}%</strong>
+        <p>첫 시도 ${summary.firstPassCorrectCount}/${summary.uniqueCardCount} · 풀이 정답률 ${answerRate}%</p>
       </div>
       <div class="completion-metric-grid">
+        <div><strong>${summary.uniqueCardCount}</strong><span>학습 카드</span></div>
+        <div><strong>${summary.repeatedCardCount}</strong><span>오답 카드</span></div>
         <div><strong>${summary.totalAttempts}</strong><span>총 풀이</span></div>
-        <div><strong>${round.wrong_count}</strong><span>오답</span></div>
-        <div><strong>${summary.repeatedCardCount}</strong><span>반복 카드</span></div>
-        <div><strong>${attemptRate}%</strong><span>풀이 정답률</span></div>
+        <div><strong>${formatDuration(round.duration_seconds)}</strong><span>소요시간</span></div>
       </div>
     </div>
   `;
@@ -2294,6 +2329,88 @@ function scrollToCompletionSection(targetId) {
   document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function getCompletionActionConfig(session) {
+  if (session.studyMode === "practice") {
+    return {
+      primary: { action: "completion-practice-again", icon: "repeat-2", label: "묶음 다시 고르기" },
+      secondary: { action: "completion-collection-detail", icon: "arrow-left", label: "대그룹 보기" },
+    };
+  }
+  if (session.studyMode === "weak") {
+    return {
+      primary: { action: "completion-weak-list", icon: "target", label: "약점 목록 보기" },
+      secondary: { action: "completion-study-home", icon: "arrow-left", label: "학습 홈" },
+    };
+  }
+  return {
+    primary: { action: "completion-next-round", icon: "repeat-2", label: "다음 회독" },
+    secondary: { action: "completion-group-list", icon: "arrow-left", label: "소그룹 선택" },
+  };
+}
+
+function renderCompletionStickyActions(session) {
+  const actions = getCompletionActionConfig(session);
+  return `
+    <div class="completion-sticky-actions" aria-label="결과 화면 작업">
+      <button class="ghost-button full" type="button" data-action="scroll-completion-section" data-target="completion-summary">
+        ${iconLabel("chevron-up", "요약")}
+      </button>
+      <button class="secondary-button full" type="button" data-action="${actions.secondary.action}">
+        ${iconLabel(actions.secondary.icon, actions.secondary.label)}
+      </button>
+      <button class="primary-button full" type="button" data-action="${actions.primary.action}">
+        ${iconLabel(actions.primary.icon, actions.primary.label)}
+      </button>
+    </div>
+  `;
+}
+
+function takeCompletionSessionSnapshot() {
+  const session = state.session;
+  if (!session) return null;
+  const snapshot = {
+    mode: session.studyMode,
+    collectionId: session.collection?.id || null,
+    groupId: session.studyMode === "weak" ? null : session.group?.id || null,
+    selectedGroupIds: (session.selectedGroups || []).map((group) => group.id),
+  };
+  if (snapshot.mode === "practice") {
+    state.selectedCollectionId = snapshot.collectionId;
+    state.selectedStudyGroupIds = snapshot.selectedGroupIds;
+  } else if (snapshot.mode !== "weak") {
+    state.selectedGroupId = snapshot.groupId;
+    state.selectedCollectionId = snapshot.collectionId || state.selectedCollectionId;
+  }
+  state.session = null;
+  state.completionCorrectOpen = false;
+  state.activeDialog = null;
+  return snapshot;
+}
+
+function navigateFromCompletion(target) {
+  const snapshot = takeCompletionSessionSnapshot();
+  if (!snapshot) return;
+  if (target === "next-round") {
+    state.studyStep = "ready";
+    state.activeDialog = "start";
+  } else if (target === "group-list") {
+    state.selectedGroupId = null;
+    state.studyStep = state.selectedCollectionId ? "collection" : "select";
+  } else if (target === "practice-again") {
+    state.studyStep = "collection";
+    state.activeDialog = "collection-study-picker";
+  } else if (target === "collection-detail") {
+    state.studyStep = "collection";
+  } else if (target === "weak-list") {
+    state.studyStep = "select";
+    state.weakPanelOpen = true;
+  } else {
+    state.studyStep = "select";
+  }
+  render();
+  scrollToTop();
+}
+
 function renderCompletionDetails(summary, session) {
   const firstPassItems = summary.cardSummaries
     .filter((item) => item.attempts[0]?.result === "correct")
@@ -2349,21 +2466,23 @@ function renderWrongReview(summary, session) {
       </div>
       ${
         summary.wrongCardSummaries.length
-          ? `<div class="wrong-review-list">${summary.wrongCardSummaries.map(renderWrongReviewCard).join("")}</div>`
+          ? `<p class="meta completion-section-copy">이번 ${sessionLabel}에서 흔들렸던 카드입니다. 뜻과 시도 흐름을 같이 확인하세요.</p><div class="wrong-review-list">${summary.wrongCardSummaries.map(renderWrongReviewCard).join("")}</div>`
           : `<p class="meta">이번 ${sessionLabel}에서 다시 볼 오답 카드가 없습니다.</p>`
       }
     </section>
   `;
 }
 
-function renderCorrectCollapsedSummary(count) {
+function renderCorrectCollapsedSummary(count, controlsId = "correct-review-list") {
   return `
     <div class="completion-collapsed-summary">
       <div>
         <strong>한 번에 맞은 카드 ${count}개</strong>
         <p>확인이 필요할 때만 목록을 펼쳐서 봅니다.</p>
       </div>
-      <button class="secondary-button small-button" type="button" data-action="toggle-completion-correct">
+      <button class="secondary-button small-button" type="button" data-action="toggle-completion-correct" aria-expanded="false" aria-controls="${escapeHtml(
+        controlsId,
+      )}">
         ${iconLabel("chevron-down", "목록 보기")}
       </button>
     </div>
@@ -2379,16 +2498,26 @@ function renderWrongReviewCard(summary) {
         <strong>${renderJapaneseText(summary.card.front)}</strong>
         <span class="pill bad">${summary.wrongCount}오답</span>
       </div>
-      <p class="wrong-review-meaning">${escapeHtml(summary.card.back)}</p>
-      <div class="attempt-timeline">
-        ${summary.attempts.map(renderAttemptChip).join("")}
-      </div>
+      <section class="wrong-review-block">
+        <span class="study-section-label">뜻</span>
+        <p class="wrong-review-meaning">${escapeHtml(summary.card.back)}</p>
+      </section>
+      <section class="wrong-review-block">
+        <span class="study-section-label">시도 흐름</span>
+        <div class="attempt-timeline">
+          ${summary.attempts.map(renderAttemptChip).join("")}
+        </div>
+      </section>
       ${
-        summary.card.memo ? `<p class="study-note">${escapeHtml(summary.card.memo)}</p>` : ""
+        summary.card.memo
+          ? `<section class="wrong-review-block"><span class="study-section-label">메모</span><p class="study-note">${escapeHtml(
+              summary.card.memo,
+            )}</p></section>`
+          : ""
       }
       ${
         visibleExamples.length
-          ? `<ul class="review-examples">${visibleExamples
+          ? `<section class="wrong-review-block"><span class="study-section-label">예문</span><ul class="review-examples">${visibleExamples
               .map(
                 (example) => `
                   <li>
@@ -2397,7 +2526,7 @@ function renderWrongReviewCard(summary) {
                   </li>
                 `,
               )
-              .join("")}</ul>`
+              .join("")}</ul></section>`
           : `<p class="meta">예문 없음</p>`
       }
       ${examples.length > visibleExamples.length ? `<p class="meta">예문 ${examples.length - visibleExamples.length}개 더 있음</p>` : ""}
@@ -2415,15 +2544,19 @@ function renderCompletionSection(title, items, tone, options = {}) {
   const emptyText = tone === "bad" ? "이번 회독에서 틀린 카드가 없습니다." : "첫 시도에서 바로 맞은 카드가 없습니다.";
   const isCollapsed = Boolean(options.collapsible && !options.open && items.length);
   const sectionId = options.id ? ` id="${escapeHtml(options.id)}"` : "";
+  const titleId = options.id ? `${options.id}-title` : "";
+  const listId = options.id ? `${options.id}-list` : "";
   return `
-    <section${sectionId} class="completion-section">
+    <section${sectionId} class="completion-section"${titleId ? ` aria-labelledby="${escapeHtml(titleId)}"` : ""}>
       <div class="completion-header">
-        <h3>${title}</h3>
+        <h3${titleId ? ` id="${escapeHtml(titleId)}"` : ""}>${title}</h3>
         <div class="completion-header-actions">
           <span class="pill ${tone}">${items.length}개</span>
           ${
             options.collapsible && items.length && options.open
-              ? `<button class="ghost-button small-button" type="button" data-action="toggle-completion-correct">
+              ? `<button class="ghost-button small-button" type="button" data-action="toggle-completion-correct" aria-expanded="true" aria-controls="${escapeHtml(
+                  listId,
+                )}">
                   ${iconLabel("chevron-up", "목록 접기")}
                 </button>`
               : ""
@@ -2432,9 +2565,11 @@ function renderCompletionSection(title, items, tone, options = {}) {
       </div>
       ${
         isCollapsed
-          ? renderCorrectCollapsedSummary(items.length)
+          ? renderCorrectCollapsedSummary(items.length, listId)
           : items.length
-          ? `<div class="result-list">${items.map((item) => renderResultItem(item, tone)).join("")}</div>`
+          ? `<div class="result-list"${listId ? ` id="${escapeHtml(listId)}"` : ""}>${items
+              .map((item) => renderResultItem(item, tone))
+              .join("")}</div>`
           : `<p class="meta">${emptyText}</p>`
       }
     </section>
@@ -4174,6 +4309,30 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "jump-wrong-review") {
       scrollToCompletionSection("wrong-review");
+    }
+    if (action === "completion-next-round") {
+      navigateFromCompletion("next-round");
+      return;
+    }
+    if (action === "completion-group-list") {
+      navigateFromCompletion("group-list");
+      return;
+    }
+    if (action === "completion-practice-again") {
+      navigateFromCompletion("practice-again");
+      return;
+    }
+    if (action === "completion-collection-detail") {
+      navigateFromCompletion("collection-detail");
+      return;
+    }
+    if (action === "completion-weak-list") {
+      navigateFromCompletion("weak-list");
+      return;
+    }
+    if (action === "completion-study-home") {
+      navigateFromCompletion("study-home");
+      return;
     }
     if (action === "scroll-completion-section") {
       scrollToCompletionSection(actionEl.dataset.target);

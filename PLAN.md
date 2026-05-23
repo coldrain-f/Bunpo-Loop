@@ -70,9 +70,9 @@ Core direction:
 - [x] Phase 4. Study Session
   - [x] 4.1 Card Front/Back Reading Polish
   - [x] 4.2 Answer Bar Stability
-- [ ] Phase 5. Completion Loop
-  - [ ] 5.1 Completion Summary Redesign
-  - [ ] 5.2 Next Action Design
+- [x] Phase 5. Completion Loop
+  - [x] 5.1 Completion Summary Redesign
+  - [x] 5.2 Next Action Design
 - [ ] Phase 6. Cards Tab
   - [ ] 6.1 Card List Information Design
   - [ ] 6.2 Single/Bulk Form UX
@@ -313,10 +313,10 @@ Purpose:
 학습 완료 후 결과를 이해하고 다음 행동으로 이어지게 한다.
 
 Tasks:
-- [ ] accuracy, wrong count, duration, studied count를 명확한 scoreboard로 정리한다.
-- [ ] practice mode completion에는 "기록 없음"을 분명히 표시한다.
-- [ ] wrong review section을 더 읽기 좋게 만든다.
-- [ ] correct review는 기본 접힘을 유지하되 접근성을 높인다.
+- [x] accuracy, wrong count, duration, studied count를 명확한 scoreboard로 정리한다.
+- [x] practice mode completion에는 "기록 없음"을 분명히 표시한다.
+- [x] wrong review section을 더 읽기 좋게 만든다.
+- [x] correct review는 기본 접힘을 유지하되 접근성을 높인다.
 
 Files:
 - `static/app.js`
@@ -332,9 +332,9 @@ Purpose:
 완료 후 학습 루프가 끊기지 않게 한다.
 
 Tasks:
-- [ ] 다음 회독, 같은 소그룹 다시, 소그룹 선택으로 돌아가기 중 상황별 primary action을 정의한다.
-- [ ] 약점 복습 완료와 일반 회독 완료의 CTA를 분리한다.
-- [ ] sticky action bar를 `DESIGN.md` 기준으로 정리한다.
+- [x] 다음 회독, 같은 소그룹 다시, 소그룹 선택으로 돌아가기 중 상황별 primary action을 정의한다.
+- [x] 약점 복습 완료와 일반 회독 완료의 CTA를 분리한다.
+- [x] sticky action bar를 `DESIGN.md` 기준으로 정리한다.
 
 Files:
 - `static/app.js`
