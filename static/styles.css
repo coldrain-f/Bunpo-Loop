@@ -1134,6 +1134,20 @@ button:active,
   text-align: left;
 }
 
+.collection-list-main {
+  display: block;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.collection-list-main:focus-visible {
+  outline: 3px solid rgba(22, 107, 98, 0.18);
+  outline-offset: 3px;
+}
+
 .group-item.active {
   border-color: var(--teal);
   box-shadow: 0 0 0 3px rgba(22, 107, 98, 0.12);

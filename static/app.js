@@ -63,7 +63,7 @@ const state = {
   groupSearchQuery: "",
   cardScreen: "list",
   groupScreen: "list",
-  groupManageMode: "collections",
+  groupDetailCollectionId: null,
   cardEntryMode: "single",
   bulkDraftText: "",
   bulkDraftGroupId: null,
@@ -153,6 +153,12 @@ async function loadData() {
   if (!state.collections.some((collection) => collection.id === state.selectedCollectionId)) {
     state.selectedCollectionId = state.collections[0]?.id ?? null;
   }
+  if (
+    state.groupDetailCollectionId &&
+    !state.collections.some((collection) => Number(collection.id) === Number(state.groupDetailCollectionId))
+  ) {
+    state.groupDetailCollectionId = null;
+  }
   const selectedCollectionGroups = getGroupsForCollection(state.selectedCollectionId);
   const selectedGroupIds = new Set(selectedCollectionGroups.map((group) => Number(group.id)));
   state.selectedStudyGroupIds = state.selectedStudyGroupIds
@@ -213,6 +219,10 @@ function getHeaderContext() {
     if (state.editingGroupId) return "그룹 · 수정";
     if (state.groupScreen === "collection-form") return "대그룹 · 등록";
     if (state.groupScreen === "group-form") return "소그룹 · 등록";
+    if (state.groupDetailCollectionId) {
+      const collection = state.collections.find((item) => Number(item.id) === Number(state.groupDetailCollectionId));
+      return collection ? `그룹 · ${collection.name}` : "그룹 관리";
+    }
     return "그룹 관리";
   }
   if (state.activeTab === "settings") return "설정";
@@ -2346,9 +2356,13 @@ function renderCardListItem(card) {
 function renderGroups() {
   const editing = state.groups.find((group) => group.id === state.editingGroupId) ?? null;
   const editingCollection = state.collections.find((collection) => collection.id === state.editingCollectionId) ?? null;
-  const visibleGroups = state.groups.filter((group) =>
-    matchesQuery([group.name, group.description, group.collection_name], state.groupSearchQuery),
-  );
+  const detailCollection =
+    state.collections.find((collection) => Number(collection.id) === Number(state.groupDetailCollectionId)) ?? null;
+  const detailGroups = detailCollection
+    ? getGroupsForCollection(detailCollection.id).filter((group) =>
+        matchesQuery([group.name, group.description], state.groupSearchQuery),
+      )
+    : [];
   const visibleCollections = state.collections.filter((collection) =>
     matchesQuery([collection.name, collection.description], state.groupSearchQuery),
   );
@@ -2360,7 +2374,11 @@ function renderGroups() {
     views.groups.innerHTML = renderGroupEditorPanel(editing);
     return;
   }
-  views.groups.innerHTML = renderGroupListPanel(visibleCollections, visibleGroups);
+  if (detailCollection) {
+    views.groups.innerHTML = renderCollectionDetailPanel(detailCollection, detailGroups);
+    return;
+  }
+  views.groups.innerHTML = renderGroupListPanel(visibleCollections);
 }
 
 function renderCollectionEditorPanel(editing) {
@@ -2393,7 +2411,8 @@ function renderCollectionEditorPanel(editing) {
 }
 
 function renderGroupEditorPanel(editing) {
-  const selectedCollectionId = editing?.collection_id ?? state.selectedCollectionId ?? state.collections[0]?.id;
+  const selectedCollectionId =
+    editing?.collection_id ?? state.groupDetailCollectionId ?? state.selectedCollectionId ?? state.collections[0]?.id;
   return `
     <div class="panel stack">
       <div class="row">
@@ -2403,7 +2422,7 @@ function renderGroupEditorPanel(editing) {
         </div>
         <button class="ghost-button small-button" type="button" data-action="show-group-list">${iconLabel(
           "list",
-          "목록",
+          state.groupDetailCollectionId ? "소그룹" : "목록",
         )}</button>
       </div>
       ${editing ? `<p class="meta">소그룹명과 설명만 바뀌고, 카드와 학습 기록은 유지됩니다.</p>` : ""}
@@ -2426,44 +2445,62 @@ function renderGroupEditorPanel(editing) {
   `;
 }
 
-function renderGroupManageModeTabs() {
-  return `
-    <div class="segmented two" role="group" aria-label="그룹 관리 범위">
-      <button class="segment ${state.groupManageMode === "collections" ? "active" : ""}" type="button" data-action="set-group-manage-mode" data-mode="collections">대그룹</button>
-      <button class="segment ${state.groupManageMode === "groups" ? "active" : ""}" type="button" data-action="set-group-manage-mode" data-mode="groups">소그룹</button>
-    </div>
-  `;
-}
-
-function renderGroupListPanel(visibleCollections, visibleGroups) {
-  const showingCollections = state.groupManageMode === "collections";
-  const count = showingCollections ? visibleCollections.length : visibleGroups.length;
+function renderGroupListPanel(visibleCollections) {
   return `
     <div class="panel stack">
       <div class="row">
         <div>
           <p class="eyebrow">그룹</p>
-          <h2 id="groups-title">${showingCollections ? "대그룹 목록" : "소그룹 목록"}</h2>
+          <h2 id="groups-title">대그룹 목록</h2>
         </div>
-        <span class="pill">${count}개</span>
+        <span class="pill">${visibleCollections.length}개</span>
       </div>
-      ${renderGroupManageModeTabs()}
-      <button class="primary-button full" type="button" data-action="${
-        showingCollections ? "open-collection-form" : "open-group-form"
-      }" ${showingCollections || state.collections.length ? "" : "disabled"}>${iconLabel(
+      <button class="primary-button full" type="button" data-action="open-collection-form">${iconLabel(
         "plus",
-        showingCollections ? "대그룹 등록" : "소그룹 등록",
+        "대그룹 등록",
       )}</button>
-      ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "그룹 검색" })}
+      ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "대그룹 검색" })}
       <div class="group-list">
         ${
-          showingCollections
-            ? visibleCollections.length
-              ? visibleCollections.map(renderCollectionListItem).join("")
-              : `<div class="empty-state">${state.collections.length ? "검색된 대그룹이 없습니다." : "등록된 대그룹이 없습니다."}</div>`
-            : visibleGroups.length
-              ? visibleGroups.map(renderGroupListItem).join("")
-              : `<div class="empty-state">${state.groups.length ? "검색된 소그룹이 없습니다." : "등록된 소그룹이 없습니다."}</div>`
+          visibleCollections.length
+            ? visibleCollections.map(renderCollectionListItem).join("")
+            : `<div class="empty-state">${state.collections.length ? "검색된 대그룹이 없습니다." : "등록된 대그룹이 없습니다."}</div>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderCollectionDetailPanel(collection, visibleGroups) {
+  return `
+    <div class="panel stack">
+      <div class="row">
+        <div>
+          <p class="eyebrow">대그룹</p>
+          <h2 id="groups-title">${escapeHtml(collection.name)}</h2>
+        </div>
+        <button class="ghost-button small-button" type="button" data-action="back-to-collections">${iconLabel(
+          "arrow-left",
+          "대그룹",
+        )}</button>
+      </div>
+      <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
+      <div class="stat-grid">
+        <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
+        <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
+        <div class="stat"><strong>${number(collection.wrong_total)}</strong><span>틀림</span></div>
+      </div>
+      <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${
+        collection.id
+      }">${iconLabel("plus", "소그룹 등록")}</button>
+      ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "소그룹 검색" })}
+      <div class="group-list">
+        ${
+          visibleGroups.length
+            ? visibleGroups.map(renderGroupListItem).join("")
+            : `<div class="empty-state">${
+                getGroupsForCollection(collection.id).length ? "검색된 소그룹이 없습니다." : "등록된 소그룹이 없습니다."
+              }</div>`
         }
       </div>
     </div>
@@ -2640,21 +2677,19 @@ function renderCollectionListItem(collection) {
   const hasHistory =
     number(collection.completed_rounds) > 0 || number(collection.correct_total) > 0 || number(collection.wrong_total) > 0;
   return `
-    <article class="group-item ${collection.id === state.selectedCollectionId ? "active" : ""}">
-      <div class="item-title">
-        <strong>${escapeHtml(collection.name)}</strong>
-        <button class="pill group-card-count" type="button" data-action="preview-collection-cards" data-collection-id="${
-          collection.id
-        }" aria-label="${escapeHtml(`${collection.name} 카드 ${number(collection.card_count)}개 미리보기`)}">${number(
-          collection.card_count,
-        )}개</button>
-      </div>
-      <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
-      <div class="stat-grid">
-        <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
-        <div class="stat"><strong>${number(collection.completed_rounds)}</strong><span>회독</span></div>
-        <div class="stat"><strong>${number(collection.wrong_total)}</strong><span>틀림</span></div>
-      </div>
+    <article class="group-item collection-item ${collection.id === state.selectedCollectionId ? "active" : ""}">
+      <button class="collection-list-main" type="button" data-action="open-collection-detail" data-collection-id="${collection.id}">
+        <div class="item-title">
+          <strong>${escapeHtml(collection.name)}</strong>
+          <span class="pill">${number(collection.card_count)}개</span>
+        </div>
+        <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
+        <div class="stat-grid">
+          <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
+          <div class="stat"><strong>${number(collection.completed_rounds)}</strong><span>회독</span></div>
+          <div class="stat"><strong>${number(collection.wrong_total)}</strong><span>틀림</span></div>
+        </div>
+      </button>
       <button class="ghost-button full reset-history-button" type="button" data-action="reset-collection-history" data-collection-id="${
         collection.id
       }" ${hasHistory ? "" : "disabled"}>${iconLabel("rotate-ccw", "기록 초기화")}</button>
@@ -2945,9 +2980,9 @@ async function saveGroup(form) {
   state.editingGroupId = null;
   state.selectedCollectionId = payload.collection_id;
   state.selectedGroupId = data.group.id;
+  state.groupDetailCollectionId = payload.collection_id;
   state.groupSearchQuery = "";
   state.groupScreen = "list";
-  state.groupManageMode = "groups";
   await loadData();
   render();
   showToast(isEditing ? "그룹을 저장했습니다." : "그룹을 등록했습니다.");
@@ -2962,9 +2997,9 @@ async function saveCollection(form) {
   });
   state.editingCollectionId = null;
   state.selectedCollectionId = data.collection.id;
+  state.groupDetailCollectionId = data.collection.id;
   state.groupSearchQuery = "";
   state.groupScreen = "list";
-  state.groupManageMode = "collections";
   await loadData();
   render();
   showToast(isEditing ? "대그룹을 저장했습니다." : "대그룹을 등록했습니다.");
@@ -3057,6 +3092,7 @@ function logout() {
     selectedCollectionId: null,
     selectedStudyGroupIds: [],
     selectedGroupId: null,
+    groupDetailCollectionId: null,
     session: null,
     activeDialog: null,
     roundDetail: null,
@@ -3070,7 +3106,6 @@ function logout() {
     groupSearchQuery: "",
     cardScreen: "list",
     groupScreen: "list",
-    groupManageMode: "collections",
     cardEntryMode: "single",
     bulkDraftText: "",
     bulkDraftGroupId: null,
@@ -3168,6 +3203,7 @@ async function deletePendingCollection() {
   if (!collectionId) return;
   await request(`/api/collections/${collectionId}`, { method: "DELETE" });
   if (state.selectedCollectionId === collectionId) state.selectedCollectionId = null;
+  if (Number(state.groupDetailCollectionId) === collectionId) state.groupDetailCollectionId = null;
   state.pendingAction = null;
   state.activeDialog = null;
   await loadData();
@@ -3214,7 +3250,7 @@ document.addEventListener("click", async (event) => {
     if (action === "go-groups") {
       state.activeTab = "groups";
       state.groupScreen = "collection-form";
-      state.groupManageMode = "collections";
+      state.groupDetailCollectionId = null;
       state.editingCollectionId = null;
       state.editingGroupId = null;
       render();
@@ -3274,9 +3310,9 @@ document.addEventListener("click", async (event) => {
     if (action === "open-group-form-for-collection") {
       const collectionId = Number(actionEl.dataset.collectionId);
       state.selectedCollectionId = collectionId || state.selectedCollectionId;
+      state.groupDetailCollectionId = collectionId || state.groupDetailCollectionId;
       state.activeTab = "groups";
       state.groupScreen = "group-form";
-      state.groupManageMode = "groups";
       state.editingGroupId = null;
       state.editingCollectionId = null;
       render();
@@ -3474,32 +3510,46 @@ document.addEventListener("click", async (event) => {
     if (action === "open-group-form") {
       state.editingGroupId = null;
       state.editingCollectionId = null;
+      state.groupDetailCollectionId = state.groupDetailCollectionId || state.selectedCollectionId;
       state.groupScreen = "group-form";
-      state.groupManageMode = "groups";
-      renderGroups();
+      render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "open-collection-form") {
       state.editingCollectionId = null;
       state.editingGroupId = null;
+      state.groupDetailCollectionId = null;
       state.groupScreen = "collection-form";
-      state.groupManageMode = "collections";
-      renderGroups();
+      render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "show-group-list") {
       state.editingGroupId = null;
       state.editingCollectionId = null;
       state.groupScreen = "list";
-      renderGroups();
+      render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
-    if (action === "set-group-manage-mode") {
-      state.groupManageMode = actionEl.dataset.mode;
+    if (action === "open-collection-detail") {
+      const collectionId = Number(actionEl.dataset.collectionId);
+      if (!state.collections.some((collection) => Number(collection.id) === collectionId)) return;
+      state.groupDetailCollectionId = collectionId;
+      state.selectedCollectionId = collectionId;
       state.groupScreen = "list";
       state.editingGroupId = null;
       state.editingCollectionId = null;
-      renderGroups();
+      state.groupSearchQuery = "";
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    if (action === "back-to-collections") {
+      state.groupDetailCollectionId = null;
+      state.groupScreen = "list";
+      state.editingGroupId = null;
+      state.editingCollectionId = null;
+      state.groupSearchQuery = "";
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "clear-search") {
       const target = actionEl.dataset.target;
@@ -3561,25 +3611,25 @@ document.addEventListener("click", async (event) => {
       }
     }
     if (action === "edit-group") {
+      const group = state.groups.find((item) => item.id === Number(actionEl.dataset.groupId));
       state.editingGroupId = Number(actionEl.dataset.groupId);
       state.editingCollectionId = null;
+      if (group) state.groupDetailCollectionId = group.collection_id;
       state.groupScreen = "group-form";
-      state.groupManageMode = "groups";
-      renderGroups();
+      render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "edit-collection") {
       state.editingCollectionId = Number(actionEl.dataset.collectionId);
       state.editingGroupId = null;
       state.groupScreen = "collection-form";
-      state.groupManageMode = "collections";
-      renderGroups();
+      render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "reset-group-form") {
       state.editingGroupId = null;
       state.groupScreen = "group-form";
-      renderGroups();
+      render();
     }
     if (action === "reset-history") {
       const group = state.groups.find((item) => item.id === Number(actionEl.dataset.groupId));
