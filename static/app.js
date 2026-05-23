@@ -252,6 +252,126 @@ async function request(path, options = {}) {
   return data;
 }
 
+function reconcileLoadedState() {
+  const collectionIds = new Set(state.collections.map((collection) => Number(collection.id)));
+  const groupById = new Map(state.groups.map((group) => [Number(group.id), group]));
+  const cardIds = new Set(state.cards.map((card) => Number(card.id)));
+
+  if (!state.collections.length) {
+    state.selectedCollectionId = null;
+    state.selectedStudyGroupIds = [];
+    state.selectedGroupId = null;
+    state.groupDetailCollectionId = null;
+    state.cardFilterCollectionId = "";
+    state.cardFilterGroupId = "";
+    state.studyStep = "select";
+  } else if (!collectionIds.has(Number(state.selectedCollectionId))) {
+    state.selectedCollectionId = state.collections[0]?.id ?? null;
+  }
+
+  if (state.groupDetailCollectionId && !collectionIds.has(Number(state.groupDetailCollectionId))) {
+    state.groupDetailCollectionId = null;
+  }
+
+  const selectedCollectionGroups = getGroupsForCollection(state.selectedCollectionId);
+  const selectedCollectionGroupIds = new Set(selectedCollectionGroups.map((group) => Number(group.id)));
+  state.selectedStudyGroupIds = state.selectedStudyGroupIds
+    .map(Number)
+    .filter((groupId) => selectedCollectionGroupIds.has(groupId));
+  if (!state.selectedStudyGroupIds.length) {
+    state.selectedStudyGroupIds = selectedCollectionGroups.filter((group) => number(group.card_count) > 0).map((group) => group.id);
+  }
+
+  const selectedGroup = groupById.get(Number(state.selectedGroupId));
+  if (
+    !selectedGroup ||
+    (state.selectedCollectionId && Number(selectedGroup.collection_id) !== Number(state.selectedCollectionId))
+  ) {
+    state.selectedGroupId = selectedCollectionGroups[0]?.id ?? null;
+  }
+
+  if (
+    state.cardFilterCollectionId &&
+    state.cardFilterCollectionId !== "all" &&
+    !collectionIds.has(Number(state.cardFilterCollectionId))
+  ) {
+    state.cardFilterCollectionId = "";
+  }
+  if (!state.cardFilterCollectionId && state.collections.length) {
+    state.cardFilterCollectionId = "all";
+  }
+  if (state.cardFilterGroupId && !groupById.has(Number(state.cardFilterGroupId))) {
+    state.cardFilterGroupId = "";
+  }
+  const filteredGroup = groupById.get(Number(state.cardFilterGroupId));
+  if (filteredGroup) {
+    state.cardFilterCollectionId = String(filteredGroup.collection_id);
+  }
+  if (
+    state.cardFilterCollectionId !== "all" &&
+    state.cardFilterCollectionId &&
+    state.cardFilterGroupId &&
+    !getGroupsForCollection(state.cardFilterCollectionId).some((group) => String(group.id) === String(state.cardFilterGroupId))
+  ) {
+    state.cardFilterGroupId = "";
+  }
+
+  if (state.editingCardId && !cardIds.has(Number(state.editingCardId))) {
+    state.editingCardId = null;
+    state.cardScreen = "list";
+  }
+  if (state.editingGroupId && !groupById.has(Number(state.editingGroupId))) {
+    state.editingGroupId = null;
+    state.groupScreen = "list";
+  }
+  if (state.editingCollectionId && !collectionIds.has(Number(state.editingCollectionId))) {
+    state.editingCollectionId = null;
+    state.groupScreen = "list";
+  }
+  if (state.bulkDraftGroupId && !groupById.has(Number(state.bulkDraftGroupId))) {
+    state.bulkDraftGroupId = null;
+    state.bulkPreview = null;
+  }
+  if (state.bulkPreview?.groupId && !groupById.has(Number(state.bulkPreview.groupId))) {
+    state.bulkPreview = null;
+  }
+  if (state.weakCardOpenId && !cardIds.has(Number(state.weakCardOpenId))) {
+    state.weakCardOpenId = null;
+  }
+  if (state.roundDetail?.id && !state.rounds.some((round) => Number(round.id) === Number(state.roundDetail.id))) {
+    state.roundDetail = null;
+  }
+  if (state.studyStep === "collection" && !state.selectedCollectionId) {
+    state.studyStep = "select";
+  }
+  if (state.studyStep === "ready" && !state.selectedGroupId) {
+    state.studyStep = state.selectedCollectionId ? "collection" : "select";
+  }
+}
+
+function resetDataScopedUiState() {
+  Object.assign(state, {
+    session: null,
+    activeDialog: null,
+    roundDetail: null,
+    pendingTab: null,
+    pendingAction: null,
+    editingCardId: null,
+    editingGroupId: null,
+    editingCollectionId: null,
+    cardScreen: "list",
+    groupScreen: "list",
+    groupDetailCollectionId: null,
+    bulkDraftText: "",
+    bulkDraftGroupId: null,
+    bulkPreview: null,
+    weakPanelOpen: false,
+    weakCardOpenId: null,
+    completionCorrectOpen: false,
+    scrollPositions: {},
+  });
+}
+
 async function loadData() {
   const [collectionData, groupData, cardData, roundData, settingsData] = await Promise.all([
     request("/api/collections"),
@@ -273,54 +393,7 @@ async function loadData() {
     weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
     ...(settingsData.settings || {}),
   };
-  if (!state.collections.some((collection) => collection.id === state.selectedCollectionId)) {
-    state.selectedCollectionId = state.collections[0]?.id ?? null;
-  }
-  if (
-    state.groupDetailCollectionId &&
-    !state.collections.some((collection) => Number(collection.id) === Number(state.groupDetailCollectionId))
-  ) {
-    state.groupDetailCollectionId = null;
-  }
-  const selectedCollectionGroups = getGroupsForCollection(state.selectedCollectionId);
-  const selectedGroupIds = new Set(selectedCollectionGroups.map((group) => Number(group.id)));
-  state.selectedStudyGroupIds = state.selectedStudyGroupIds
-    .map(Number)
-    .filter((groupId) => selectedGroupIds.has(groupId));
-  if (!state.selectedStudyGroupIds.length) {
-    state.selectedStudyGroupIds = selectedCollectionGroups.filter((group) => number(group.card_count) > 0).map((group) => group.id);
-  }
-  if (!state.groups.some((group) => group.id === state.selectedGroupId)) {
-    state.selectedGroupId = state.groups[0]?.id ?? null;
-  }
-  if (
-    state.cardFilterCollectionId &&
-    state.cardFilterCollectionId !== "all" &&
-    !state.collections.some((collection) => String(collection.id) === String(state.cardFilterCollectionId))
-  ) {
-    state.cardFilterCollectionId = "";
-  }
-  if (!state.cardFilterCollectionId && state.collections.length) {
-    state.cardFilterCollectionId = "all";
-  }
-  if (state.cardFilterGroupId && !state.groups.some((group) => String(group.id) === String(state.cardFilterGroupId))) {
-    state.cardFilterGroupId = "";
-  }
-  const filteredGroup = state.groups.find((group) => String(group.id) === String(state.cardFilterGroupId));
-  if (filteredGroup) {
-    state.cardFilterCollectionId = String(filteredGroup.collection_id);
-  }
-  if (
-    state.cardFilterCollectionId !== "all" &&
-    state.cardFilterCollectionId &&
-    state.cardFilterGroupId &&
-    !getGroupsForCollection(state.cardFilterCollectionId).some((group) => String(group.id) === String(state.cardFilterGroupId))
-  ) {
-    state.cardFilterGroupId = "";
-  }
-  if (state.weakCardOpenId && !state.cards.some((card) => Number(card.id) === Number(state.weakCardOpenId))) {
-    state.weakCardOpenId = null;
-  }
+  reconcileLoadedState();
 }
 
 function handleLoadDataError(error) {
@@ -4416,9 +4489,7 @@ async function restoreBackup() {
   if (!backup) return;
   try {
     const data = await request("/api/backup", { method: "POST", body: JSON.stringify(backup) });
-    state.pendingAction = null;
-    state.activeDialog = null;
-    state.session = null;
+    resetDataScopedUiState();
     state.backupError = "";
     state.backupDraftText = "";
     await loadData();

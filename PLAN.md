@@ -96,11 +96,11 @@ Core direction:
 - [x] Phase 12. Language Neutrality & Product Copy
   - [x] 12.1 Generic Subject Cleanup
   - [x] 12.2 Copy Inventory & Tone Pass
-- [ ] Phase 13. Data Integrity & State Resilience
-  - [ ] 13.1 Official vs Practice Stats Audit
-  - [ ] 13.2 Destructive Actions & Restore Safety
-  - [ ] 13.3 Client State Edge Cases
-  - [ ] 13.4 Backup Schema & Migration Contract
+- [x] Phase 13. Data Integrity & State Resilience
+  - [x] 13.1 Official vs Practice Stats Audit
+  - [x] 13.2 Destructive Actions & Restore Safety
+  - [x] 13.3 Client State Edge Cases
+  - [x] 13.4 Backup Schema & Migration Contract
 - [ ] Phase 14. Performance & Large Data UX
   - [ ] 14.1 List Rendering & Search Responsiveness
   - [ ] 14.2 Network/Request Feedback
@@ -690,11 +690,11 @@ Purpose:
 소그룹 공식 학습과 기록 없는 묶음 연습의 경계가 데이터에서도 절대 섞이지 않게 한다.
 
 Tasks:
-- [ ] 소그룹 공식 학습 완료 시 `study_rounds`, `study_round_groups`, `reviews`, card stats 업데이트를 검증한다.
-- [ ] 묶음 연습 완료 시 공식 이력/통계가 저장되지 않는지 검증한다.
-- [ ] 약점 복습 완료 시 어떤 통계가 변해야 하는지 명확히 정한다.
-- [ ] 대그룹 aggregate stats가 독립 이력처럼 계산되지 않는지 확인한다.
-- [ ] 소그룹 삭제/대그룹 삭제 후 orphan round/review가 남지 않는지 확인한다.
+- [x] 소그룹 공식 학습 완료 시 `study_rounds`, `study_round_groups`, `reviews`, card stats 업데이트를 검증한다.
+- [x] 묶음 연습 완료 시 공식 이력/통계가 저장되지 않는지 검증한다.
+- [x] 약점 복습 완료 시 어떤 통계가 변해야 하는지 명확히 정한다.
+- [x] 대그룹 aggregate stats가 독립 이력처럼 계산되지 않는지 확인한다.
+- [x] 소그룹 삭제/대그룹 삭제 후 orphan round/review가 남지 않는지 확인한다.
 
 Files:
 - `app.py`
@@ -711,11 +711,11 @@ Purpose:
 삭제, 초기화, 복원은 실수 비용이 크므로 별도 안전 기준을 둔다.
 
 Tasks:
-- [ ] 카드/소그룹/대그룹 삭제 dialog가 삭제 대상과 영향 범위를 명확히 말한다.
-- [ ] 소그룹 학습기록 초기화와 대그룹 하위 기록 초기화의 차이를 설명한다.
-- [ ] 백업 복원 전 현재 데이터가 대체된다는 점을 구체적으로 보여준다.
-- [ ] 복원 실패 시 기존 데이터가 손상되지 않는지 확인한다.
-- [ ] 삭제/초기화 후 선택된 collection/group/card state를 안전하게 재설정한다.
+- [x] 카드/소그룹/대그룹 삭제 dialog가 삭제 대상과 영향 범위를 명확히 말한다.
+- [x] 소그룹 학습기록 초기화와 대그룹 하위 기록 초기화의 차이를 설명한다.
+- [x] 백업 복원 전 현재 데이터가 대체된다는 점을 구체적으로 보여준다.
+- [x] 복원 실패 시 기존 데이터가 손상되지 않는지 확인한다.
+- [x] 삭제/초기화 후 선택된 collection/group/card state를 안전하게 재설정한다.
 
 Files:
 - `static/app.js`
@@ -732,11 +732,11 @@ Purpose:
 단일 페이지 앱 상태가 탭 이동, 삭제, 복원, 검색, 학습 중단 후에도 안정적이게 한다.
 
 Tasks:
-- [ ] 선택된 대그룹/소그룹이 삭제됐을 때 fallback selection을 정의한다.
-- [ ] 카드 필터와 카드 등록 form의 selected collection/group이 서로 꼬이지 않는지 확인한다.
-- [ ] 학습 중 다른 탭 이동, 로그아웃, 새로고침, session 종료 흐름을 정리한다.
-- [ ] 검색어가 남아 있는 상태에서 데이터가 바뀔 때 empty state가 정확한지 확인한다.
-- [ ] 백업 복원 후 모든 derived state를 다시 계산한다.
+- [x] 선택된 대그룹/소그룹이 삭제됐을 때 fallback selection을 정의한다.
+- [x] 카드 필터와 카드 등록 form의 selected collection/group이 서로 꼬이지 않는지 확인한다.
+- [x] 학습 중 다른 탭 이동, 로그아웃, 새로고침, session 종료 흐름을 정리한다.
+- [x] 검색어가 남아 있는 상태에서 데이터가 바뀔 때 empty state가 정확한지 확인한다.
+- [x] 백업 복원 후 모든 derived state를 다시 계산한다.
 
 Files:
 - `static/app.js`
@@ -752,10 +752,10 @@ Purpose:
 앱 구조가 바뀌어도 백업/복원과 기존 데이터가 안전하게 이어지게 한다.
 
 Tasks:
-- [ ] 백업 JSON의 `version` 의미와 호환 범위를 문서화한다.
-- [ ] 대그룹 도입 전/후 백업을 복원할 때 기대 동작을 명확히 한다.
-- [ ] legacy naming을 바꿀 경우 localStorage key, header name, DB env alias의 migration path를 정한다.
-- [ ] restore 시 알 수 없는 version 또는 누락 필드를 어떻게 처리할지 정의한다.
+- [x] 백업 JSON의 `version` 의미와 호환 범위를 문서화한다.
+- [x] 대그룹 도입 전/후 백업을 복원할 때 기대 동작을 명확히 한다.
+- [x] legacy naming을 바꿀 경우 localStorage key, header name, DB env alias의 migration path를 정한다.
+- [x] restore 시 알 수 없는 version 또는 누락 필드를 어떻게 처리할지 정의한다.
 - [x] backup export 파일명도 현재 브랜드명 `byeorakchigi` 기준으로 맞춘다.
 
 Files:

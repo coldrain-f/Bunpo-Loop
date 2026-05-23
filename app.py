@@ -24,6 +24,7 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD")
 DEFAULT_WEAK_CARD_THRESHOLD = 16
 DEFAULT_WEAK_RECENT_ROUNDS = 3
 DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8
+BACKUP_VERSION = 2
 
 USER_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -535,12 +536,19 @@ def collections_payload(conn: sqlite3.Connection) -> list[dict]:
             LEFT JOIN cards c ON c.group_id = g.id
             GROUP BY g.collection_id
         ),
+        round_collection_links AS (
+            SELECT DISTINCT
+                g.collection_id,
+                sr.id AS round_id
+            FROM study_rounds sr
+            JOIN study_round_groups rg ON rg.round_id = sr.id
+            JOIN groups g ON g.id = rg.group_id
+        ),
         round_stats AS (
             SELECT
                 collection_id,
-                COUNT(*) AS completed_rounds
-            FROM study_rounds
-            WHERE collection_id IS NOT NULL
+                COUNT(DISTINCT round_id) AS completed_rounds
+            FROM round_collection_links
             GROUP BY collection_id
         ),
         latest_rounds AS (
@@ -548,12 +556,13 @@ def collections_payload(conn: sqlite3.Connection) -> list[dict]:
             FROM (
                 SELECT
                     sr.*,
+                    rcl.collection_id AS stat_collection_id,
                     ROW_NUMBER() OVER (
-                        PARTITION BY sr.collection_id
+                        PARTITION BY rcl.collection_id
                         ORDER BY sr.completed_at DESC, sr.id DESC
                     ) AS row_no
                 FROM study_rounds sr
-                WHERE sr.collection_id IS NOT NULL
+                JOIN round_collection_links rcl ON rcl.round_id = sr.id
             )
             WHERE row_no = 1
         ),
@@ -591,7 +600,7 @@ def collections_payload(conn: sqlite3.Connection) -> list[dict]:
         LEFT JOIN group_stats gs ON gs.collection_id = c.id
         LEFT JOIN card_stats cs ON cs.collection_id = c.id
         LEFT JOIN round_stats rs ON rs.collection_id = c.id
-        LEFT JOIN latest_rounds lr ON lr.collection_id = c.id
+        LEFT JOIN latest_rounds lr ON lr.stat_collection_id = c.id
         LEFT JOIN first_attempts fa ON fa.round_id = lr.id
         ORDER BY c.created_at ASC, c.id ASC
         """
@@ -775,7 +784,7 @@ def table_payload(conn: sqlite3.Connection, table: str, order_by: str) -> list[d
 
 def backup_payload(conn: sqlite3.Connection) -> dict:
     return {
-        "version": 2,
+        "version": BACKUP_VERSION,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "collections": table_payload(conn, "collections", "id ASC"),
         "groups": table_payload(conn, "groups", "id ASC"),
@@ -793,8 +802,30 @@ def ensure_list(value: object, field: str) -> list:
     return value
 
 
-def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
+def normalize_backup_payload(payload: dict) -> tuple[dict, int]:
+    if not isinstance(payload, dict):
+        raise ValueError("백업 JSON 형식이 올바르지 않습니다.")
     backup = payload.get("backup") if isinstance(payload.get("backup"), dict) else payload
+    if not isinstance(backup, dict):
+        raise ValueError("백업 JSON 형식이 올바르지 않습니다.")
+    raw_version = backup.get("version", 1)
+    try:
+        version = int(raw_version)
+    except (TypeError, ValueError):
+        raise ValueError("백업 version 값이 올바르지 않습니다.")
+    if version < 1:
+        raise ValueError("백업 version 값이 올바르지 않습니다.")
+    if version > BACKUP_VERSION:
+        raise ValueError("현재 앱에서 지원하지 않는 백업 version입니다.")
+    return backup, version
+
+
+def table_count(conn: sqlite3.Connection, table: str) -> int:
+    return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] or 0)
+
+
+def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
+    backup, _version = normalize_backup_payload(payload)
     collections = ensure_list(backup.get("collections", []), "대그룹 백업")
     groups = ensure_list(backup.get("groups", []), "소그룹 백업")
     cards = ensure_list(backup.get("cards", []), "카드 백업")
@@ -985,13 +1016,14 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
             ),
         )
 
+    delete_orphan_rounds(conn)
     return {
-        "collections": len(collections),
-        "groups": len(groups),
-        "cards": len(cards),
-        "examples": len(examples),
-        "rounds": len(rounds),
-        "reviews": len(reviews),
+        "collections": table_count(conn, "collections"),
+        "groups": table_count(conn, "groups"),
+        "cards": table_count(conn, "cards"),
+        "examples": table_count(conn, "examples"),
+        "rounds": table_count(conn, "study_rounds"),
+        "reviews": table_count(conn, "reviews"),
     }
 
 
@@ -1105,14 +1137,53 @@ def group_round_no(conn: sqlite3.Connection, group_id: int) -> int:
     )
 
 
-def collection_round_no(conn: sqlite3.Connection, collection_id: int) -> int:
-    return (
-        conn.execute(
-            "SELECT COUNT(*) + 1 FROM study_rounds WHERE collection_id = ?",
-            (collection_id,),
-        ).fetchone()[0]
-        or 1
-    )
+def delete_rounds_for_group(conn: sqlite3.Connection, group_id: int) -> int:
+    return conn.execute(
+        """
+        DELETE FROM study_rounds
+        WHERE group_id = ?
+           OR id IN (
+               SELECT round_id
+               FROM study_round_groups
+               WHERE group_id = ?
+           )
+        """,
+        (group_id, group_id),
+    ).rowcount
+
+
+def delete_rounds_for_collection(conn: sqlite3.Connection, collection_id: int) -> int:
+    return conn.execute(
+        """
+        DELETE FROM study_rounds
+        WHERE collection_id = ?
+           OR group_id IN (
+               SELECT id
+               FROM groups
+               WHERE collection_id = ?
+           )
+           OR id IN (
+               SELECT rg.round_id
+               FROM study_round_groups rg
+               JOIN groups g ON g.id = rg.group_id
+               WHERE g.collection_id = ?
+           )
+        """,
+        (collection_id, collection_id, collection_id),
+    ).rowcount
+
+
+def delete_orphan_rounds(conn: sqlite3.Connection) -> int:
+    return conn.execute(
+        """
+        DELETE FROM study_rounds
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM study_round_groups rg
+            WHERE rg.round_id = study_rounds.id
+        )
+        """
+    ).rowcount
 
 
 class AppHandler(BaseHTTPRequestHandler):
@@ -1246,7 +1317,9 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.send_json({"collection": row_to_dict(updated)})
                     return
                 if method == "DELETE":
+                    delete_rounds_for_collection(conn, collection_id)
                     conn.execute("DELETE FROM collections WHERE id = ?", (collection_id,))
+                    delete_orphan_rounds(conn)
                     self.send_json({"ok": True})
                     return
 
@@ -1307,7 +1380,9 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.send_json({"group": row_to_dict(updated)})
                     return
                 if method == "DELETE":
+                    delete_rounds_for_group(conn, group_id)
                     conn.execute("DELETE FROM groups WHERE id = ?", (group_id,))
+                    delete_orphan_rounds(conn)
                     self.send_json({"ok": True})
                     return
 
@@ -1687,17 +1762,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json({"ok": True, "restored": result})
 
     def reset_group_history(self, conn: sqlite3.Connection, group_id: int) -> None:
-        rounds_deleted = conn.execute(
-            """
-            DELETE FROM study_rounds
-            WHERE id IN (
-                SELECT round_id
-                FROM study_round_groups
-                WHERE group_id = ?
-            )
-            """,
-            (group_id,),
-        ).rowcount
+        rounds_deleted = delete_rounds_for_group(conn, group_id)
         cards_reset = conn.execute(
             f"""
             UPDATE cards
@@ -1717,10 +1782,7 @@ class AppHandler(BaseHTTPRequestHandler):
         )
 
     def reset_collection_history(self, conn: sqlite3.Connection, collection_id: int) -> None:
-        rounds_deleted = conn.execute(
-            "DELETE FROM study_rounds WHERE collection_id = ?",
-            (collection_id,),
-        ).rowcount
+        rounds_deleted = delete_rounds_for_collection(conn, collection_id)
         cards_reset = conn.execute(
             f"""
             UPDATE cards
@@ -2062,8 +2124,21 @@ class AppHandler(BaseHTTPRequestHandler):
             )
             params.append(group_id)
         if collection_id:
-            clauses.append("sr.collection_id = ?")
-            params.append(collection_id)
+            clauses.append(
+                """
+                (
+                    sr.collection_id = ?
+                    OR EXISTS (
+                        SELECT 1
+                        FROM study_round_groups rg_filter
+                        JOIN groups g_filter ON g_filter.id = rg_filter.group_id
+                        WHERE rg_filter.round_id = sr.id
+                          AND g_filter.collection_id = ?
+                    )
+                )
+                """
+            )
+            params.extend([collection_id, collection_id])
         where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = conn.execute(
             f"""
