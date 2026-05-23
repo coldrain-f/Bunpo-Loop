@@ -63,10 +63,10 @@ Core direction:
 - [x] Phase 2. Study Home
   - [x] 2.1 "Today First" Home Structure
   - [x] 2.2 Weak Review Panel Refinement
-- [ ] Phase 3. Subgroup-Centered Study UX
-  - [ ] 3.1 Subgroup Card Redesign
-  - [ ] 3.2 Collection Detail Refinement
-  - [ ] 3.3 Bundle Practice Dialog Polish
+- [x] Phase 3. Subgroup-Centered Study UX
+  - [x] 3.1 Subgroup Card Redesign
+  - [x] 3.2 Collection Detail Refinement
+  - [x] 3.3 Bundle Practice Dialog Polish
 - [ ] Phase 4. Study Session
   - [ ] 4.1 Card Front/Back Reading Polish
   - [ ] 4.2 Answer Bar Stability
@@ -206,16 +206,16 @@ Purpose:
 소그룹이 공식 학습 단위라는 사실이 화면에서 바로 느껴지게 한다.
 
 Tasks:
-- [ ] 소그룹 item에 다음 정보 위계를 적용한다:
+- [x] 소그룹 item에 다음 정보 위계를 적용한다:
   1. 소그룹명
   2. 카드 수
   3. 오늘 학습 여부
   4. 마지막 학습일
   5. 정답률/오답 누적
   6. 회독 수
-- [ ] 오늘 완료, 미학습, 오답 있음 상태 pill을 정리한다.
-- [ ] 비어 있는 소그룹은 학습 CTA 대신 카드 추가 CTA를 보여준다.
-- [ ] active/selected 상태는 border + subtle mint로 표현한다.
+- [x] 오늘 완료, 미학습, 오답 있음 상태 pill을 정리한다.
+- [x] 비어 있는 소그룹은 학습 CTA 대신 카드 추가 CTA를 보여준다.
+- [x] active/selected 상태는 border + subtle mint로 표현한다.
 
 Files:
 - `static/app.js`
@@ -232,10 +232,10 @@ Purpose:
 대그룹을 "학습 기록 단위"가 아니라 "소그룹 묶음"으로 보이게 한다.
 
 Tasks:
-- [ ] 대그룹 상세 상단에 aggregate stats를 명확히 표시한다.
-- [ ] "소그룹 합산 · 묶음 연습은 공식 기록 제외" 문구를 더 자연스럽게 다듬는다.
-- [ ] 소그룹 만들기 CTA를 명확히 배치한다.
-- [ ] 묶음 연습 CTA는 secondary로 유지한다.
+- [x] 대그룹 상세 상단에 aggregate stats를 명확히 표시한다.
+- [x] "소그룹 합산 · 묶음 연습은 공식 기록 제외" 문구를 더 자연스럽게 다듬는다.
+- [x] 소그룹 만들기 CTA를 명확히 배치한다.
+- [x] 묶음 연습 CTA는 secondary로 유지한다.
 
 Files:
 - `static/app.js`
@@ -251,11 +251,11 @@ Purpose:
 여러 소그룹을 묶는 연습을 강력하지만 보조 기능으로 유지한다.
 
 Tasks:
-- [ ] dialog title/subtitle에서 기록 없는 연습임을 명확히 한다.
-- [ ] selected subgroup count와 card count를 sticky-ish summary처럼 유지한다.
-- [ ] quick presets를 compact segmented/ghost action으로 정리한다.
-- [ ] empty-card subgroup은 disabled visual을 명확히 한다.
-- [ ] start button disabled reason이 보이게 한다.
+- [x] dialog title/subtitle에서 기록 없는 연습임을 명확히 한다.
+- [x] selected subgroup count와 card count를 sticky-ish summary처럼 유지한다.
+- [x] quick presets를 compact segmented/ghost action으로 정리한다.
+- [x] empty-card subgroup은 disabled visual을 명확히 한다.
+- [x] start button disabled reason이 보이게 한다.
 
 Files:
 - `static/app.js`

@@ -708,10 +708,37 @@ function getAccuracyTone(rate) {
   return "bad";
 }
 
-function renderGroupRecentAccuracy(group) {
+function getGroupLastStudyLabel(group) {
+  return group.last_studied_at ? `마지막 ${formatDate(group.last_studied_at)}` : "학습 기록 없음";
+}
+
+function renderGroupStatusPills(group) {
+  const cardCount = number(group.card_count);
+  const wrongTotal = number(group.wrong_total);
+  const studiedToday = isToday(group.last_studied_at);
+  const status = cardCount
+    ? studiedToday
+      ? `<span class="status-pill done">오늘 완료</span>`
+      : group.last_studied_at
+        ? `<span class="status-pill">학습 기록 있음</span>`
+        : `<span class="status-pill muted">미학습</span>`
+    : `<span class="status-pill muted">카드 없음</span>`;
+  const wrong = wrongTotal
+    ? `<span class="status-pill bad">오답 ${wrongTotal}</span>`
+    : `<span class="status-pill muted">오답 없음</span>`;
+  return `<div class="group-status-strip">${status}${wrong}</div>`;
+}
+
+function renderGroupMetricRow(group) {
   const rate = getGroupRecentAccuracy(group);
-  if (rate === null) return "";
-  return `<span class="accuracy-pill ${getAccuracyTone(rate)}">최근 정답률 ${rate}%</span>`;
+  const accuracyTone = getAccuracyTone(rate);
+  return `
+    <div class="subgroup-metrics" aria-label="소그룹 학습 지표">
+      <div class="subgroup-metric"><strong>${number(group.card_count)}</strong><span>카드</span></div>
+      <div class="subgroup-metric"><strong>${number(group.completed_rounds)}</strong><span>회독</span></div>
+      <div class="subgroup-metric accuracy ${accuracyTone}"><strong>${rate === null ? "-" : `${rate}%`}</strong><span>최근 정답률</span></div>
+    </div>
+  `;
 }
 
 function compareGroupName(left, right) {
@@ -1341,8 +1368,9 @@ function renderStudySubgroupPicker(collection) {
       <div class="stat-grid">
         <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
         <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
+        <div class="stat"><strong>${number(collection.completed_rounds)}</strong><span>하위 회독</span></div>
       </div>
-      <p class="meta">회독 기록은 소그룹별로 저장되고, 묶음 연습은 공식 기록에 저장되지 않습니다.</p>
+      <p class="meta">공식 기록은 하위 소그룹 합산입니다. 묶음 연습은 공식 기록에 저장되지 않습니다.</p>
       <button class="secondary-button full" type="button" data-action="open-collection-study-dialog" ${
         number(collection.card_count) ? "" : "disabled"
       }>${iconLabel("repeat-2", "묶음 연습")}</button>
@@ -1576,26 +1604,18 @@ function renderStudyCollectionChoiceItem(collection) {
 
 function renderStudyGroupChoiceItem(group) {
   const cardCount = number(group.card_count);
-  const studiedToday = isToday(group.last_studied_at);
-  const lastStudyText = group.last_studied_at ? `마지막 ${formatDate(group.last_studied_at)}` : "학습 기록 없음";
+  const active = Number(group.id) === Number(state.selectedGroupId);
+  const lastStudyText = getGroupLastStudyLabel(group);
   return `
-    <article class="group-item group-choice ${cardCount ? "" : "empty"}">
+    <article class="group-item group-choice subgroup-choice ${active ? "active" : ""} ${cardCount ? "" : "empty"}">
       <button class="group-choice-main" type="button" data-action="choose-study-group" data-group-id="${group.id}">
         <div class="item-title">
           <strong>${escapeHtml(group.name)}</strong>
         </div>
         <p class="meta">${escapeHtml(group.collection_name)} · ${escapeHtml(group.description || "설명 없음")}</p>
-        <div class="group-choice-status">
-          <span class="today-badge ${studiedToday ? "done" : "pending"}">${
-            studiedToday ? "오늘 학습함" : "오늘 미학습"
-          }</span>
-          <span>${escapeHtml(lastStudyText)}</span>
-        </div>
-        <div class="group-choice-footer">
-          <span>${number(group.completed_rounds)}회독</span>
-          ${renderGroupRecentAccuracy(group)}
-          <span>오답 ${number(group.wrong_total)}</span>
-        </div>
+        ${renderGroupStatusPills(group)}
+        ${renderGroupMetricRow(group)}
+        <p class="meta">${escapeHtml(lastStudyText)} · 누적 알맞음 ${number(group.correct_total)} · 누적 틀림 ${number(group.wrong_total)}</p>
       </button>
       ${
         cardCount
@@ -1677,6 +1697,7 @@ function renderStudyGroupSelection(groups) {
           .map((group) => {
             const checked = selectedIds.has(Number(group.id));
             const disabled = !number(group.card_count);
+            const lastStudyText = getGroupLastStudyLabel(group);
             return `
               <label class="study-subgroup-option ${checked ? "active" : ""} ${disabled ? "disabled" : ""}">
                 <input type="checkbox" data-action="toggle-study-subgroup" data-group-id="${group.id}" ${
@@ -1684,7 +1705,11 @@ function renderStudyGroupSelection(groups) {
                 } ${disabled ? "disabled" : ""} />
                 <span>
                   <strong>${escapeHtml(group.name)}</strong>
-                  <small>${number(group.card_count)}개 · ${escapeHtml(group.description || "설명 없음")}</small>
+                  <small>${
+                    disabled
+                      ? "카드 없음 · 선택할 수 없음"
+                      : `카드 ${number(group.card_count)}개 · ${escapeHtml(lastStudyText)} · 오답 ${number(group.wrong_total)}`
+                  }</small>
                 </span>
               </label>
             `;
@@ -1703,28 +1728,31 @@ function renderCollectionStudyDialog() {
   const selectedGroups = getSelectedStudyGroups();
   const selectedCardCount = getSelectedStudyCardCount();
   const canStart = selectedCardCount > 0;
+  const summaryText = canStart
+    ? `${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]} · 공식 기록에 저장 안 함`
+    : "카드가 있는 소그룹을 하나 이상 선택하세요.";
   dialogRoot.innerHTML = `
     <div class="dialog-backdrop" role="presentation">
       <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title">
         <div class="row">
           <div>
             <p class="eyebrow">묶음 연습</p>
-            <h2 id="study-dialog-title">소그룹 선택</h2>
+            <h2 id="study-dialog-title">기록 없이 소그룹 묶기</h2>
           </div>
           <button class="ghost-button small-button" type="button" data-action="close-dialog">${iconLabel("x", "닫기")}</button>
         </div>
+        <p class="meta">선택한 소그룹의 카드만 임시로 섞어 연습합니다. 회독 기록과 통계에는 저장되지 않습니다.</p>
         <label class="field">
           <span>대그룹</span>
           <select id="study-collection-select" class="select" aria-label="학습 대그룹 선택">
             ${collectionOptions(collection.id)}
           </select>
         </label>
-        ${renderStudyGroupSelection(groups)}
-        <section class="study-start-panel">
+        <section class="study-start-panel practice-summary">
           <div>
             <span class="today-action-label">기록 없는 연습</span>
             <strong>${selectedGroups.length}개 소그룹 · 카드 ${selectedCardCount}개</strong>
-            <p>${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]} · 공식 기록에 저장 안 함</p>
+            <p>${escapeHtml(summaryText)}</p>
           </div>
           <div class="study-start-actions">
             <button class="primary-button full" type="button" data-action="start-bundle-study" ${canStart ? "" : "disabled"}>
@@ -1735,6 +1763,7 @@ function renderCollectionStudyDialog() {
             </button>
           </div>
         </section>
+        ${renderStudyGroupSelection(groups)}
         ${renderStudyOptionsPanel()}
       </section>
     </div>
@@ -2936,11 +2965,17 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
       <div class="stat-grid">
         <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
         <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
+        <div class="stat"><strong>${number(collection.completed_rounds)}</strong><span>하위 회독</span></div>
       </div>
-      <p class="meta">소그룹 합산 · 묶음 연습은 공식 기록 제외</p>
-      <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${
-        collection.id
-      }">${iconLabel("plus", "소그룹 만들기")}</button>
+      <p class="meta">공식 기록은 하위 소그룹 합산입니다. 묶음 연습은 공식 기록에 저장되지 않습니다.</p>
+      <div class="button-row">
+        <button class="primary-button" type="button" data-action="open-group-form-for-collection" data-collection-id="${
+          collection.id
+        }">${iconLabel("plus", "소그룹 만들기")}</button>
+        <button class="secondary-button" type="button" data-action="open-collection-study-dialog" ${
+          number(collection.card_count) ? "" : "disabled"
+        }>${iconLabel("repeat-2", "묶음 연습")}</button>
+      </div>
       ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "소그룹 검색" })}
       <div class="group-list">
         ${
@@ -3171,22 +3206,33 @@ function renderCollectionListItem(collection) {
 function renderGroupListItem(group) {
   const hasHistory =
     number(group.completed_rounds) > 0 || number(group.correct_total) > 0 || number(group.wrong_total) > 0;
+  const cardCount = number(group.card_count);
+  const active = Number(group.id) === Number(state.selectedGroupId);
+  const lastStudyText = getGroupLastStudyLabel(group);
   return `
-    <article class="group-item ${group.id === state.selectedGroupId ? "active" : ""}">
+    <article class="group-item subgroup-management-item ${active ? "active" : ""} ${cardCount ? "" : "empty"}">
       <div class="item-title">
         <strong>${escapeHtml(group.name)}</strong>
-        <button class="pill group-card-count" type="button" data-action="preview-group-cards" data-group-id="${
-          group.id
-        }" aria-label="${escapeHtml(`${group.name} 카드 ${number(group.card_count)}개 미리보기`)}">${number(
-          group.card_count,
-        )}개</button>
+        ${
+          cardCount
+            ? `<button class="pill group-card-count" type="button" data-action="preview-group-cards" data-group-id="${
+                group.id
+              }" aria-label="${escapeHtml(`${group.name} 카드 ${cardCount}개 미리보기`)}">${cardCount}개</button>`
+            : `<span class="pill">카드 없음</span>`
+        }
       </div>
       <p class="meta">${escapeHtml(group.collection_name || "대그룹 없음")} · ${escapeHtml(group.description || "설명 없음")}</p>
-      <div class="stat-grid">
-        <div class="stat"><strong>${number(group.completed_rounds)}</strong><span>회독</span></div>
-        <div class="stat"><strong>${number(group.correct_total)}</strong><span>알맞음</span></div>
-        <div class="stat"><strong>${number(group.wrong_total)}</strong><span>틀림</span></div>
-      </div>
+      ${renderGroupStatusPills(group)}
+      ${renderGroupMetricRow(group)}
+      <p class="meta">${escapeHtml(lastStudyText)} · 누적 알맞음 ${number(group.correct_total)} · 누적 틀림 ${number(group.wrong_total)}</p>
+      ${
+        cardCount
+          ? ""
+          : `<button class="secondary-button full add-card-button" type="button" data-action="add-card-to-study-group" data-group-id="${group.id}">${iconLabel(
+              "plus",
+              "카드 등록",
+            )}</button>`
+      }
       <button class="ghost-button full reset-history-button" type="button" data-action="reset-history" data-group-id="${group.id}" ${
         hasHistory ? "" : "disabled"
       }>${iconLabel("rotate-ccw", "기록 초기화")}</button>
