@@ -1589,7 +1589,7 @@ class AppHandler(BaseHTTPRequestHandler):
         body = parse_body(self)
         group_id = int(body.get("group_id") or 0)
         if get_group(conn, group_id) is None:
-            raise ValueError("카드를 넣을 소그룹을 선택하세요.")
+            raise ValueError("카드를 저장할 소그룹을 선택하세요.")
         front = validate_text(body.get("front"), "앞면", 200)
         back = validate_text(body.get("back"), "뒷면", 500)
         memo = str(body.get("memo") or "").strip()
@@ -1619,7 +1619,7 @@ class AppHandler(BaseHTTPRequestHandler):
         body = parse_body(self)
         group_id = int(body.get("group_id", card["group_id"]) or card["group_id"])
         if get_group(conn, group_id) is None:
-            raise ValueError("카드를 넣을 소그룹을 선택하세요.")
+            raise ValueError("카드를 저장할 소그룹을 선택하세요.")
         front = validate_text(body.get("front", card["front"]), "앞면", 200)
         back = validate_text(body.get("back", card["back"]), "뒷면", 500)
         memo = str(body.get("memo", card["memo"]) or "").strip()
@@ -1650,16 +1650,16 @@ class AppHandler(BaseHTTPRequestHandler):
         body = parse_body(self)
         group_id = int(body.get("group_id") or 0)
         if get_group(conn, group_id) is None:
-            raise ValueError("카드를 넣을 소그룹을 선택하세요.")
+            raise ValueError("카드를 저장할 소그룹을 선택하세요.")
         items = parse_bulk_cards(body.get("text"))
         seen_fronts = set()
         for item in items:
             front = item["front"]
             if front in seen_fronts:
-                raise ValueError(f"대량 등록 안에 중복 앞면이 있습니다: {front}")
+                raise ValueError(f"대량 등록 안에 같은 앞면이 두 번 들어 있습니다: {front}")
             seen_fronts.add(front)
             if duplicate_card_exists(conn, group_id, front):
-                raise ValueError(f"이미 등록된 카드입니다: {front}")
+                raise ValueError(f"같은 소그룹에 이미 같은 앞면 카드가 있습니다: {front}")
         created_ids = []
         for item in items:
             cur = conn.execute(

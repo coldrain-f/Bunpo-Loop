@@ -2880,6 +2880,18 @@ button:active,
   line-height: 1.45;
 }
 
+.disabled-reason {
+  margin: -2px 0 0;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 760;
+  line-height: 1.4;
+}
+
 .example-editor-list {
   display: grid;
   max-height: min(44vh, 420px);

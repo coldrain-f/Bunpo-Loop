@@ -79,9 +79,9 @@ Core direction:
 - [x] Phase 7. Groups Tab
   - [x] 7.1 Collection List Polish
   - [x] 7.2 Collection Detail & Group Form
-- [ ] Phase 8. Empty States & First-Use Flow
-  - [ ] 8.1 First-Use Onboarding Without Landing
-  - [ ] 8.2 Error & Disabled State Copy
+- [x] Phase 8. Empty States & First-Use Flow
+  - [x] 8.1 First-Use Onboarding Without Landing
+  - [x] 8.2 Error & Disabled State Copy
 - [ ] Phase 9. Settings & Data Safety
   - [ ] 9.1 Settings Screen Clarity
   - [ ] 9.2 Backup/Restore Serious Mode
@@ -430,10 +430,10 @@ Purpose:
 데이터가 없는 사용자가 자연스럽게 첫 카드를 만들게 한다.
 
 Tasks:
-- [ ] 대그룹 없음: 대그룹 만들기 CTA
-- [ ] 대그룹은 있는데 소그룹 없음: 소그룹 만들기 CTA
-- [ ] 소그룹은 있는데 카드 없음: 카드 만들기 CTA
-- [ ] 각 빈 상태는 다음 단계 하나만 primary로 제안한다.
+- [x] 대그룹 없음: 대그룹 만들기 CTA
+- [x] 대그룹은 있는데 소그룹 없음: 소그룹 만들기 CTA
+- [x] 소그룹은 있는데 카드 없음: 카드 만들기 CTA
+- [x] 각 빈 상태는 다음 단계 하나만 primary로 제안한다.
 
 Files:
 - `static/app.js`
@@ -449,9 +449,9 @@ Purpose:
 막힌 이유를 명확히 알려준다.
 
 Tasks:
-- [ ] disabled button 주변에 이유를 표시한다.
-- [ ] duplicate card, missing group, empty practice selection copy를 통일한다.
-- [ ] toast는 짧은 결과 알림에만 쓴다.
+- [x] disabled button 주변에 이유를 표시한다.
+- [x] duplicate card, missing group, empty practice selection copy를 통일한다.
+- [x] toast는 짧은 결과 알림에만 쓴다.
 
 Files:
 - `static/app.js`

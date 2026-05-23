@@ -479,10 +479,10 @@ function buildBulkPreview(groupId, text) {
   const seen = new Map();
   parsed.items.forEach((item) => {
     const existing = findDuplicateCard(groupId, item.front);
-    if (existing) item.warnings.push(`이미 등록됨: ${existing.front}`);
+    if (existing) item.warnings.push(`같은 소그룹에 이미 같은 앞면 카드가 있습니다: ${existing.front}`);
     const key = item.front.trim();
     if (key) {
-      if (seen.has(key)) item.warnings.push(`${seen.get(key)}번째 줄과 앞면이 같습니다.`);
+      if (seen.has(key)) item.warnings.push(`대량 등록 안에 같은 앞면이 두 번 들어 있습니다: ${seen.get(key)}번째 줄`);
       else seen.set(key, item.lineNo);
     }
   });
@@ -541,6 +541,27 @@ function renderOrientationNote(parts, note) {
       ${note ? `<small>${escapeHtml(note)}</small>` : ""}
     </p>
   `;
+}
+
+function renderActionEmptyState({ title, body, action, label, iconName = "plus", buttonClass = "primary-button", attrs = "" }) {
+  return `
+    <div class="empty-state action-empty">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(body)}</p>
+      ${
+        action && label
+          ? `<button class="${buttonClass} full" type="button" data-action="${action}" ${attrs}>${iconLabel(
+              iconName,
+              label,
+            )}</button>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderDisabledReason(message) {
+  return `<p class="disabled-reason">${escapeHtml(message)}</p>`;
 }
 
 function getSelectedGroup() {
@@ -676,40 +697,59 @@ function renderCardFilterSummary(filteredCount, visibleCount) {
 
 function renderCardListEmptyState(filteredCards) {
   if (!state.collections.length) {
-    return `
-      <div class="empty-state">카드를 만들기 전에 대그룹을 먼저 만들어주세요.</div>
-      <button class="primary-button full" type="button" data-action="go-groups">${iconLabel("plus", "대그룹 만들기")}</button>
-    `;
+    return renderActionEmptyState({
+      title: "첫 대그룹을 만들어 주세요.",
+      body: "대그룹 아래에 소그룹을 만들고, 카드는 소그룹에 저장합니다.",
+      action: "go-groups",
+      label: "대그룹 만들기",
+    });
   }
   if (!state.groups.length) {
-    return `
-      <div class="empty-state">대그룹은 있지만 아직 소그룹이 없습니다. 카드는 소그룹에 저장됩니다.</div>
-      <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${state.selectedCollectionId || state.collections[0]?.id || ""}">${iconLabel(
-        "plus",
-        "소그룹 만들기",
-      )}</button>
-    `;
+    return renderActionEmptyState({
+      title: "소그룹을 먼저 만들어 주세요.",
+      body: "카드는 소그룹에 저장되고 공식 회독과 통계도 소그룹 기준으로 남습니다.",
+      action: "open-group-form-for-collection",
+      label: "소그룹 만들기",
+      attrs: `data-collection-id="${state.selectedCollectionId || state.collections[0]?.id || ""}"`,
+    });
   }
   if (filteredCards.length && state.cardSearchQuery) {
-    return `<div class="empty-state">검색어와 맞는 카드가 없습니다. 앞면, 뜻, 메모, 예문을 함께 검색합니다.</div>`;
+    return renderActionEmptyState({
+      title: "검색된 카드가 없습니다.",
+      body: "앞면, 뜻, 메모, 예문을 함께 검색합니다. 검색어를 지우면 현재 범위의 카드가 다시 보입니다.",
+      action: "clear-search",
+      label: "검색어 지우기",
+      iconName: "x",
+      buttonClass: "secondary-button",
+      attrs: `data-target="card-search"`,
+    });
   }
   if (!state.cardFilterCollectionId) {
-    return `<div class="empty-state">대그룹을 선택하거나 전체 카드를 선택하면 목록이 나타납니다.</div>`;
+    return renderActionEmptyState({
+      title: "볼 카드 범위를 선택해 주세요.",
+      body: "대그룹을 고르거나 전체 카드를 선택하면 목록이 나타납니다.",
+      action: "show-all-cards",
+      label: "전체 카드 보기",
+      iconName: "list",
+      buttonClass: "secondary-button",
+    });
   }
   if (state.cardFilterCollectionId !== "all" && !getCardFilterGroups().length) {
-    return `
-      <div class="empty-state">선택한 대그룹에 아직 소그룹이 없습니다.</div>
-      <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${state.cardFilterCollectionId}">${iconLabel(
-        "plus",
-        "소그룹 만들기",
-      )}</button>
-    `;
+    return renderActionEmptyState({
+      title: "선택한 대그룹에 소그룹이 없습니다.",
+      body: "카드를 등록하려면 먼저 이 대그룹 안에 소그룹을 만들어야 합니다.",
+      action: "open-group-form-for-collection",
+      label: "소그룹 만들기",
+      attrs: `data-collection-id="${state.cardFilterCollectionId}"`,
+    });
   }
   const target = state.cardFilterGroupId ? "소그룹" : state.cardFilterCollectionId === "all" ? "앱" : "대그룹";
-  return `
-    <div class="empty-state">이 ${target}에는 아직 카드가 없습니다.</div>
-    <button class="primary-button full" type="button" data-action="open-card-form">${iconLabel("plus", "카드 등록")}</button>
-  `;
+  return renderActionEmptyState({
+    title: `이 ${target}에는 아직 카드가 없습니다.`,
+    body: "첫 카드를 등록하면 학습 탭에서 바로 회독을 시작할 수 있습니다.",
+    action: "open-card-form",
+    label: "카드 등록",
+  });
 }
 
 function renderCardLocationPicker(selection, ids) {
@@ -735,6 +775,7 @@ function renderCardLocationPicker(selection, ids) {
           selection.groups.length ? "" : "disabled"
         }>${subgroupOptions(selection.groups, selection.groupId)}</select></label>
       </div>
+      ${selection.groups.length ? "" : renderDisabledReason("선택한 대그룹에 소그룹이 없어 저장 위치를 고를 수 없습니다.")}
     </section>
   `;
 }
@@ -1414,8 +1455,12 @@ function renderStudy() {
       <div class="panel stack">
         <p class="eyebrow">학습</p>
         <h2 id="study-title">대그룹 선택</h2>
-        <div class="empty-state">대그룹을 먼저 만들면 소그룹을 담아 학습할 수 있어요.</div>
-        <button class="primary-button full" type="button" data-action="go-groups">${iconLabel("plus", "대그룹 만들기")}</button>
+        ${renderActionEmptyState({
+          title: "첫 대그룹을 만들어 주세요.",
+          body: "대그룹을 만든 뒤 소그룹과 카드를 넣으면 학습을 시작할 수 있습니다.",
+          action: "go-groups",
+          label: "대그룹 만들기",
+        })}
       </div>
     `;
     return;
@@ -1456,7 +1501,15 @@ function renderStudyGroupPicker() {
           ${
             visibleCollections.length
               ? visibleCollections.map(renderStudyCollectionChoiceItem).join("")
-              : `<div class="empty-state">검색된 대그룹이 없습니다.</div>`
+              : renderActionEmptyState({
+                  title: "검색된 대그룹이 없습니다.",
+                  body: "검색어를 지우면 전체 대그룹을 다시 볼 수 있습니다.",
+                  action: "clear-search",
+                  label: "검색어 지우기",
+                  iconName: "x",
+                  buttonClass: "secondary-button",
+                  attrs: `data-target="study-collection-search"`,
+                })
           }
         </div>
       </section>
@@ -1493,6 +1546,11 @@ function renderStudySubgroupPicker(collection) {
       <button class="secondary-button full" type="button" data-action="open-collection-study-dialog" ${
         number(collection.card_count) ? "" : "disabled"
       }>${iconLabel("repeat-2", "묶음 연습")}</button>
+      ${
+        number(collection.card_count)
+          ? ""
+          : renderDisabledReason("카드가 있는 소그룹이 있어야 기록 없는 묶음 연습을 시작할 수 있습니다.")
+      }
       <section class="group-browser-block">
         <div class="completion-header">
           <h3>소그룹 선택</h3>
@@ -1506,7 +1564,23 @@ function renderStudySubgroupPicker(collection) {
           ${
             collectionGroups.length
               ? collectionGroups.map(renderStudyGroupChoiceItem).join("")
-              : `<div class="empty-state">검색된 소그룹이 없습니다.</div>`
+              : getGroupsForCollection(collection.id).length
+                ? renderActionEmptyState({
+                    title: "검색된 소그룹이 없습니다.",
+                    body: "검색어를 지우면 이 대그룹의 소그룹을 다시 볼 수 있습니다.",
+                    action: "clear-search",
+                    label: "검색어 지우기",
+                    iconName: "x",
+                    buttonClass: "secondary-button",
+                    attrs: `data-target="study-group-search"`,
+                  })
+                : renderActionEmptyState({
+                    title: "아직 소그룹이 없습니다.",
+                    body: "공식 회독과 통계는 소그룹 단위로 저장됩니다.",
+                    action: "open-group-form-for-collection",
+                    label: "소그룹 만들기",
+                    attrs: `data-collection-id="${collection.id}"`,
+                  })
           }
         </div>
       </section>
@@ -1584,7 +1658,8 @@ function renderTodayStudyPanel(recentGroup, weakCards = getWeakCards()) {
                     state.weakPanelOpen ? "접기" : "목록 보기",
                   )}</button>
                 </div>`
-              : `<button class="ghost-button full" type="button" disabled>${iconLabel("rotate-ccw", "복습할 카드 없음")}</button>`
+              : `<button class="ghost-button full" type="button" disabled>${iconLabel("rotate-ccw", "복습할 카드 없음")}</button>
+                 ${renderDisabledReason("약점 기준에 걸린 카드가 생기면 복습을 시작할 수 있습니다.")}`
           }
         </article>
       </div>
@@ -1787,10 +1862,13 @@ function renderStudyGroupSelection(groups) {
   if (!groups.length) {
     return `
       <section class="study-subgroup-panel">
-        <div class="empty-state">이 대그룹에는 아직 소그룹이 없습니다.</div>
-        <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${
-          state.selectedCollectionId
-        }">${iconLabel("plus", "소그룹 만들기")}</button>
+        ${renderActionEmptyState({
+          title: "이 대그룹에는 아직 소그룹이 없습니다.",
+          body: "소그룹을 만든 뒤 카드를 넣으면 묶음 연습에 포함할 수 있습니다.",
+          action: "open-group-form-for-collection",
+          label: "소그룹 만들기",
+          attrs: `data-collection-id="${state.selectedCollectionId}"`,
+        })}
       </section>
     `;
   }
@@ -1881,6 +1959,7 @@ function renderCollectionStudyDialog() {
               ${iconLabel("eye", "미리보기")}
             </button>
           </div>
+          ${canStart ? "" : renderDisabledReason(summaryText)}
         </section>
         ${renderStudyGroupSelection(groups)}
         ${renderStudyOptionsPanel()}
@@ -1903,13 +1982,23 @@ function renderStudyStartPanel(group) {
         }</p>
       </div>
       <div class="study-start-actions">
-        <button class="primary-button full" type="button" data-action="start-study" ${canStart ? "" : "disabled"}>
-          ${iconLabel("play", `${nextRoundNo}회독 시작`)}
-        </button>
-        <button class="ghost-button full" type="button" data-action="preview-study-cards" ${canStart ? "" : "disabled"}>
-          ${iconLabel("eye", "미리보기")}
-        </button>
+        ${
+          canStart
+            ? `<button class="primary-button full" type="button" data-action="start-study">
+                ${iconLabel("play", `${nextRoundNo}회독 시작`)}
+              </button>
+              <button class="ghost-button full" type="button" data-action="preview-study-cards">
+                ${iconLabel("eye", "미리보기")}
+              </button>`
+            : `<button class="primary-button full" type="button" data-action="add-card-to-study-group" data-group-id="${group.id}">
+                ${iconLabel("plus", "카드 등록")}
+              </button>
+              <button class="ghost-button full" type="button" data-action="preview-study-cards" disabled>
+                ${iconLabel("eye", "미리보기")}
+              </button>`
+        }
       </div>
+      ${canStart ? "" : renderDisabledReason("카드를 등록하면 회독과 미리보기를 사용할 수 있습니다.")}
     </section>
   `;
 }
@@ -2835,9 +2924,14 @@ function renderCardEditorPanel(editing, formGroupId) {
           ? state.cardEntryMode === "bulk" && !editing
             ? renderBulkCardForm(formGroupId)
             : renderCardForm(editing, formGroupId)
-          : `<div class="empty-state">카드를 등록하려면 소그룹이 필요해요.</div><button class="primary-button full" type="button" data-action="${
-              state.collections.length ? "open-group-form" : "go-groups"
-            }">${iconLabel("plus", state.collections.length ? "소그룹 만들기" : "대그룹 만들기")}</button>`
+          : renderActionEmptyState({
+              title: state.collections.length ? "소그룹을 먼저 만들어 주세요." : "첫 대그룹을 만들어 주세요.",
+              body: state.collections.length
+                ? "카드는 소그룹에 저장됩니다. 소그룹을 만든 뒤 바로 카드를 등록할 수 있습니다."
+                : "대그룹 아래에 소그룹을 만들고, 카드는 소그룹에 저장합니다.",
+              action: state.collections.length ? "open-group-form" : "go-groups",
+              label: state.collections.length ? "소그룹 만들기" : "대그룹 만들기",
+            })
       }
     </div>
   `;
@@ -2857,6 +2951,7 @@ function renderCardListPanel(visibleCards, filteredCards = visibleCards) {
       <button class="primary-button full" type="button" data-action="open-card-form" ${
         state.groups.length ? "" : "disabled"
       }>${iconLabel("plus", "카드 등록")}</button>
+      ${state.groups.length ? "" : renderDisabledReason("카드는 소그룹에 저장됩니다. 먼저 소그룹을 만들어 주세요.")}
       ${
         state.collections.length
           ? `<div class="card-filter-grid">
@@ -2913,12 +3008,13 @@ function renderCardForm(card, groupId) {
   const examples = card?.examples?.length ? card.examples : [{ japanese: "", korean: "" }];
   const selection = getCardFormSelection(groupId);
   const groupMissingPanel = !selection.groups.length
-    ? `
-      <div class="empty-state">선택한 대그룹에 아직 소그룹이 없습니다.</div>
-      <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${
-        selection.collectionId || ""
-      }">${iconLabel("plus", "소그룹 만들기")}</button>
-    `
+    ? renderActionEmptyState({
+        title: "선택한 대그룹에 소그룹이 없습니다.",
+        body: "카드를 저장하려면 이 대그룹 안에 소그룹이 필요합니다.",
+        action: "open-group-form-for-collection",
+        label: "소그룹 만들기",
+        attrs: `data-collection-id="${selection.collectionId || ""}"`,
+      })
     : "";
   return `
     <form id="card-form" class="stack">
@@ -2957,12 +3053,13 @@ function renderBulkCardForm(groupId) {
   const selection = getCardFormSelection(state.bulkDraftGroupId || groupId);
   const preview = state.bulkPreview;
   const groupMissingPanel = !selection.groups.length
-    ? `
-      <div class="empty-state">선택한 대그룹에 아직 소그룹이 없습니다.</div>
-      <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${
-        selection.collectionId || ""
-      }">${iconLabel("plus", "소그룹 만들기")}</button>
-    `
+    ? renderActionEmptyState({
+        title: "선택한 대그룹에 소그룹이 없습니다.",
+        body: "대량 등록도 소그룹 하나를 저장 위치로 사용합니다.",
+        action: "open-group-form-for-collection",
+        label: "소그룹 만들기",
+        attrs: `data-collection-id="${selection.collectionId || ""}"`,
+      })
     : "";
   return `
     <form id="bulk-card-form" class="stack">
@@ -2999,6 +3096,13 @@ function renderBulkPreview(preview) {
     : preview.warningCount
       ? "중복을 확인하세요."
       : "등록할 수 있습니다.";
+  const disabledReason = preview.errors.length
+    ? "형식 오류를 고치면 등록할 수 있습니다."
+    : preview.warningCount
+      ? "중복 카드를 정리하면 등록할 수 있습니다."
+      : preview.items.length
+        ? ""
+        : "등록할 카드가 없습니다.";
   return `
     <section class="bulk-preview">
       <div class="completion-header">
@@ -3024,6 +3128,7 @@ function renderBulkPreview(preview) {
       <button class="primary-button full" type="button" data-action="confirm-bulk-cards" ${
         canCreate ? "" : "disabled"
       }>${iconLabel("check", "미리보기대로 등록")}</button>
+      ${canCreate || !disabledReason ? "" : renderDisabledReason(disabledReason)}
     </section>
   `;
 }
@@ -3228,47 +3333,43 @@ function renderGroupEditorPanel(editing) {
 
 function renderCollectionEmptyState() {
   if (state.collections.length) {
-    return `
-      <div class="empty-state action-empty">
-        <strong>검색된 대그룹이 없습니다.</strong>
-        <p>검색어를 줄이거나 새 대그룹을 만들어 주세요.</p>
-        <button class="secondary-button full" type="button" data-action="open-collection-form">${iconLabel(
-          "plus",
-          "대그룹 만들기",
-        )}</button>
-      </div>
-    `;
+    return renderActionEmptyState({
+      title: "검색된 대그룹이 없습니다.",
+      body: "검색어를 지우면 전체 대그룹을 다시 볼 수 있습니다.",
+      action: "clear-search",
+      label: "검색어 지우기",
+      iconName: "x",
+      buttonClass: "secondary-button",
+      attrs: `data-target="collection-search"`,
+    });
   }
-  return `
-    <div class="empty-state action-empty">
-      <strong>첫 대그룹을 만들어 주세요.</strong>
-      <p>대그룹을 만든 뒤 안에서 소그룹과 카드를 이어서 관리할 수 있습니다.</p>
-      <button class="primary-button full" type="button" data-action="open-collection-form">${iconLabel(
-        "plus",
-        "대그룹 만들기",
-      )}</button>
-    </div>
-  `;
+  return renderActionEmptyState({
+    title: "첫 대그룹을 만들어 주세요.",
+    body: "대그룹을 만든 뒤 안에서 소그룹과 카드를 이어서 관리할 수 있습니다.",
+    action: "open-collection-form",
+    label: "대그룹 만들기",
+  });
 }
 
 function renderGroupEmptyState(collection) {
   if (getGroupsForCollection(collection.id).length) {
-    return `
-      <div class="empty-state action-empty">
-        <strong>검색된 소그룹이 없습니다.</strong>
-        <p>검색어를 줄이면 이 대그룹의 다른 소그룹을 볼 수 있습니다.</p>
-      </div>
-    `;
+    return renderActionEmptyState({
+      title: "검색된 소그룹이 없습니다.",
+      body: "검색어를 지우면 이 대그룹의 소그룹을 다시 볼 수 있습니다.",
+      action: "clear-search",
+      label: "검색어 지우기",
+      iconName: "x",
+      buttonClass: "secondary-button",
+      attrs: `data-target="group-search"`,
+    });
   }
-  return `
-    <div class="empty-state action-empty">
-      <strong>아직 소그룹이 없습니다.</strong>
-      <p>공식 회독과 통계는 소그룹 단위로 저장됩니다.</p>
-      <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${
-        collection.id
-      }">${iconLabel("plus", "소그룹 만들기")}</button>
-    </div>
-  `;
+  return renderActionEmptyState({
+    title: "아직 소그룹이 없습니다.",
+    body: "공식 회독과 통계는 소그룹 단위로 저장됩니다.",
+    action: "open-group-form-for-collection",
+    label: "소그룹 만들기",
+    attrs: `data-collection-id="${collection.id}"`,
+  });
 }
 
 function renderGroupListPanel(visibleCollections) {
@@ -3335,6 +3436,11 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
           number(collection.card_count) ? "" : "disabled"
         }>${iconLabel("repeat-2", "묶음 연습")}</button>
       </div>
+      ${
+        number(collection.card_count)
+          ? ""
+          : renderDisabledReason("카드가 있는 소그룹이 있어야 기록 없는 묶음 연습을 시작할 수 있습니다.")
+      }
       ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "소그룹 검색" })}
       <div class="group-list">
         ${
@@ -3667,12 +3773,12 @@ async function startStudy() {
 async function startBundleStudy() {
   const collection = getSelectedCollection();
   const selectedGroups = getSelectedStudyGroups();
-  if (!collection || !selectedGroups.length) return showToast("학습할 소그룹을 선택하세요.");
+  if (!collection || !selectedGroups.length) return showToast("카드가 있는 소그룹을 선택하세요.");
   const groupIds = selectedGroups.map((group) => group.id).join(",");
   const data = await request(
     `/api/study?collection_id=${collection.id}&group_ids=${encodeURIComponent(groupIds)}&order=${state.orderMode}`,
   );
-  if (!data.cards.length) return showToast("선택한 소그룹에는 카드가 없습니다.");
+  if (!data.cards.length) return showToast("선택한 소그룹에 카드가 없습니다.");
   state.session = {
     studyMode: "practice",
     group: { id: null, name: `${data.collection.name} 묶음 연습` },
@@ -3833,7 +3939,7 @@ function updateSingleDuplicateWarning(form) {
   const front = form.elements.front.value.trim();
   const duplicate = findDuplicateCard(groupId, front, state.editingCardId);
   if (duplicate) {
-    warning.textContent = `같은 소그룹에 이미 '${duplicate.front}' 카드가 있습니다.`;
+    warning.textContent = `같은 소그룹에 이미 같은 앞면 카드가 있습니다: ${duplicate.front}`;
     warning.hidden = false;
   } else {
     warning.textContent = "";
@@ -3853,7 +3959,7 @@ async function saveCard(form) {
   const isEditing = Boolean(state.editingCardId);
   if (findDuplicateCard(payload.group_id, payload.front, state.editingCardId)) {
     updateSingleDuplicateWarning(form);
-    throw new Error("같은 소그룹에 이미 같은 앞면 카드가 있습니다.");
+    return;
   }
   await request(isEditing ? `/api/cards/${state.editingCardId}` : "/api/cards", {
     method: isEditing ? "PATCH" : "POST",
@@ -3879,11 +3985,7 @@ function previewBulkCards(form) {
   state.bulkDraftText = text;
   state.bulkPreview = buildBulkPreview(groupId, text);
   renderCards();
-  if (state.bulkPreview.errors.length) {
-    showToast("대량 등록 형식을 확인해주세요.");
-  } else if (state.bulkPreview.warningCount) {
-    showToast("중복 카드를 정리해주세요.");
-  } else {
+  if (!state.bulkPreview.errors.length && !state.bulkPreview.warningCount) {
     showToast(`카드 ${state.bulkPreview.items.length}개를 확인했습니다.`);
   }
 }
@@ -4652,6 +4754,11 @@ document.addEventListener("click", async (event) => {
         state.groupSearchQuery = "";
         renderGroups();
       }
+    }
+    if (action === "show-all-cards") {
+      state.cardFilterCollectionId = "all";
+      state.cardFilterGroupId = "";
+      renderCards();
     }
     if (action === "add-example") {
       const list = document.querySelector("#example-editor-list");
