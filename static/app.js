@@ -55,6 +55,7 @@ const state = {
   selectedCollectionId: null,
   selectedStudyGroupIds: [],
   selectedGroupId: null,
+  cardFilterCollectionId: "",
   cardFilterGroupId: "",
   cardSearchQuery: "",
   studyGroupSearchQuery: "",
@@ -163,7 +164,24 @@ async function loadData() {
   if (!state.groups.some((group) => group.id === state.selectedGroupId)) {
     state.selectedGroupId = state.groups[0]?.id ?? null;
   }
+  if (
+    state.cardFilterCollectionId &&
+    !state.collections.some((collection) => String(collection.id) === String(state.cardFilterCollectionId))
+  ) {
+    state.cardFilterCollectionId = "";
+  }
   if (state.cardFilterGroupId && !state.groups.some((group) => String(group.id) === String(state.cardFilterGroupId))) {
+    state.cardFilterGroupId = "";
+  }
+  const filteredGroup = state.groups.find((group) => String(group.id) === String(state.cardFilterGroupId));
+  if (filteredGroup) {
+    state.cardFilterCollectionId = String(filteredGroup.collection_id);
+  }
+  if (
+    state.cardFilterCollectionId &&
+    state.cardFilterGroupId &&
+    !getGroupsForCollection(state.cardFilterCollectionId).some((group) => String(group.id) === String(state.cardFilterGroupId))
+  ) {
     state.cardFilterGroupId = "";
   }
   if (state.weakCardOpenId && !state.cards.some((card) => Number(card.id) === Number(state.weakCardOpenId))) {
@@ -430,6 +448,11 @@ function getSelectedStudyGroups() {
 
 function getSelectedStudyCardCount() {
   return getSelectedStudyGroups().reduce((sum, group) => sum + number(group.card_count), 0);
+}
+
+function getCardFilterGroups() {
+  if (!state.cardFilterCollectionId) return [];
+  return getGroupsForCollection(state.cardFilterCollectionId);
 }
 
 function getGroupLabel(group) {
@@ -2033,11 +2056,16 @@ function renderCards() {
   const editing = state.cards.find((card) => card.id === state.editingCardId) ?? null;
   const formGroupId = editing?.group_id ?? state.selectedGroupId ?? state.groups[0]?.id;
   const showForm = state.cardScreen === "form" || Boolean(editing);
-  const hasGroupFilter = state.groups.some((group) => String(group.id) === String(state.cardFilterGroupId));
-  const filteredByGroup = hasGroupFilter
+  const hasCollectionFilter = state.collections.some(
+    (collection) => String(collection.id) === String(state.cardFilterCollectionId),
+  );
+  const hasGroupFilter = getCardFilterGroups().some((group) => String(group.id) === String(state.cardFilterGroupId));
+  const filteredCards = hasGroupFilter
     ? state.cards.filter((card) => String(card.group_id) === String(state.cardFilterGroupId))
-    : [];
-  const visibleCards = filteredByGroup.filter((card) =>
+    : hasCollectionFilter
+      ? state.cards.filter((card) => String(card.collection_id) === String(state.cardFilterCollectionId))
+      : [];
+  const visibleCards = filteredCards.filter((card) =>
     matchesQuery(
       [
         card.front,
@@ -2091,6 +2119,7 @@ function renderCardEditorPanel(editing, formGroupId) {
 }
 
 function renderCardListPanel(visibleCards) {
+  const collectionGroups = getCardFilterGroups();
   return `
     <div class="panel stack">
       <div class="row">
@@ -2104,18 +2133,35 @@ function renderCardListPanel(visibleCards) {
         state.groups.length ? "" : "disabled"
       }>${iconLabel("plus", "카드 등록")}</button>
       ${
-        state.groups.length
-          ? `<select id="card-filter" class="select" aria-label="카드 그룹 필터">
-              <option value="" ${state.cardFilterGroupId ? "" : "selected"}>소그룹 선택</option>
-              ${state.groups
-                .map(
-                  (group) =>
-                    `<option value="${group.id}" ${String(state.cardFilterGroupId) === String(group.id) ? "selected" : ""}>${escapeHtml(
-                      getGroupLabel(group),
-                    )}</option>`,
-                )
-                .join("")}
-            </select>`
+        state.collections.length
+          ? `<div class="card-filter-grid">
+              <select id="card-collection-filter" class="select" aria-label="카드 대그룹 필터">
+                <option value="" ${state.cardFilterCollectionId ? "" : "selected"}>대그룹 선택</option>
+                ${state.collections
+                  .map(
+                    (collection) =>
+                      `<option value="${collection.id}" ${
+                        String(state.cardFilterCollectionId) === String(collection.id) ? "selected" : ""
+                      }>${escapeHtml(collection.name)}</option>`,
+                  )
+                  .join("")}
+              </select>
+              <select id="card-group-filter" class="select" aria-label="카드 소그룹 필터" ${
+                state.cardFilterCollectionId ? "" : "disabled"
+              }>
+                <option value="" ${state.cardFilterGroupId ? "" : "selected"}>${
+                  state.cardFilterCollectionId ? "소그룹 전체" : "대그룹을 먼저 선택"
+                }</option>
+                ${collectionGroups
+                  .map(
+                    (group) =>
+                      `<option value="${group.id}" ${String(state.cardFilterGroupId) === String(group.id) ? "selected" : ""}>${escapeHtml(
+                        group.name,
+                      )}</option>`,
+                  )
+                  .join("")}
+              </select>
+            </div>`
           : ""
       }
       ${renderSearchInput({ id: "card-search", value: state.cardSearchQuery, placeholder: "카드 검색" })}
@@ -2126,8 +2172,10 @@ function renderCardListPanel(visibleCards) {
           : `<div class="empty-state">${
               state.cardFilterGroupId
                 ? "검색된 카드가 없습니다."
-                : state.groups.length
-                  ? "그룹을 선택하면 카드 목록이 보입니다."
+                : state.cardFilterCollectionId
+                  ? "검색된 카드가 없습니다."
+                  : state.collections.length
+                    ? "대그룹을 선택하면 카드 목록이 보입니다."
                   : "등록된 카드가 없습니다."
             }</div>`
       }
@@ -2835,6 +2883,7 @@ async function saveCard(form) {
   state.selectedGroupId = payload.group_id;
   const targetGroup = state.groups.find((group) => Number(group.id) === Number(payload.group_id));
   if (targetGroup) state.selectedCollectionId = targetGroup.collection_id;
+  if (targetGroup) state.cardFilterCollectionId = String(targetGroup.collection_id);
   state.cardFilterGroupId = String(payload.group_id);
   await loadData();
   render();
@@ -2870,6 +2919,7 @@ async function confirmBulkCards() {
   state.selectedGroupId = preview.groupId;
   const targetGroup = state.groups.find((group) => Number(group.id) === Number(preview.groupId));
   if (targetGroup) state.selectedCollectionId = targetGroup.collection_id;
+  if (targetGroup) state.cardFilterCollectionId = String(targetGroup.collection_id);
   state.cardFilterGroupId = String(preview.groupId);
   state.cardSearchQuery = "";
   state.cardScreen = "list";
@@ -3012,6 +3062,7 @@ function logout() {
     roundDetail: null,
     pendingTab: null,
     pendingAction: null,
+    cardFilterCollectionId: "",
     cardFilterGroupId: "",
     cardSearchQuery: "",
     studyGroupSearchQuery: "",
@@ -3208,7 +3259,9 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "add-card-to-study-group") {
       const groupId = Number(actionEl.dataset.groupId);
+      const group = state.groups.find((item) => Number(item.id) === groupId);
       state.selectedGroupId = groupId;
+      if (group) state.cardFilterCollectionId = String(group.collection_id);
       state.cardFilterGroupId = String(groupId);
       state.activeTab = "cards";
       state.cardScreen = "form";
@@ -3567,7 +3620,12 @@ document.addEventListener("click", async (event) => {
 
 document.addEventListener("change", async (event) => {
   try {
-    if (event.target.id === "card-filter") {
+    if (event.target.id === "card-collection-filter") {
+      state.cardFilterCollectionId = event.target.value;
+      state.cardFilterGroupId = "";
+      renderCards();
+    }
+    if (event.target.id === "card-group-filter") {
       state.cardFilterGroupId = event.target.value;
       renderCards();
     }

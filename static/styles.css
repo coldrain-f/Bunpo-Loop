@@ -585,6 +585,12 @@ h3 {
   display: block;
 }
 
+.card-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .search-field .input {
   padding-right: 42px;
   padding-left: 42px;
@@ -785,10 +791,6 @@ button:active,
   padding-right: 4px;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-}
-
-.management-list-scroll {
-  max-height: min(74vh, 660px);
 }
 
 .recent-round-scroll {
