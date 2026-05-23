@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nickname TEXT NOT NULL UNIQUE,
     access_code TEXT NOT NULL,
+    target_name TEXT NOT NULL DEFAULT '',
     jlpt_exam_date TEXT NOT NULL DEFAULT '',
     jlpt_level TEXT NOT NULL DEFAULT '',
     weak_card_threshold INTEGER NOT NULL DEFAULT 16,
@@ -158,6 +159,8 @@ def migrate_db(conn: sqlite3.Connection) -> None:
     }
     if "jlpt_exam_date" not in user_columns:
         conn.execute("ALTER TABLE users ADD COLUMN jlpt_exam_date TEXT NOT NULL DEFAULT ''")
+    if "target_name" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN target_name TEXT NOT NULL DEFAULT ''")
     if "jlpt_level" not in user_columns:
         conn.execute("ALTER TABLE users ADD COLUMN jlpt_level TEXT NOT NULL DEFAULT ''")
     if "weak_card_threshold" not in user_columns:
@@ -371,6 +374,13 @@ def validate_text(value: object, field: str, max_len: int = 500) -> str:
     text = str(value or "").strip()
     if not text:
         raise ValueError(f"{field} 값을 입력하세요.")
+    if len(text) > max_len:
+        raise ValueError(f"{field} 값이 너무 깁니다.")
+    return text
+
+
+def validate_optional_text(value: object, field: str, max_len: int = 500) -> str:
+    text = str(value or "").strip()
     if len(text) > max_len:
         raise ValueError(f"{field} 값이 너무 깁니다.")
     return text
@@ -776,11 +786,11 @@ def ensure_list(value: object, field: str) -> list:
 def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
     backup = payload.get("backup") if isinstance(payload.get("backup"), dict) else payload
     collections = ensure_list(backup.get("collections", []), "대그룹 백업")
-    groups = ensure_list(backup.get("groups", []), "그룹 백업")
+    groups = ensure_list(backup.get("groups", []), "소그룹 백업")
     cards = ensure_list(backup.get("cards", []), "카드 백업")
     examples = ensure_list(backup.get("examples", []), "예문 백업")
     rounds = ensure_list(backup.get("study_rounds", []), "회독 백업")
-    round_groups = ensure_list(backup.get("study_round_groups", []), "회독 그룹 백업")
+    round_groups = ensure_list(backup.get("study_round_groups", []), "회독 소그룹 백업")
     reviews = ensure_list(backup.get("reviews", []), "복습 백업")
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -797,7 +807,7 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
             {
                 "id": 1,
                 "name": "기본 대그룹",
-                "description": "이전 백업에서 가져온 그룹입니다.",
+                "description": "이전 백업에서 가져온 소그룹입니다.",
                 "created_at": now,
             }
         ]
@@ -830,7 +840,7 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
             (
                 group_id,
                 collection_id,
-                validate_text(group.get("name"), "그룹명", 100),
+                validate_text(group.get("name"), "소그룹명", 100),
                 str(group.get("description") or "").strip(),
                 str(group.get("created_at") or now),
             ),
@@ -1239,7 +1249,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     collection_id = int(body.get("collection_id") or 0)
                     if get_collection(conn, collection_id) is None:
                         raise ValueError("소그룹을 넣을 대그룹을 선택하세요.")
-                    name = validate_text(body.get("name"), "그룹명", 100)
+                    name = validate_text(body.get("name"), "소그룹명", 100)
                     description = str(body.get("description") or "").strip()
                     cur = conn.execute(
                         "INSERT INTO groups (collection_id, name, description) VALUES (?, ?, ?)",
@@ -1261,7 +1271,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 group_id = int(parts[2])
                 group = get_group(conn, group_id)
                 if group is None:
-                    self.send_json({"error": "그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+                    self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                     return
                 self.reset_group_history(conn, group_id)
                 return
@@ -1270,14 +1280,14 @@ class AppHandler(BaseHTTPRequestHandler):
                 group_id = int(parts[2])
                 group = get_group(conn, group_id)
                 if group is None:
-                    self.send_json({"error": "그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+                    self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                     return
                 if method == "PATCH":
                     body = parse_body(self)
                     collection_id = int(body.get("collection_id", group["collection_id"]) or group["collection_id"])
                     if get_collection(conn, collection_id) is None:
                         raise ValueError("소그룹을 넣을 대그룹을 선택하세요.")
-                    name = validate_text(body.get("name", group["name"]), "그룹명", 100)
+                    name = validate_text(body.get("name", group["name"]), "소그룹명", 100)
                     description = str(body.get("description", group["description"]) or "").strip()
                     conn.execute(
                         "UPDATE groups SET collection_id = ?, name = ?, description = ? WHERE id = ?",
@@ -1360,7 +1370,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 group_id = int(query.get("group_id", ["0"])[0])
                 group = get_group(conn, group_id)
                 if group is None:
-                    self.send_json({"error": "그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+                    self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                     return
                 collection = get_collection(conn, int(group["collection_id"]))
                 cards = cards_payload(conn, group_id=group_id, order_mode=order_mode)
@@ -1487,6 +1497,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def settings_payload(self, user: sqlite3.Row) -> dict:
         return {
+            "target_name": str(user["target_name"] or ""),
             "jlpt_exam_date": str(user["jlpt_exam_date"] or ""),
             "jlpt_level": str(user["jlpt_level"] or ""),
             "weak_card_threshold": int(user["weak_card_threshold"] or DEFAULT_WEAK_CARD_THRESHOLD),
@@ -1498,6 +1509,11 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def update_settings(self, conn: sqlite3.Connection, user: sqlite3.Row) -> None:
         body = parse_body(self)
+        target_name = (
+            validate_optional_text(body.get("target_name"), "목표 이름", 80)
+            if "target_name" in body
+            else str(user["target_name"] or "")
+        )
         exam_date = (
             validate_exam_date(body.get("jlpt_exam_date"))
             if "jlpt_exam_date" in body
@@ -1526,14 +1542,23 @@ class AppHandler(BaseHTTPRequestHandler):
         conn.execute(
             """
             UPDATE users
-            SET jlpt_exam_date = ?,
+            SET target_name = ?,
+                jlpt_exam_date = ?,
                 jlpt_level = ?,
                 weak_card_threshold = ?,
                 weak_recent_rounds = ?,
                 weak_recent_wrong_threshold = ?
             WHERE id = ?
             """,
-            (exam_date, jlpt_level, weak_card_threshold, weak_recent_rounds, weak_recent_wrong_threshold, user["id"]),
+            (
+                target_name,
+                exam_date,
+                jlpt_level,
+                weak_card_threshold,
+                weak_recent_rounds,
+                weak_recent_wrong_threshold,
+                user["id"],
+            ),
         )
         updated = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
         self.send_json({"settings": self.settings_payload(updated)})
@@ -1542,7 +1567,7 @@ class AppHandler(BaseHTTPRequestHandler):
         body = parse_body(self)
         group_id = int(body.get("group_id") or 0)
         if get_group(conn, group_id) is None:
-            raise ValueError("카드를 넣을 그룹을 선택하세요.")
+            raise ValueError("카드를 넣을 소그룹을 선택하세요.")
         front = validate_text(body.get("front"), "앞면", 200)
         back = validate_text(body.get("back"), "뒷면", 500)
         memo = str(body.get("memo") or "").strip()
@@ -1550,7 +1575,7 @@ class AppHandler(BaseHTTPRequestHandler):
         if not isinstance(examples, list):
             raise ValueError("예문은 배열이어야 합니다.")
         if duplicate_card_exists(conn, group_id, front):
-            raise ValueError("같은 그룹에 이미 같은 앞면 카드가 있습니다.")
+            raise ValueError("같은 소그룹에 이미 같은 앞면 카드가 있습니다.")
         cur = conn.execute(
             """
             INSERT INTO cards (group_id, front, back, memo)
@@ -1572,7 +1597,7 @@ class AppHandler(BaseHTTPRequestHandler):
         body = parse_body(self)
         group_id = int(body.get("group_id", card["group_id"]) or card["group_id"])
         if get_group(conn, group_id) is None:
-            raise ValueError("카드를 넣을 그룹을 선택하세요.")
+            raise ValueError("카드를 넣을 소그룹을 선택하세요.")
         front = validate_text(body.get("front", card["front"]), "앞면", 200)
         back = validate_text(body.get("back", card["back"]), "뒷면", 500)
         memo = str(body.get("memo", card["memo"]) or "").strip()
@@ -1580,7 +1605,7 @@ class AppHandler(BaseHTTPRequestHandler):
         if examples is not None and not isinstance(examples, list):
             raise ValueError("예문은 배열이어야 합니다.")
         if duplicate_card_exists(conn, group_id, front, card_id):
-            raise ValueError("같은 그룹에 이미 같은 앞면 카드가 있습니다.")
+            raise ValueError("같은 소그룹에 이미 같은 앞면 카드가 있습니다.")
         conn.execute(
             f"""
             UPDATE cards
@@ -1603,7 +1628,7 @@ class AppHandler(BaseHTTPRequestHandler):
         body = parse_body(self)
         group_id = int(body.get("group_id") or 0)
         if get_group(conn, group_id) is None:
-            raise ValueError("카드를 넣을 그룹을 선택하세요.")
+            raise ValueError("카드를 넣을 소그룹을 선택하세요.")
         items = parse_bulk_cards(body.get("text"))
         seen_fronts = set()
         for item in items:
@@ -1739,7 +1764,7 @@ class AppHandler(BaseHTTPRequestHandler):
         else:
             group = get_group(conn, group_id)
             if group is None:
-                raise ValueError("그룹을 찾을 수 없습니다.")
+                raise ValueError("소그룹을 찾을 수 없습니다.")
             primary_group_id = group_id
             selected_group_ids = [group_id]
             round_no = group_round_no(conn, group_id)
@@ -2086,7 +2111,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def require_auth(self) -> None:
         self.send_response(HTTPStatus.UNAUTHORIZED)
-        self.send_header("WWW-Authenticate", 'Basic realm="Bunpo Loop", charset="UTF-8"')
+        self.send_header("WWW-Authenticate", 'Basic realm="Byeorakjjitgi", charset="UTF-8"')
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
         self.wfile.write("인증이 필요합니다.".encode("utf-8"))

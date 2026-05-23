@@ -837,6 +837,18 @@ button:active,
   gap: 8px;
 }
 
+.quick-practice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.quick-practice-grid .ghost-button {
+  min-height: 40px;
+  padding: 0 8px;
+  font-size: 0.78rem;
+}
+
 .study-subgroup-option {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -852,6 +864,10 @@ button:active,
 .study-subgroup-option.active {
   border-color: #b9d6cf;
   background: var(--teal-soft);
+}
+
+.study-subgroup-option.disabled {
+  opacity: 0.58;
 }
 
 .study-subgroup-option input {
@@ -2441,6 +2457,7 @@ button:active,
   .form-actions,
   .study-start-actions,
   .today-action-buttons,
+  .quick-practice-grid,
   .study-actions {
     grid-template-columns: 1fr;
   }
