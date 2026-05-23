@@ -2050,6 +2050,26 @@ function isCardExamplesExpanded(session, card) {
   return Boolean(override);
 }
 
+function getStudyTextScriptClass(value) {
+  const text = String(value || "");
+  if (/[\u3040-\u30ff]/u.test(text)) return "script-jp";
+  if (/[\u3400-\u9fff]/u.test(text)) return "script-cjk";
+  if (/[A-Za-z]/.test(text)) return "script-latin";
+  return "script-generic";
+}
+
+function getStudyTextDensityClass(value) {
+  const length = Array.from(String(value || "").trim()).length;
+  if (length > 72) return "density-long";
+  if (length > 36) return "density-medium";
+  return "density-short";
+}
+
+function shouldUseCjkCardMeta(value) {
+  const script = getStudyTextScriptClass(value);
+  return script === "script-jp" || script === "script-cjk";
+}
+
 function getSessionTitle(session) {
   if (session.studyMode === "practice") return "묶음 연습";
   return session.studyMode === "weak" ? "약점 복습" : `${session.roundNo}회독`;
@@ -2101,6 +2121,7 @@ function renderStudySession() {
   const examplesExpanded = isCardExamplesExpanded(session, card);
   const feedbackClass = session.answerFeedback ? `answer-feedback-${session.answerFeedback}` : "";
   const feedbackLabel = session.answerFeedback === "correct" ? "알맞음" : "틀림";
+  const frontClass = `grammar ${getStudyTextScriptClass(card.front)} ${getStudyTextDensityClass(card.front)}`;
   views.study.innerHTML = `
     <div class="stack study-shell">
       <div class="row">
@@ -2134,9 +2155,10 @@ function renderStudySession() {
         ${
           session.showingBack
             ? renderCardBack(card, examplesExpanded)
-            : `${renderStudyCardMeta(card.group_name, card)}<div class="grammar">${escapeHtml(
-                card.front,
-              )}</div><p class="study-hint">탭해서 뜻 보기</p>`
+            : `<div class="study-front-content">${renderStudyCardMeta(
+                card.group_name,
+                card,
+              )}<div class="${frontClass}">${escapeHtml(card.front)}</div><p class="study-hint">탭해서 뜻 보기</p></div>`
         }
       </div>
       <div class="study-action-bar ${feedbackClass}">
@@ -2435,39 +2457,52 @@ function renderCardBack(card, examplesExpanded = false) {
   const examples = card.examples || [];
   const visibleExamples = examplesExpanded ? examples : examples.slice(0, 1);
   return `
-    ${renderStudyCardMeta(card.front, card, true)}
-    <div class="meaning">${escapeHtml(card.back)}</div>
-    ${card.memo ? `<p class="study-note">${escapeHtml(card.memo)}</p>` : ""}
-    ${
-      examples.length
-        ? `
-          <div class="example-header">
-            <span>예문</span>
-            <span class="pill">${examples.length}개</span>
-          </div>
-          <ul class="examples">${visibleExamples
-            .map(
-              (example) => `
-                <li class="example">
-                  <p class="example-jp">${renderMarkedJapaneseText(example.japanese)}</p>
-                  ${example.korean ? `<p class="example-ko">${renderMarkedText(example.korean)}</p>` : ""}
-                </li>
-              `,
-            )
-            .join("")}</ul>
-          ${
-            examples.length > 1
-              ? `<button class="ghost-button full example-toggle" type="button" data-action="toggle-examples">${
-                  iconLabel(
-                    examplesExpanded ? "chevron-up" : "chevron-down",
-                    examplesExpanded ? "예문 접기" : `예문 ${examples.length - 1}개 더 보기`,
-                  )
-                }</button>`
-              : ""
-          }
-        `
-        : `<p class="meta">예문 없음</p>`
-    }
+    <div class="study-back-content">
+      ${renderStudyCardMeta(card.front, card, shouldUseCjkCardMeta(card.front))}
+      <section class="study-back-section meaning-section">
+        <span class="study-section-label">뜻</span>
+        <div class="meaning">${escapeHtml(card.back)}</div>
+      </section>
+      ${
+        card.memo
+          ? `<section class="study-back-section"><span class="study-section-label">메모</span><p class="study-note">${escapeHtml(
+              card.memo,
+            )}</p></section>`
+          : ""
+      }
+      <section class="study-back-section example-section">
+        <div class="example-header">
+          <span>예문</span>
+          <span class="pill">${examples.length}개</span>
+        </div>
+        ${
+          examples.length
+            ? `
+              <ul class="examples">${visibleExamples
+                .map(
+                  (example) => `
+                    <li class="example">
+                      <p class="example-jp">${renderMarkedJapaneseText(example.japanese)}</p>
+                      ${example.korean ? `<p class="example-ko">${renderMarkedText(example.korean)}</p>` : ""}
+                    </li>
+                  `,
+                )
+                .join("")}</ul>
+              ${
+                examples.length > 1
+                  ? `<button class="ghost-button full example-toggle" type="button" data-action="toggle-examples">${
+                      iconLabel(
+                        examplesExpanded ? "chevron-up" : "chevron-down",
+                        examplesExpanded ? "예문 접기" : `예문 ${examples.length - 1}개 더 보기`,
+                      )
+                    }</button>`
+                  : ""
+              }
+            `
+            : `<p class="meta study-empty-note">예문 없음</p>`
+        }
+      </section>
+    </div>
   `;
 }
 

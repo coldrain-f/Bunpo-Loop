@@ -67,9 +67,9 @@ Core direction:
   - [x] 3.1 Subgroup Card Redesign
   - [x] 3.2 Collection Detail Refinement
   - [x] 3.3 Bundle Practice Dialog Polish
-- [ ] Phase 4. Study Session
-  - [ ] 4.1 Card Front/Back Reading Polish
-  - [ ] 4.2 Answer Bar Stability
+- [x] Phase 4. Study Session
+  - [x] 4.1 Card Front/Back Reading Polish
+  - [x] 4.2 Answer Bar Stability
 - [ ] Phase 5. Completion Loop
   - [ ] 5.1 Completion Summary Redesign
   - [ ] 5.2 Next Action Design
@@ -273,10 +273,10 @@ Purpose:
 학습 카드의 읽기 경험을 앱의 최고 품질 지점으로 만든다.
 
 Tasks:
-- [ ] front card의 content type이 일본어/영어/기타 모두 자연스럽게 보이도록 typography를 조정한다.
-- [ ] back card에서 뜻, 메모, 예문의 위계를 재정리한다.
-- [ ] 예문 spacing과 grammar highlight를 더 읽기 좋게 다듬는다.
-- [ ] 긴 예문/긴 번역이 카드 밖으로 밀리지 않게 한다.
+- [x] front card의 content type이 일본어/영어/기타 모두 자연스럽게 보이도록 typography를 조정한다.
+- [x] back card에서 뜻, 메모, 예문의 위계를 재정리한다.
+- [x] 예문 spacing과 grammar highlight를 더 읽기 좋게 다듬는다.
+- [x] 긴 예문/긴 번역이 카드 밖으로 밀리지 않게 한다.
 
 Files:
 - `static/app.js`
@@ -293,9 +293,9 @@ Purpose:
 학습 중 조작 리듬을 안정화한다.
 
 Tasks:
-- [ ] 답변 버튼 높이와 위치가 feedback 상태에서도 변하지 않게 한다.
-- [ ] correct/wrong feedback은 color + label로 표현하되 layout shift를 없앤다.
-- [ ] quit/study timer/progress 영역이 너무 시끄럽지 않게 정리한다.
+- [x] 답변 버튼 높이와 위치가 feedback 상태에서도 변하지 않게 한다.
+- [x] correct/wrong feedback은 color + label로 표현하되 layout shift를 없앤다.
+- [x] quit/study timer/progress 영역이 너무 시끄럽지 않게 정리한다.
 
 Files:
 - `static/app.js`
