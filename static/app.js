@@ -237,7 +237,7 @@ function getHeaderContext() {
     return "묶음 관리";
   }
   if (state.activeTab === "settings") return "설정";
-  return TAB_LABELS[state.activeTab] || "벼락찢기";
+  return TAB_LABELS[state.activeTab] || "벼락치기";
 }
 
 function getExamDateInfo() {

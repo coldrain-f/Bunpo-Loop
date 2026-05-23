@@ -1106,7 +1106,7 @@ def collection_round_no(conn: sqlite3.Connection, collection_id: int) -> int:
 
 
 class AppHandler(BaseHTTPRequestHandler):
-    server_version = "ByeorakJjitgi/1.0"
+    server_version = "Byeorakchigi/1.0"
 
     def do_GET(self) -> None:
         self.handle_request("GET")
@@ -2111,7 +2111,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def require_auth(self) -> None:
         self.send_response(HTTPStatus.UNAUTHORIZED)
-        self.send_header("WWW-Authenticate", 'Basic realm="Byeorakjjitgi", charset="UTF-8"')
+        self.send_header("WWW-Authenticate", 'Basic realm="Byeorakchigi", charset="UTF-8"')
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
         self.wfile.write("인증이 필요합니다.".encode("utf-8"))
@@ -2122,7 +2122,7 @@ def main() -> None:
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
     server = ThreadingHTTPServer((host, port), AppHandler)
-    print(f"벼락찢기 running at http://{host}:{port}")
+    print(f"벼락치기 running at http://{host}:{port}")
     print(f"SQLite database: {DB_PATH}")
     server.serve_forever()
 

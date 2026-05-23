@@ -13,13 +13,12 @@
   --red: #b94a43;
   --red-soft: #f8e3df;
   --gold: #b97918;
-  --amber: #d99a18;
-  --amber-soft: #fbefd4;
-  --shell-dark: #26312e;
+  --gold-soft: #fbefd4;
   --shadow: 0 16px 38px rgba(35, 47, 43, 0.1);
   --shadow-soft: 0 6px 18px rgba(35, 47, 43, 0.07);
   --focus-ring: 0 0 0 3px rgba(23, 111, 102, 0.18);
   --font-ui:
+    Inter,
     ui-sans-serif,
     system-ui,
     -apple-system,
@@ -42,6 +41,13 @@
     "YuMincho",
     "Noto Serif CJK JP",
     serif;
+  --font-mono:
+    "Geist Mono",
+    "SF Mono",
+    Menlo,
+    Consolas,
+    ui-monospace,
+    monospace;
   font-family: var(--font-ui);
 }
 
@@ -57,7 +63,7 @@ html {
 body {
   min-height: 100%;
   margin: 0;
-  background: linear-gradient(180deg, #fbfcfa 0, var(--paper) 42%, #eef3f0 100%);
+  background: var(--paper);
   color: var(--ink);
 }
 
@@ -196,8 +202,8 @@ h1 {
 
 .app-header h1 {
   color: var(--ink);
-  font-size: 1.78rem;
-  font-weight: 950;
+  font-size: 1.75rem;
+  font-weight: 800;
 }
 
 .header-context {
@@ -339,9 +345,7 @@ h3 {
   padding: 12px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 246, 0.96)),
-    var(--surface-strong);
+  background: var(--surface-strong);
 }
 
 .stat strong {
@@ -366,7 +370,7 @@ h3 {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: linear-gradient(180deg, var(--surface), var(--surface-strong));
+  background: var(--surface-strong);
 }
 
 .study-readiness.done {
@@ -393,7 +397,7 @@ h3 {
   padding: 16px;
   border: 1px solid rgba(23, 111, 102, 0.22);
   border-radius: 8px;
-  background: linear-gradient(180deg, #f7fbf9, var(--teal-soft));
+  background: var(--teal-soft);
   box-shadow: var(--shadow-soft);
 }
 
@@ -687,6 +691,11 @@ textarea[name="example_japanese"] {
   line-height: 1.5;
 }
 
+.backup-textarea {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+}
+
 .input:focus,
 .select:focus,
 .textarea:focus {
@@ -887,7 +896,7 @@ button:active,
   padding: 13px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: linear-gradient(180deg, var(--surface), var(--surface-strong));
+  background: var(--surface-strong);
 }
 
 .study-subgroup-list {
@@ -966,13 +975,13 @@ button:active,
 
 .today-action-card.primary {
   border-color: rgba(23, 111, 102, 0.24);
-  background: linear-gradient(180deg, #f8fbfa, var(--teal-soft));
+  background: var(--teal-soft);
   color: var(--ink);
 }
 
 .today-action-card.weak {
   border-color: rgba(178, 70, 62, 0.24);
-  background: linear-gradient(180deg, #fff, rgba(248, 222, 219, 0.54));
+  background: var(--red-soft);
 }
 
 .today-action-label {
@@ -1057,7 +1066,7 @@ button:active,
   padding: 13px;
   border: 1px solid rgba(178, 70, 62, 0.22);
   border-radius: 8px;
-  background: linear-gradient(180deg, #fff, rgba(248, 222, 219, 0.4));
+  background: var(--red-soft);
 }
 
 .weak-card-panel h3 {
@@ -1322,8 +1331,8 @@ button:active,
 }
 
 .accuracy-pill.warn {
-  background: rgba(197, 139, 43, 0.16);
-  color: #8f6116;
+  background: var(--gold-soft);
+  color: var(--gold);
 }
 
 .accuracy-pill.bad {
@@ -1416,7 +1425,7 @@ button:active,
   min-height: 26px;
   padding: 0 9px;
   border-radius: 999px;
-  background: #22201c;
+  background: var(--ink);
   color: white;
   font-size: 0.78rem;
   font-weight: 900;
@@ -1455,7 +1464,7 @@ button:active,
   padding: 16px;
   border: 1px solid rgba(23, 111, 102, 0.24);
   border-radius: 8px;
-  background: linear-gradient(180deg, #f8fbfa, var(--teal-soft));
+  background: var(--teal-soft);
 }
 
 .completion-main-score strong {
@@ -1743,9 +1752,9 @@ button:active,
 }
 
 .bulk-issues.warn {
-  border: 1px solid rgba(197, 139, 43, 0.28);
-  background: rgba(197, 139, 43, 0.13);
-  color: #8a5e18;
+  border: 1px solid rgba(185, 121, 24, 0.28);
+  background: var(--gold-soft);
+  color: var(--gold);
 }
 
 .card-preview-example {
@@ -1834,9 +1843,7 @@ button:active,
   padding: 24px;
   border: 1px solid rgba(22, 34, 31, 0.12);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 246, 0.99)),
-    var(--surface);
+  background: var(--surface);
   box-shadow: var(--shadow);
   text-align: center;
   animation: study-card-enter 180ms ease;
@@ -2021,8 +2028,8 @@ button:active,
 .grammar-mark {
   padding: 0 0.12em 0.08em;
   border-radius: 4px;
-  background: rgba(197, 139, 43, 0.18);
-  box-shadow: inset 0 -0.34em rgba(197, 139, 43, 0.14);
+  background: var(--gold-soft);
+  box-shadow: inset 0 -0.34em rgba(185, 121, 24, 0.12);
   color: inherit;
   font-weight: inherit;
 }
@@ -2175,7 +2182,7 @@ button:active,
   padding: 14px;
   border: 1px solid rgba(23, 111, 102, 0.24);
   border-radius: 8px;
-  background: linear-gradient(180deg, #f8fbfa, var(--teal-soft));
+  background: var(--teal-soft);
 }
 
 .settings-summary.empty {
@@ -2218,7 +2225,7 @@ button:active,
   padding: 13px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: linear-gradient(180deg, var(--surface), var(--surface-strong));
+  background: var(--surface-strong);
 }
 
 .number-setting {
@@ -2355,7 +2362,7 @@ button:active,
   margin: 0 auto;
   padding: 12px 14px;
   border-radius: 8px;
-  background: var(--shell-dark);
+  background: var(--ink);
   color: white;
   font-weight: 750;
   line-height: 1.4;
