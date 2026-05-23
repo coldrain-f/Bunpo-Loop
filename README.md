@@ -73,7 +73,7 @@ python3 app.py
 HOST=0.0.0.0 PORT=8000 python3 app.py
 ```
 
-개인 서버에 공개할 때는 앱 안의 간단 로그인과 별도로, 서버 전체를 보호하는 기본 인증을 켜는 편이 좋습니다.
+개인 서버에 공개할 때는 앱 안의 간단 로그인과 별도로, 서버 전체를 보호하는 기본 인증을 켜는 편이 좋습니다. 앱 안의 닉네임과 숫자 6자리 코드는 학습 데이터를 나누어 여는 개인용 구분값이고, 공개 서비스 수준의 계정 보안 기능은 아닙니다.
 
 ```bash
 APP_USER=myname APP_PASSWORD='strong-password' HOST=0.0.0.0 PORT=8000 python3 app.py
@@ -84,6 +84,14 @@ SQLite 파일은 기본으로 `data/jlpt_cards.sqlite3`에 생성됩니다. 다�
 ```bash
 BYEORAKCHIGI_DB=/var/lib/bunpo-loop/bunpo-loop.sqlite3 HOST=0.0.0.0 PORT=8000 python3 app.py
 ```
+
+## 데이터와 보안
+
+- 학습 데이터는 서버의 SQLite 파일에 저장됩니다. Docker Compose 기본 구성에서는 `bunpo-loop-data` 볼륨에 보관됩니다.
+- 앱 안 로그인은 닉네임과 6자리 코드로 학습 공간을 구분하는 간단한 방식입니다. 여러 사람이 쓰는 공개 서비스의 강한 인증, 권한 관리, 비밀번호 재설정 기능을 제공하지 않습니다.
+- 개인 서버에서 인터넷에 노출할 때는 Nginx나 Caddy 같은 리버스 프록시 뒤에 두고 HTTPS를 적용하세요. 가능하면 `APP_USER`, `APP_PASSWORD`로 서버 기본 인증도 함께 켜는 구성을 권장합니다.
+- 백업 JSON 파일에는 대그룹, 소그룹, 카드, 예문, 회독 기록이 그대로 들어갑니다. 백업 파일은 개인 저장소에 보관하고 공개 저장소나 공유 링크에 올리지 마세요.
+- 현재 구조는 개인용 또는 신뢰하는 소수 사용자를 전제로 합니다. 불특정 다수가 쓰는 public server로 운영하려면 별도의 사용자 관리, 암호 저장, 권한 분리, HTTPS 강제, 감사 로그 같은 보강이 필요합니다.
 
 ## 기능
 
@@ -127,7 +135,7 @@ BYEORAKCHIGI_DB=/var/lib/bunpo-loop/bunpo-loop.sqlite3 HOST=0.0.0.0 PORT=8000 py
 
 ## 우분투 배포 메모
 
-개인 서버에서는 Docker Compose로 실행하고, Nginx나 Caddy 뒤에 붙여 HTTPS를 적용하는 구성을 추천합니다.
+개인 서버에서는 Docker Compose로 실행하고, Nginx나 Caddy 뒤에 붙여 HTTPS를 적용하는 구성을 추천합니다. 외부에는 80/443만 열고, 앱 포트는 서버 내부에서만 프록시 대상이 되게 두는 편이 안전합니다.
 
 프록시 대상:
 
@@ -135,4 +143,4 @@ BYEORAKCHIGI_DB=/var/lib/bunpo-loop/bunpo-loop.sqlite3 HOST=0.0.0.0 PORT=8000 py
 http://127.0.0.1:8000
 ```
 
-서버 방화벽을 직접 열어 접속할 경우에는 `BUNPO_LOOP_PORT`로 지정한 포트만 열면 됩니다.
+서버 방화벽을 직접 열어 접속할 경우에는 `BUNPO_LOOP_PORT`로 지정한 포트만 열면 됩니다. 다만 인터넷에 그대로 노출하기보다는 HTTPS 리버스 프록시와 기본 인증을 앞에 두는 구성을 권장합니다.

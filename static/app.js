@@ -1111,7 +1111,7 @@ function renderAuth() {
       <div class="auth-heading">
         <p class="eyebrow">개인 학습 공간</p>
         <h2 id="auth-title">바로 시작하기</h2>
-        <p id="auth-help" class="meta">닉네임과 6자리 코드는 같은 학습 데이터를 다시 여는 간단한 열쇠입니다.</p>
+        <p id="auth-help" class="meta">닉네임과 6자리 코드는 같은 학습 데이터를 다시 여는 개인용 구분값입니다. 공개 서비스용 계정 보안은 아닙니다.</p>
       </div>
       <form id="login-form" class="stack" novalidate>
         <label class="field">
@@ -1372,11 +1372,14 @@ function renderDialog() {
     return;
   }
   if (state.activeDialog === "restore-backup") {
+    const summary = backupSummary(state.pendingAction?.backup);
     renderConfirmDialog({
-      eyebrow: "복원",
-      title: "백업을 복원할까요?",
-      message: "현재 대그룹, 소그룹, 카드, 예문, 회독 기록을 지우고 백업 내용으로 교체합니다.",
-      confirmLabel: "복원",
+      eyebrow: "데이터 복원",
+      title: "현재 데이터를 백업 파일로 교체할까요?",
+      message: `현재 학습 데이터는 삭제되고 백업의 대그룹 ${number(summary.collections)}개, 소그룹 ${number(
+        summary.groups,
+      )}개, 카드 ${number(summary.cards)}개, 회독 ${number(summary.rounds)}개로 교체됩니다. 이 작업은 되돌릴 수 없습니다.`,
+      confirmLabel: "교체 복원",
       confirmAction: "confirm-restore-backup",
     });
     return;
@@ -3467,13 +3470,48 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
   `;
 }
 
+function backupSummary(backup) {
+  const payload = backup?.backup && typeof backup.backup === "object" ? backup.backup : backup || {};
+  return {
+    collections: Array.isArray(payload.collections) ? payload.collections.length : 0,
+    groups: Array.isArray(payload.groups) ? payload.groups.length : 0,
+    cards: Array.isArray(payload.cards) ? payload.cards.length : 0,
+    rounds: Array.isArray(payload.study_rounds) ? payload.study_rounds.length : 0,
+  };
+}
+
+function renderPrivacyPanel() {
+  return `
+    <section class="panel stack data-safety-panel">
+      <div>
+        <p class="eyebrow">개인 데이터</p>
+        <h2>저장 위치와 로그인</h2>
+      </div>
+      <div class="safety-note-grid">
+        <article class="safety-note">
+          <strong>앱 안 로그인</strong>
+          <p>닉네임과 6자리 코드는 같은 학습 데이터를 다시 여는 개인용 구분값입니다. 강력한 계정 보안으로 보기는 어렵습니다.</p>
+        </article>
+        <article class="safety-note">
+          <strong>서버 보호</strong>
+          <p>개인 서버에 올릴 때는 HTTPS와 서버 기본 인증 또는 리버스 프록시 보호를 함께 쓰는 구성을 권장합니다.</p>
+        </article>
+        <article class="safety-note">
+          <strong>학습 데이터</strong>
+          <p>카드, 예문, 회독 기록은 서버의 SQLite 데이터베이스와 백업 JSON 파일에 그대로 저장됩니다.</p>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
 function renderBackupPanel() {
   return `
-    <div class="panel stack">
+    <section class="panel stack data-safety-panel">
       <div class="row">
         <div>
-          <p class="eyebrow">데이터</p>
-          <h2>데이터 백업</h2>
+          <p class="eyebrow">데이터 안전</p>
+          <h2>백업과 복원</h2>
         </div>
         <button class="ghost-button small-button" type="button" data-action="toggle-data-panel">${iconLabel(
           state.dataPanelOpen ? "chevron-up" : "chevron-down",
@@ -3483,6 +3521,12 @@ function renderBackupPanel() {
       ${
         state.dataPanelOpen
           ? `
+            <div class="data-safety-summary">
+              <strong>백업 파일에는 학습 데이터가 그대로 들어갑니다.</strong>
+              <p>대그룹 ${number(state.collections.length)}개, 소그룹 ${number(state.groups.length)}개, 카드 ${number(
+                state.cards.length,
+              )}개와 예문, 회독 기록이 포함됩니다. 파일은 개인 저장소에 보관하세요.</p>
+            </div>
             <div class="button-row">
               <button class="secondary-button" type="button" data-action="export-backup">${iconLabel(
                 "download",
@@ -3491,9 +3535,13 @@ function renderBackupPanel() {
               <label class="ghost-button file-button">${iconLabel("upload", "파일 선택")}<input id="backup-file-input" type="file" accept="application/json,.json" /></label>
             </div>
             <form id="backup-import-form" class="stack">
-              <textarea id="backup-json" class="textarea backup-textarea" name="backup_json" placeholder="백업 JSON" aria-describedby="backup-error">${escapeHtml(
-                state.backupDraftText,
-              )}</textarea>
+              <label class="field">
+                <span>복원할 백업 JSON</span>
+                <textarea id="backup-json" class="textarea backup-textarea" name="backup_json" placeholder="백업 JSON" aria-describedby="backup-error backup-help">${escapeHtml(
+                  state.backupDraftText,
+                )}</textarea>
+                <small id="backup-help" class="form-hint">복원하면 현재 대그룹, 소그룹, 카드, 예문, 회독 기록이 백업 파일 내용으로 교체됩니다.</small>
+              </label>
               ${
                 state.backupError
                   ? `<p id="backup-error" class="backup-error" role="alert">${escapeHtml(state.backupError)}</p>`
@@ -3504,7 +3552,7 @@ function renderBackupPanel() {
           `
           : `<p class="meta">카드 ${state.cards.length}개 · 대그룹 ${state.collections.length}개 · 소그룹 ${state.groups.length}개 · 예문과 회독 기록 포함</p>`
       }
-    </div>
+    </section>
   `;
 }
 
@@ -3512,6 +3560,7 @@ function renderSettings() {
   const examInfo = getExamDateInfo();
   const targetLabel = getTargetLabel();
   const targetDateLabel = targetLabel === "목표" ? "목표일" : `${targetLabel} 목표일`;
+  const hasTargetSettings = Boolean(state.settings?.target_name || state.settings?.jlpt_exam_date || state.settings?.jlpt_level);
   const examDateMessage = examInfo
     ? examInfo.diffDays > 0
       ? `${escapeHtml(examInfo.dateLabel)}까지 ${number(examInfo.diffDays)}일 남았습니다.`
@@ -3534,18 +3583,26 @@ function renderSettings() {
         <p>${examDateMessage}</p>
       </div>
       <form id="settings-form" class="stack">
-        ${renderTargetNameField()}
-        ${renderLevelOptions()}
-        ${renderExamDateSelects()}
+        <section class="settings-subsection">
+          <div>
+            <span class="field-label">목표 표시</span>
+            <p class="form-hint">목표 이름과 목표일은 선택 사항입니다. 일본어가 아니라도 시험명, 프로젝트명, 단어장 이름처럼 자유롭게 적을 수 있습니다.</p>
+          </div>
+          ${renderTargetNameField()}
+          ${renderLevelOptions()}
+          ${renderExamDateSelects()}
+        </section>
         ${renderWeakThresholdSetting()}
         <div class="form-actions">
           <button class="ghost-button" type="button" data-action="clear-exam-date" ${
-            state.settings?.target_name || state.settings?.jlpt_exam_date || state.settings?.jlpt_level ? "" : "disabled"
+            hasTargetSettings ? "" : "disabled"
           }>${iconLabel("rotate-ccw", "초기화")}</button>
           <button class="primary-button" type="submit">${iconLabel("save", "저장")}</button>
         </div>
+        ${hasTargetSettings ? "" : renderDisabledReason("초기화할 목표 이름, 목표일, JLPT 급수가 아직 없습니다.")}
       </form>
     </div>
+    ${renderPrivacyPanel()}
     ${renderBackupPanel()}
   `;
 }
@@ -3557,6 +3614,7 @@ function renderTargetNameField() {
       <input class="input" name="target_name" value="${escapeHtml(
         state.settings?.target_name || "",
       )}" placeholder="JLPT N1, HSK 5급, 토익 단어처럼 직접 입력" maxlength="80" />
+      <small class="form-hint">헤더와 학습 화면에 보일 이름입니다. 비워두면 일반 목표로 표시됩니다.</small>
     </label>
   `;
 }
@@ -3569,7 +3627,11 @@ function renderWeakThresholdSetting() {
     <section class="settings-subsection">
       <div>
         <span class="field-label">약점 카드 기준</span>
-        <p class="form-hint">최근 기준이나 전체 기준 중 하나라도 해당하면 약점 카드에 모입니다.</p>
+        <p class="form-hint">최근 회독에서 자주 틀렸거나, 전체 회독에서 누적 오답이 많은 카드를 약점으로 모읍니다.</p>
+      </div>
+      <div class="weak-rule-preview">
+        <span>최근 ${number(recentRounds)}회독 중 오답 ${number(recentThreshold)}회 이상</span>
+        <span>또는 전체 오답 ${number(totalThreshold)}회 이상</span>
       </div>
       <div class="weak-rule-grid">
         <label class="number-setting weak-rule-setting">
@@ -3588,7 +3650,7 @@ function renderWeakThresholdSetting() {
           <span>회 이상</span>
         </label>
       </div>
-      <p class="form-hint">약점 복습에서 틀린 횟수는 최근/전체 회독 기준에는 넣지 않습니다.</p>
+      <p class="form-hint">약점 복습에서 틀린 횟수는 이 기준 계산에 넣지 않습니다.</p>
     </section>
   `;
 }
@@ -3598,6 +3660,7 @@ function renderLevelOptions() {
   return `
     <div class="field">
       <span>JLPT 급수 (선택)</span>
+      <p class="form-hint">JLPT 목표가 아닐 때는 미정으로 두면 됩니다.</p>
       <div class="level-options" role="radiogroup" aria-label="JLPT 급수 선택">
         ${["", ...JLPT_LEVELS]
           .map(
@@ -3638,6 +3701,7 @@ function renderExamDateSelects() {
   return `
     <div class="field">
       <span>목표일</span>
+      <p class="form-hint">목표일도 선택 사항입니다. 세 칸을 모두 비우면 날짜 없이 사용합니다.</p>
       <div class="date-select-grid">
         <select class="select" name="exam_year" aria-label="목표 연도">
           ${renderSelectOptions(years, parts.year, "연도")}
@@ -4214,7 +4278,7 @@ function logout() {
 async function exportBackup() {
   const data = await request("/api/backup");
   downloadJson(`byeorakchigi-backup-${new Date().toISOString().slice(0, 10)}.json`, data.backup);
-  showToast("백업 파일을 만들었습니다.");
+  showToast("백업 파일을 만들었습니다. 개인 저장소에 보관하세요.");
 }
 
 function prepareBackupRestore(form) {

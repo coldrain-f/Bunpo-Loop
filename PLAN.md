@@ -82,10 +82,10 @@ Core direction:
 - [x] Phase 8. Empty States & First-Use Flow
   - [x] 8.1 First-Use Onboarding Without Landing
   - [x] 8.2 Error & Disabled State Copy
-- [ ] Phase 9. Settings & Data Safety
-  - [ ] 9.1 Settings Screen Clarity
-  - [ ] 9.2 Backup/Restore Serious Mode
-  - [ ] 9.3 Privacy & Auth Expectations
+- [x] Phase 9. Settings & Data Safety
+  - [x] 9.1 Settings Screen Clarity
+  - [x] 9.2 Backup/Restore Serious Mode
+  - [x] 9.3 Privacy & Auth Expectations
 - [x] Phase 10. Login, Loading & App Shell
   - [x] 10.1 Login Screen Polish
   - [x] 10.2 Loading & Error Shell
@@ -469,9 +469,9 @@ Purpose:
 목표 설정과 약점 기준을 앱 정체성에 맞게 정리한다.
 
 Tasks:
-- [ ] 목표 이름, 목표일, JLPT 급수 optional 관계를 명확히 한다.
-- [ ] 약점 카드 기준 설정을 compact but understandable하게 만든다.
-- [ ] 설정 저장/초기화 CTA 우선순위를 정리한다.
+- [x] 목표 이름, 목표일, JLPT 급수 optional 관계를 명확히 한다.
+- [x] 약점 카드 기준 설정을 compact but understandable하게 만든다.
+- [x] 설정 저장/초기화 CTA 우선순위를 정리한다.
 
 Files:
 - `static/app.js`
@@ -487,9 +487,9 @@ Purpose:
 백업/복원은 강력한 작업이므로 실수 방지 UI를 강화한다.
 
 Tasks:
-- [ ] 백업/복원 panel을 data safety section으로 분리한다.
-- [ ] 복원 전 경고 copy를 구체화한다.
-- [ ] 백업 textarea mono styling을 유지한다.
+- [x] 백업/복원 panel을 data safety section으로 분리한다.
+- [x] 복원 전 경고 copy를 구체화한다.
+- [x] 백업 textarea mono styling을 유지한다.
 
 Files:
 - `static/app.js`
@@ -505,11 +505,11 @@ Purpose:
 개인 학습 데이터를 다루는 앱이므로 사용자가 보안 수준과 데이터 위치를 오해하지 않게 한다.
 
 Tasks:
-- [ ] 앱 안의 간단 로그인과 서버 기본 인증의 역할 차이를 README와 설정 copy에서 명확히 한다.
-- [ ] 개인 서버 배포 시 HTTPS/reverse proxy 권장 문구를 더 구체화한다.
-- [ ] 닉네임/6자리 코드가 강력한 계정 보안이 아니라 개인용 접근 구분임을 제품 톤에 맞게 설명한다.
-- [ ] 백업 파일에는 학습 데이터가 그대로 들어간다는 점을 복원/내보내기 UI에 명시한다.
-- [ ] public server 사용을 상정하지 않는다면 그 제약을 문서화한다.
+- [x] 앱 안의 간단 로그인과 서버 기본 인증의 역할 차이를 README와 설정 copy에서 명확히 한다.
+- [x] 개인 서버 배포 시 HTTPS/reverse proxy 권장 문구를 더 구체화한다.
+- [x] 닉네임/6자리 코드가 강력한 계정 보안이 아니라 개인용 접근 구분임을 제품 톤에 맞게 설명한다.
+- [x] 백업 파일에는 학습 데이터가 그대로 들어간다는 점을 복원/내보내기 UI에 명시한다.
+- [x] public server 사용을 상정하지 않는다면 그 제약을 문서화한다.
 
 Files:
 - `README.md`
