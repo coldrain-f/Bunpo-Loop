@@ -4,7 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HOST=0.0.0.0 \
     PORT=8000 \
-    JLPT_DB=/data/bunpo-loop.sqlite3
+    BYEORAKCHIGI_DB=/data/bunpo-loop.sqlite3
 
 WORKDIR /app
 

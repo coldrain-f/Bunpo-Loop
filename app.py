@@ -134,10 +134,11 @@ def connect() -> sqlite3.Connection:
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(USER_SCHEMA_SQL)
-        conn.executescript(LEARNING_SCHEMA_SQL)
-        migrate_db(conn)
         if learning_schema_needs_reset(conn):
             reset_learning_schema(conn)
+        else:
+            conn.executescript(LEARNING_SCHEMA_SQL)
+        migrate_db(conn)
         count = conn.execute("SELECT COUNT(*) FROM collections").fetchone()[0]
         if count == 0:
             seed_data(conn)

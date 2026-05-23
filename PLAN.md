@@ -106,11 +106,11 @@ Core direction:
   - [x] 14.2 Network/Request Feedback
 - [ ] Phase 15. Product QA Pass
   - [ ] 15.1 Visual QA
-  - [ ] 15.2 Functional QA
-  - [ ] 15.3 Technical QA
+  - [x] 15.2 Functional QA
+  - [x] 15.3 Technical QA
   - [ ] 15.4 Accessibility QA
-  - [ ] 15.5 Data Integrity QA
-  - [ ] 15.6 Release Readiness QA
+  - [x] 15.5 Data Integrity QA
+  - [x] 15.6 Release Readiness QA
 
 ## Phase 1. Foundation Polish
 
@@ -823,24 +823,24 @@ Checklist:
 - [ ] 390px mobile width에서 하단 nav가 안정적이다.
 - [ ] 긴 대그룹/소그룹/카드 이름이 layout을 깨지 않는다.
 - [ ] 일본어 긴 예문과 긴 한국어 번역이 readable하다.
-- [ ] dialog가 86vh 안에서 스크롤된다.
-- [ ] active/disabled/focus states가 구분된다.
+- [x] dialog가 86vh 안에서 스크롤된다.
+- [x] active/disabled/focus states가 구분된다.
 
 ### 15.2 Functional QA
 
 Checklist:
-- [ ] 로그인
-- [ ] 대그룹 생성/수정/삭제
-- [ ] 소그룹 생성/수정/삭제
-- [ ] 카드 단일 등록/수정/삭제
-- [ ] 카드 대량 등록/미리보기/중복 처리
-- [ ] 소그룹 공식 학습
-- [ ] 약점 복습
-- [ ] 대그룹 묶음 연습
-- [ ] 회독 완료 저장
-- [ ] 묶음 연습 기록 미저장
-- [ ] 설정 저장/초기화
-- [ ] 백업/복원
+- [x] 로그인
+- [x] 대그룹 생성/수정/삭제
+- [x] 소그룹 생성/수정/삭제
+- [x] 카드 단일 등록/수정/삭제
+- [x] 카드 대량 등록/미리보기/중복 처리
+- [x] 소그룹 공식 학습
+- [x] 약점 복습
+- [x] 대그룹 묶음 연습
+- [x] 회독 완료 저장
+- [x] 묶음 연습 기록 미저장
+- [x] 설정 저장/초기화
+- [x] 백업/복원
 
 ### 15.3 Technical QA
 
@@ -863,28 +863,28 @@ Browser checks:
 
 Checklist:
 - [ ] keyboard만으로 로그인, 탭 이동, 카드 등록, 학습 시작을 완료한다.
-- [ ] dialog open/close focus 위치가 자연스럽다.
-- [ ] Escape key가 confirm flow를 위험하게 만들지 않는다.
-- [ ] screen reader label이 없는 icon-only button이 없다.
-- [ ] 정답/오답/disabled 상태가 색상 외의 텍스트나 형태로도 구분된다.
+- [x] dialog open/close focus 위치가 자연스럽다.
+- [x] Escape key가 confirm flow를 위험하게 만들지 않는다.
+- [x] screen reader label이 없는 icon-only button이 없다.
+- [x] 정답/오답/disabled 상태가 색상 외의 텍스트나 형태로도 구분된다.
 
 ### 15.5 Data Integrity QA
 
 Checklist:
-- [ ] 소그룹 공식 학습은 이력과 통계를 저장한다.
-- [ ] 묶음 연습은 이력과 통계를 저장하지 않는다.
-- [ ] 약점 복습의 통계 반영 규칙이 의도와 일치한다.
-- [ ] 대그룹 aggregate는 하위 소그룹 합산으로만 보인다.
-- [ ] 삭제/초기화/복원 후 orphan data와 깨진 selection이 없다.
+- [x] 소그룹 공식 학습은 이력과 통계를 저장한다.
+- [x] 묶음 연습은 이력과 통계를 저장하지 않는다.
+- [x] 약점 복습의 통계 반영 규칙이 의도와 일치한다.
+- [x] 대그룹 aggregate는 하위 소그룹 합산으로만 보인다.
+- [x] 삭제/초기화/복원 후 orphan data와 깨진 selection이 없다.
 
 ### 15.6 Release Readiness QA
 
 Checklist:
-- [ ] README의 앱 이름, 실행 방법, 데이터 저장 위치, 백업/복원 설명이 최신이다.
-- [ ] Docker Compose 실행 후 첫 화면, 로그인, 백업 경로가 문서와 일치한다.
-- [ ] 기본 포트, env 변수, DB 파일/volume 이름이 설명과 맞는다.
-- [ ] 브라우저 새로고침, 서버 재시작 후 데이터가 유지된다.
-- [ ] release 전 `DESIGN.md`, `PLAN.md`, `AGENTS.md`가 현재 제품 방향과 충돌하지 않는다.
+- [x] README의 앱 이름, 실행 방법, 데이터 저장 위치, 백업/복원 설명이 최신이다.
+- [x] Docker Compose 실행 후 첫 화면, 로그인, 백업 경로가 문서와 일치한다.
+- [x] 기본 포트, env 변수, DB 파일/volume 이름이 설명과 맞는다.
+- [x] 브라우저 새로고침, 서버 재시작 후 데이터가 유지된다.
+- [x] release 전 `DESIGN.md`, `PLAN.md`, `AGENTS.md`가 현재 제품 방향과 충돌하지 않는다.
 
 ## Suggested Execution Order
 
