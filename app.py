@@ -491,6 +491,14 @@ def normalize_duration(value: object) -> int:
     return seconds
 
 
+def normalize_round_limit(value: object, default: int = 200) -> int:
+    try:
+        limit = int(value or default)
+    except (TypeError, ValueError):
+        return default
+    return min(500, max(1, limit))
+
+
 def get_collection(conn: sqlite3.Connection, collection_id: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM collections WHERE id = ?", (collection_id,)).fetchone()
 
@@ -1477,7 +1485,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 if method == "GET":
                     group_id = int(query["group_id"][0]) if query.get("group_id") else None
                     collection_id = int(query["collection_id"][0]) if query.get("collection_id") else None
-                    self.send_json({"rounds": self.rounds_payload(conn, group_id, collection_id)})
+                    limit = normalize_round_limit(query.get("limit", ["200"])[0])
+                    self.send_json({"rounds": self.rounds_payload(conn, group_id, collection_id, limit)})
                     return
                 if method == "POST":
                     self.complete_round(conn)
@@ -2109,6 +2118,7 @@ class AppHandler(BaseHTTPRequestHandler):
         conn: sqlite3.Connection,
         group_id: int | None,
         collection_id: int | None = None,
+        limit: int = 200,
     ) -> list[dict]:
         clauses = []
         params = []
@@ -2178,9 +2188,9 @@ class AppHandler(BaseHTTPRequestHandler):
             ) first_attempts ON first_attempts.round_id = sr.id
             {where_sql}
             ORDER BY sr.completed_at DESC, sr.id DESC
-            LIMIT 30
+            LIMIT ?
             """,
-            params,
+            [*params, limit],
         ).fetchall()
         return [row_to_dict(row) for row in rows]
 

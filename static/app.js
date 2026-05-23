@@ -33,6 +33,15 @@ const STUDY_GROUP_SORT_LABELS = {
   name: "이름순",
 };
 
+const STATS_RANGE_LABELS = {
+  all: "전체",
+  today: "오늘",
+  days7: "7일",
+  days30: "30일",
+  days60: "60일",
+  days90: "90일",
+};
+
 const JLPT_LEVELS = ["N1", "N2", "N3", "N4", "N5"];
 const DEFAULT_WEAK_CARD_THRESHOLD = 16;
 const DEFAULT_WEAK_RECENT_ROUNDS = 3;
@@ -87,6 +96,8 @@ const state = {
   dataPanelOpen: false,
   recentRoundsOpen: false,
   statsRecentRoundsOpen: false,
+  statsRangeMode: "all",
+  statsCollectionId: "",
   orderMode: "sequence",
   exampleDisplayMode: "collapsed",
   studyStep: "select",
@@ -340,6 +351,7 @@ function reconcileLoadedState() {
     state.groupDetailCollectionId = null;
     state.cardFilterCollectionId = "";
     state.cardFilterGroupId = "";
+    state.statsCollectionId = "";
     state.studyStep = "select";
   } else if (!collectionIds.has(Number(state.selectedCollectionId))) {
     state.selectedCollectionId = state.collections[0]?.id ?? null;
@@ -347,6 +359,12 @@ function reconcileLoadedState() {
 
   if (state.groupDetailCollectionId && !collectionIds.has(Number(state.groupDetailCollectionId))) {
     state.groupDetailCollectionId = null;
+  }
+  if (state.statsCollectionId && !collectionIds.has(Number(state.statsCollectionId))) {
+    state.statsCollectionId = "";
+  }
+  if (!STATS_RANGE_LABELS[state.statsRangeMode]) {
+    state.statsRangeMode = "all";
   }
 
   const selectedCollectionGroups = getGroupsForCollection(state.selectedCollectionId);
@@ -450,7 +468,7 @@ async function loadData() {
     request("/api/collections"),
     request("/api/groups"),
     request("/api/cards"),
-    request("/api/rounds"),
+    request("/api/rounds?limit=500"),
     request("/api/settings"),
   ]);
   state.collections = collectionData.collections;
@@ -1199,9 +1217,9 @@ function sortStudyGroups(groups) {
   });
 }
 
-function getRecentStudyGroup() {
+function getRecentStudyGroup(groups = state.groups) {
   return (
-    [...state.groups]
+    [...groups]
       .filter((group) => dateMs(group.last_studied_at) > 0)
       .sort(
         (left, right) =>
@@ -1251,8 +1269,8 @@ function isWeakCard(card) {
   return cardRecentWrongCount(card) >= getWeakRecentWrongThreshold() || cardRoundWrongCount(card) >= getWeakCardThreshold();
 }
 
-function getWeakCards() {
-  return [...state.cards]
+function getWeakCards(cards = state.cards) {
+  return [...cards]
     .filter(isWeakCard)
     .sort(
       (left, right) =>
@@ -1279,29 +1297,126 @@ function rateText(rate) {
   return rate === null ? "-" : `${rate}%`;
 }
 
+function getStatsRangeStart(mode = state.statsRangeMode) {
+  if (mode === "all") return null;
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysByMode = {
+    days7: 7,
+    days30: 30,
+    days60: 60,
+    days90: 90,
+  };
+  const days = daysByMode[mode];
+  if (days) start.setDate(start.getDate() - (days - 1));
+  return start.getTime();
+}
+
+function getStatsRangeCopy(mode = state.statsRangeMode) {
+  if (mode === "all") return { label: "전체", detail: "누적 기록 기준" };
+  if (mode === "today") return { label: "오늘", detail: "오늘 완료한 회독 기준" };
+  const label = STATS_RANGE_LABELS[mode] || STATS_RANGE_LABELS.days30;
+  return { label: `최근 ${label}`, detail: `최근 ${label} 완료한 회독 기준` };
+}
+
+function getRoundGroupIds(round) {
+  return String(round.selected_group_ids || round.group_id || "")
+    .split(",")
+    .map((value) => Number(value.trim()))
+    .filter(Boolean);
+}
+
+function roundMatchesCollection(round, collectionId, groupIds = null) {
+  if (!collectionId) return true;
+  if (Number(round.collection_id) === Number(collectionId)) return true;
+  const scopedGroupIds = groupIds || new Set(getGroupsForCollection(collectionId).map((group) => Number(group.id)));
+  return getRoundGroupIds(round).some((groupId) => scopedGroupIds.has(Number(groupId)));
+}
+
+function roundMatchesRange(round, rangeStart = getStatsRangeStart()) {
+  if (!rangeStart) return true;
+  return dateMs(round.completed_at) >= rangeStart;
+}
+
+function getStatsScope() {
+  const collectionId = state.statsCollectionId ? Number(state.statsCollectionId) : null;
+  const collection = collectionId
+    ? state.collections.find((item) => Number(item.id) === collectionId) || null
+    : null;
+  const collections = collection ? [collection] : state.collections;
+  const groups = collectionId ? getGroupsForCollection(collectionId) : state.groups;
+  const groupIds = new Set(groups.map((group) => Number(group.id)));
+  const cards = state.cards.filter((card) =>
+    groupIds.size ? groupIds.has(Number(card.group_id)) : !collectionId || Number(card.collection_id) === collectionId,
+  );
+  const rangeStart = getStatsRangeStart();
+  const rounds = state.rounds.filter(
+    (round) => roundMatchesCollection(round, collectionId, groupIds) && roundMatchesRange(round, rangeStart),
+  );
+  return {
+    collection,
+    collectionId,
+    collections,
+    groups,
+    groupIds,
+    cards,
+    rounds,
+    rangeMode: state.statsRangeMode,
+    rangeStart,
+    rangeCopy: getStatsRangeCopy(),
+    isAllTime: state.statsRangeMode === "all",
+  };
+}
+
+function getRoundScopedGroupIds(round, groupIds) {
+  const ids = getRoundGroupIds(round).filter((groupId) => groupIds.has(Number(groupId)));
+  return ids.length ? ids : round.group_id && groupIds.has(Number(round.group_id)) ? [Number(round.group_id)] : [];
+}
+
 function getStatsSummary() {
-  const totalCards = state.cards.length;
-  const learnedCards = state.cards.filter((card) => cardAttemptCount(card) > 0).length;
-  const totalGroups = state.groups.length;
-  const studiedGroups = state.groups.filter((group) => number(group.completed_rounds) > 0).length;
-  const studyReadyGroups = state.groups.filter((group) => number(group.card_count) > 0);
+  const scope = getStatsScope();
+  const totalCards = scope.cards.length;
+  const learnedCards = scope.isAllTime
+    ? scope.cards.filter((card) => cardAttemptCount(card) > 0).length
+    : scope.rounds.reduce((sum, round) => sum + number(round.total_cards), 0);
+  const totalGroups = scope.groups.length;
+  const periodStudiedGroupIds = new Set();
+  scope.rounds.forEach((round) => getRoundScopedGroupIds(round, scope.groupIds).forEach((groupId) => periodStudiedGroupIds.add(groupId)));
+  const studiedGroups = scope.isAllTime
+    ? scope.groups.filter((group) => number(group.completed_rounds) > 0).length
+    : periodStudiedGroupIds.size;
+  const studyReadyGroups = scope.groups.filter((group) => number(group.card_count) > 0);
   const todayGroups = studyReadyGroups.filter((group) => isToday(group.last_studied_at));
   const pendingTodayGroups = studyReadyGroups.filter((group) => !isToday(group.last_studied_at));
-  const totalCorrect = state.cards.reduce((sum, card) => sum + number(card.correct_count), 0);
-  const totalWrong = state.cards.reduce((sum, card) => sum + number(card.wrong_count), 0);
-  const latestFirstAttempt = state.groups.reduce(
+  const totalCorrect = scope.isAllTime
+    ? scope.cards.reduce((sum, card) => sum + number(card.correct_count), 0)
+    : scope.rounds.reduce((sum, round) => sum + number(round.correct_count), 0);
+  const totalWrong = scope.isAllTime
+    ? scope.cards.reduce((sum, card) => sum + number(card.wrong_count), 0)
+    : scope.rounds.reduce((sum, round) => sum + number(round.wrong_count), 0);
+  const latestFirstAttempt = scope.isAllTime
+    ? scope.groups.reduce(
     (acc, group) => {
       acc.correct += number(group.latest_first_attempt_correct_count);
       acc.total += number(group.latest_first_attempt_total);
       return acc;
     },
     { correct: 0, total: 0 },
-  );
-  const weakCards = getWeakCards();
-  const recentGroup = getRecentStudyGroup();
+      )
+    : scope.rounds.reduce(
+        (acc, round) => {
+          acc.correct += number(round.first_attempt_correct_count);
+          acc.total += number(round.first_attempt_total || round.total_cards);
+          return acc;
+        },
+        { correct: 0, total: 0 },
+      );
+  const weakCards = getWeakCards(scope.cards);
+  const recentGroup = getRecentStudyGroup(scope.groups);
   const recommendedGroup =
     sortStudyGroups(pendingTodayGroups)[0] || (recentGroup && number(recentGroup.card_count) > 0 ? recentGroup : null);
   return {
+    scope,
     totalCards,
     learnedCards,
     totalGroups,
@@ -1312,7 +1427,9 @@ function getStatsSummary() {
     totalCorrect,
     totalWrong,
     totalAttempts: totalCorrect + totalWrong,
-    totalSubgroupRounds: state.groups.reduce((sum, group) => sum + number(group.completed_rounds), 0),
+    totalSubgroupRounds: scope.isAllTime
+      ? scope.groups.reduce((sum, group) => sum + number(group.completed_rounds), 0)
+      : scope.rounds.length,
     latestFirstAttemptRate: getRate(latestFirstAttempt.correct, latestFirstAttempt.total),
     answerRate: getRate(totalCorrect, totalCorrect + totalWrong),
     weakCards,
@@ -1351,15 +1468,48 @@ function renderStats() {
             <p class="eyebrow">통계</p>
             <h2 id="stats-title">오늘의 상태</h2>
           </div>
-          <span class="pill">공식 회독</span>
+          <span class="pill">${escapeHtml(summary.scope.rangeCopy.label)}</span>
         </div>
+        ${renderStatsFilters(summary.scope)}
         ${renderStatsTodayPanel(summary)}
       </section>
       ${renderStatsOverviewSection(summary)}
-      ${renderStatsCollectionSection()}
+      ${renderStatsCollectionSection(summary.scope)}
       ${renderStatsFocusSection(summary)}
-      ${renderStatsRecentRoundSection()}
+      ${renderStatsRecentRoundSection(summary.scope)}
     </div>
+  `;
+}
+
+function renderStatsFilters(scope) {
+  return `
+    <section class="stats-filter-panel" aria-label="통계 필터">
+      <div class="segmented stats-range-options" role="group" aria-label="통계 기간">
+        ${Object.entries(STATS_RANGE_LABELS)
+          .map(
+            ([mode, label]) => `
+              <button class="segment ${state.statsRangeMode === mode ? "active" : ""}" type="button" data-action="set-stats-range" data-range="${mode}" aria-pressed="${
+                state.statsRangeMode === mode ? "true" : "false"
+              }">
+                ${label}
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+      <select id="stats-collection-filter" class="select" aria-label="통계 대그룹 필터">
+        <option value="" ${state.statsCollectionId ? "" : "selected"}>전체 대그룹</option>
+        ${state.collections
+          .map(
+            (collection) =>
+              `<option value="${collection.id}" ${String(state.statsCollectionId) === String(collection.id) ? "selected" : ""}>${escapeHtml(
+                collection.name,
+              )}</option>`,
+          )
+          .join("")}
+      </select>
+      <p>${escapeHtml(scope.rangeCopy.detail)} · ${escapeHtml(scope.collection?.name || "전체 대그룹")}</p>
+    </section>
   `;
 }
 
@@ -1449,17 +1599,31 @@ function renderStatsOverviewSection(summary) {
   const latestDetail = summary.recentGroup
     ? `${formatDate(summary.recentGroup.last_studied_at)} · ${number(summary.recentGroup.completed_rounds)}회독`
     : "첫 회독을 완료하면 최근 학습 소그룹이 표시됩니다.";
+  const cardMetricValue = summary.scope.isAllTime
+    ? `${number(summary.learnedCards)}/${number(summary.totalCards)}`
+    : `${number(summary.learnedCards)}장`;
+  const cardMetricDetail = summary.scope.isAllTime ? "한 번이라도 풀이한 카드" : `${summary.scope.rangeCopy.label} 회독에 나온 카드`;
   return `
     <section class="panel stack stats-overview-panel">
       <div class="completion-header">
-        <h3>전체 흐름</h3>
+        <h3>${summary.scope.isAllTime ? "전체 흐름" : `${summary.scope.rangeCopy.label} 흐름`}</h3>
         <span class="pill">회독 ${number(summary.totalSubgroupRounds)}회</span>
       </div>
       <div class="stats-overview">
-        ${renderStatsMetricCard("카드 풀이", `${number(summary.learnedCards)}/${number(summary.totalCards)}`, "한 번이라도 풀이한 카드", learnedRate)}
+        ${renderStatsMetricCard("카드 풀이", cardMetricValue, cardMetricDetail, summary.scope.isAllTime ? learnedRate : null)}
         ${renderStatsMetricCard("소그룹 진행", `${number(summary.studiedGroups)}/${number(summary.totalGroups)}`, "회독 기록이 있는 소그룹", studiedGroupRate)}
-        ${renderStatsMetricCard("첫 풀이 정답률", rateText(summary.latestFirstAttemptRate), "각 소그룹의 최근 회독 기준", summary.latestFirstAttemptRate)}
-        ${renderStatsMetricCard("누적 정답률", rateText(summary.answerRate), `풀이 ${number(summary.totalAttempts)}회`, summary.answerRate)}
+        ${renderStatsMetricCard(
+          "첫 풀이 정답률",
+          rateText(summary.latestFirstAttemptRate),
+          summary.scope.isAllTime ? "각 소그룹의 최근 회독 기준" : `${summary.scope.rangeCopy.label} 회독 기준`,
+          summary.latestFirstAttemptRate,
+        )}
+        ${renderStatsMetricCard(
+          summary.scope.isAllTime ? "누적 정답률" : "기간 정답률",
+          rateText(summary.answerRate),
+          `풀이 ${number(summary.totalAttempts)}회`,
+          summary.answerRate,
+        )}
       </div>
       <section class="stats-insight-strip">
         <div>
@@ -1498,29 +1662,61 @@ function renderStatsProgress(rate, label = "") {
   `;
 }
 
-function getCollectionStats(collection) {
+function getCollectionStats(collection, scope = getStatsScope()) {
   const groups = getGroupsForCollection(collection.id);
   const studiedGroups = groups.filter((group) => number(group.completed_rounds) > 0).length;
-  const totalAttempts = number(collection.correct_total) + number(collection.wrong_total);
+  const collectionGroupIds = new Set(groups.map((group) => Number(group.id)));
+  const rounds = scope.rounds.filter((round) => roundMatchesCollection(round, collection.id, collectionGroupIds));
+  const totalAttempts = scope.isAllTime
+    ? number(collection.correct_total) + number(collection.wrong_total)
+    : rounds.reduce((sum, round) => sum + number(round.correct_count) + number(round.wrong_count), 0);
+  const correctTotal = scope.isAllTime
+    ? number(collection.correct_total)
+    : rounds.reduce((sum, round) => sum + number(round.correct_count), 0);
+  const firstAttempt = scope.isAllTime
+    ? {
+        correct: number(collection.latest_first_attempt_correct_count),
+        total: number(collection.latest_first_attempt_total),
+      }
+    : rounds.reduce(
+        (acc, round) => {
+          acc.correct += number(round.first_attempt_correct_count);
+          acc.total += number(round.first_attempt_total || round.total_cards);
+          return acc;
+        },
+        { correct: 0, total: 0 },
+      );
+  const periodStudiedGroupIds = new Set();
+  rounds.forEach((round) =>
+    getRoundScopedGroupIds(round, collectionGroupIds).forEach((groupId) => periodStudiedGroupIds.add(Number(groupId))),
+  );
+  const scopedStudiedGroups = scope.isAllTime ? studiedGroups : periodStudiedGroupIds.size;
   return {
     groups,
-    studiedGroups,
-    groupRate: getRate(studiedGroups, groups.length),
-    answerRate: getRate(collection.correct_total, totalAttempts),
-    latestRate: getRate(collection.latest_first_attempt_correct_count, collection.latest_first_attempt_total),
+    studiedGroups: scopedStudiedGroups,
+    groupRate: getRate(scopedStudiedGroups, groups.length),
+    answerRate: getRate(correctTotal, totalAttempts),
+    latestRate: getRate(firstAttempt.correct, firstAttempt.total),
+    rounds,
+    correctTotal,
+    wrongTotal: scope.isAllTime
+      ? number(collection.wrong_total)
+      : rounds.reduce((sum, round) => sum + number(round.wrong_count), 0),
+    roundCount: scope.isAllTime ? number(collection.completed_rounds) : rounds.length,
   };
 }
 
-function renderStatsCollectionSection() {
+function renderStatsCollectionSection(scope = getStatsScope()) {
+  const collections = scope.collections;
   return `
     <section class="panel stack">
       <div class="completion-header">
-        <h3>대그룹별 진행</h3>
-        <span class="pill">${number(state.collections.length)}개</span>
+        <h3>${scope.collection ? "선택 대그룹 진행" : "대그룹별 진행"}</h3>
+        <span class="pill">${number(collections.length)}개</span>
       </div>
       ${
-        state.collections.length
-          ? `<div class="stats-collection-list">${state.collections.map(renderStatsCollectionItem).join("")}</div>`
+        collections.length
+          ? `<div class="stats-collection-list">${collections.map((collection) => renderStatsCollectionItem(collection, scope)).join("")}</div>`
           : renderActionEmptyState({
               title: "대그룹이 없습니다.",
               body: "대그룹을 만들면 소그룹별 학습 진행을 모아 볼 수 있습니다.",
@@ -1533,8 +1729,8 @@ function renderStatsCollectionSection() {
   `;
 }
 
-function renderStatsCollectionItem(collection) {
-  const stats = getCollectionStats(collection);
+function renderStatsCollectionItem(collection, scope = getStatsScope()) {
+  const stats = getCollectionStats(collection, scope);
   const lastStudy = collection.last_studied_at ? formatDate(collection.last_studied_at) : "학습 기록 없음";
   return `
     <article class="stats-collection-item">
@@ -1550,7 +1746,7 @@ function renderStatsCollectionItem(collection) {
       <div class="stats-chip-row">
         <span>소그룹 ${number(stats.studiedGroups)}/${number(stats.groups.length)}</span>
         <span>카드 ${number(collection.card_count)}</span>
-        <span>하위 회독 ${number(collection.completed_rounds)}</span>
+        <span>회독 ${number(stats.roundCount)}</span>
         <span>최근 ${rateText(stats.latestRate)}</span>
       </div>
       <div class="stats-progress-row">
@@ -1558,31 +1754,48 @@ function renderStatsCollectionItem(collection) {
         ${renderStatsProgress(stats.groupRate, `소그룹 진행 ${rateText(stats.groupRate)}`)}
         <strong>${rateText(stats.groupRate)}</strong>
       </div>
-      <p class="meta">누적 정답률 ${rateText(stats.answerRate)} · 알맞음 ${number(collection.correct_total)} · 틀림 ${number(
-        collection.wrong_total,
+      <p class="meta">${scope.isAllTime ? "누적" : scope.rangeCopy.label} 정답률 ${rateText(stats.answerRate)} · 알맞음 ${number(
+        stats.correctTotal,
+      )} · 틀림 ${number(
+        stats.wrongTotal,
       )}</p>
     </article>
   `;
 }
 
-function getStatsFocusGroups() {
-  return [...state.groups]
-    .filter((group) => number(group.card_count) > 0 && number(group.wrong_total) > 0)
+function getStatsFocusGroups(scope = getStatsScope()) {
+  const periodWrongByGroup = new Map();
+  if (!scope.isAllTime) {
+    scope.rounds.forEach((round) => {
+      const groupIds = getRoundScopedGroupIds(round, scope.groupIds);
+      const share = groupIds.length ? number(round.wrong_count) / groupIds.length : 0;
+      groupIds.forEach((groupId) => periodWrongByGroup.set(groupId, number(periodWrongByGroup.get(groupId)) + share));
+    });
+  }
+  return [...scope.groups]
+    .filter((group) =>
+      scope.isAllTime
+        ? number(group.card_count) > 0 && number(group.wrong_total) > 0
+        : number(group.card_count) > 0 && number(periodWrongByGroup.get(Number(group.id))) > 0,
+    )
     .sort((left, right) => {
       const leftAttempts = number(left.correct_total) + number(left.wrong_total);
       const rightAttempts = number(right.correct_total) + number(right.wrong_total);
+      const leftWrong = scope.isAllTime ? number(left.wrong_total) : number(periodWrongByGroup.get(Number(left.id)));
+      const rightWrong = scope.isAllTime ? number(right.wrong_total) : number(periodWrongByGroup.get(Number(right.id)));
       return (
-        number(right.wrong_total) - number(left.wrong_total) ||
-        number(right.wrong_total) / Math.max(1, rightAttempts) - number(left.wrong_total) / Math.max(1, leftAttempts) ||
+        rightWrong - leftWrong ||
+        rightWrong / Math.max(1, rightAttempts) - leftWrong / Math.max(1, leftAttempts) ||
         dateMs(right.last_studied_at) - dateMs(left.last_studied_at) ||
         compareGroupName(left, right)
       );
     })
+    .map((group) => ({ ...group, stats_wrong_total: scope.isAllTime ? number(group.wrong_total) : Math.round(number(periodWrongByGroup.get(Number(group.id)))) }))
     .slice(0, 5);
 }
 
 function renderStatsFocusSection(summary) {
-  const focusGroups = getStatsFocusGroups();
+  const focusGroups = getStatsFocusGroups(summary.scope);
   if (!focusGroups.length) {
     return `
       <section class="stats-healthy-note">
@@ -1591,7 +1804,7 @@ function renderStatsFocusSection(summary) {
           <strong>누적 오답이 없습니다.</strong>
           <p>${
             summary.totalAttempts
-              ? "현재 기준으로 오답이 쌓인 소그룹이 없습니다."
+              ? `${summary.scope.rangeCopy.label} 기준으로 오답이 쌓인 소그룹이 없습니다.`
               : "회독을 완료하면 오답이 많은 소그룹을 우선순위로 보여줍니다."
           }</p>
         </div>
@@ -1610,8 +1823,9 @@ function renderStatsFocusSection(summary) {
 }
 
 function renderStatsFocusGroupItem(group) {
+  const wrongTotal = number(group.stats_wrong_total ?? group.wrong_total);
   const attempts = number(group.correct_total) + number(group.wrong_total);
-  const wrongRate = getRate(group.wrong_total, attempts);
+  const wrongRate = getRate(wrongTotal, attempts);
   const recentRate = getGroupRecentAccuracy(group);
   return `
     <article class="stats-focus-item">
@@ -1627,7 +1841,7 @@ function renderStatsFocusGroupItem(group) {
       <div class="stats-chip-row">
         <span>카드 ${number(group.card_count)}</span>
         <span>회독 ${number(group.completed_rounds)}</span>
-        <span>오답 ${number(group.wrong_total)}</span>
+        <span>오답 ${number(wrongTotal)}</span>
         <span>최근 ${rateText(recentRate)}</span>
       </div>
       <div class="stats-progress-row danger">
@@ -1639,19 +1853,19 @@ function renderStatsFocusGroupItem(group) {
   `;
 }
 
-function renderStatsRecentRoundSection() {
+function renderStatsRecentRoundSection(scope = getStatsScope()) {
   const visibleLimit = state.statsRecentRoundsOpen ? 10 : 3;
-  const rounds = state.rounds.slice(0, visibleLimit);
+  const rounds = scope.rounds.slice(0, visibleLimit);
   return `
     <section class="panel stack">
       <div class="completion-header">
         <h3>최근 회독</h3>
         ${
-          state.rounds.length > 3
+          scope.rounds.length > 3
             ? `<button class="ghost-button small-button" type="button" data-action="toggle-stats-rounds">
                 ${iconLabel(
                   state.statsRecentRoundsOpen ? "chevron-up" : "chevron-down",
-                  state.statsRecentRoundsOpen ? "접기" : `더 보기 ${number(state.rounds.length - 3)}`,
+                  state.statsRecentRoundsOpen ? "접기" : `더 보기 ${number(scope.rounds.length - 3)}`,
                 )}
               </button>`
             : `<span class="pill">최근 ${number(rounds.length)}개</span>`
@@ -1662,7 +1876,7 @@ function renderStatsRecentRoundSection() {
           ? `<div class="stats-round-list">${rounds.map(renderStatsRecentRoundItem).join("")}</div>`
           : renderActionEmptyState({
               title: "회독 기록이 없습니다.",
-              body: "소그룹 학습을 완료하면 최근 회독 결과를 여기서 바로 열어볼 수 있습니다.",
+              body: `${scope.rangeCopy.label} 조건에 맞는 회독 기록이 없습니다.`,
             })
       }
     </section>
@@ -5255,6 +5469,14 @@ document.addEventListener("click", async (event) => {
       focusAfterRender('[data-action="start-study"]');
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
+    if (action === "set-stats-range") {
+      const nextRange = actionEl.dataset.range;
+      if (!STATS_RANGE_LABELS[nextRange]) return;
+      state.statsRangeMode = nextRange;
+      state.statsRecentRoundsOpen = false;
+      renderStats();
+      focusAfterRender(`[data-action="set-stats-range"][data-range="${nextRange}"]`);
+    }
     if (action === "logout") {
       state.activeDialog = "logout";
       renderDialog();
@@ -5819,6 +6041,12 @@ document.addEventListener("change", async (event) => {
       state.cardFilterGroupId = event.target.value;
       resetCardListLimit();
       renderCards();
+    }
+    if (event.target.id === "stats-collection-filter") {
+      state.statsCollectionId = event.target.value;
+      state.statsRecentRoundsOpen = false;
+      renderStats();
+      focusAfterRender("#stats-collection-filter");
     }
     if (event.target.id === "study-collection-select") {
       const collectionId = Number(event.target.value);
