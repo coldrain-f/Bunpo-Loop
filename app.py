@@ -1348,7 +1348,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     cards = cards_payload(conn, group_ids=selected_group_ids, order_mode=order_mode)
                     self.send_json(
                         {
-                            "scope_type": "bundle",
+                            "scope_type": "practice",
                             "collection": row_to_dict(collection),
                             "groups": [row_to_dict(group) for group in selected_groups],
                             "round_no": group_round_no(conn, selected_group_ids[0]),
@@ -1708,6 +1708,8 @@ class AppHandler(BaseHTTPRequestHandler):
             raise ValueError("지원하지 않는 학습 순서입니다.")
         if not isinstance(results, list) or not results:
             raise ValueError("저장할 학습 결과가 없습니다.")
+        if collection_id:
+            raise ValueError("묶음 연습은 학습 기록을 저장하지 않습니다.")
 
         scope_type = "group"
         primary_group_id: int | None = None

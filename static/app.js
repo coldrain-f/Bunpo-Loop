@@ -201,7 +201,7 @@ function getHeaderContext() {
     if (state.session?.savedRound) return `${state.session.group.name} · 완료`;
     if (state.session) {
       if (state.session.studyMode === "weak") return `${state.session.group.name} · 복습`;
-      if (state.session.studyMode === "bundle") return `${state.session.group.name} · 묶음 학습`;
+      if (state.session.studyMode === "practice") return `${state.session.group.name} · 묶음 연습`;
       return `${state.session.group.name} · ${state.session.roundNo}회독`;
     }
     if (state.studyStep === "ready") {
@@ -1088,6 +1088,9 @@ function renderStudySubgroupPicker(collection) {
         <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
         <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
       </div>
+      <button class="secondary-button full" type="button" data-action="open-collection-study-dialog" ${
+        number(collection.card_count) ? "" : "disabled"
+      }>${iconLabel("repeat-2", "소그룹 묶어 연습")}</button>
       <section class="group-browser-block">
         <div class="completion-header">
           <h3>소그룹 선택</h3>
@@ -1433,7 +1436,7 @@ function renderCollectionStudyDialog() {
       <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title">
         <div class="row">
           <div>
-            <p class="eyebrow">대그룹 묶음 학습</p>
+            <p class="eyebrow">묶음 연습</p>
             <h2 id="study-dialog-title">소그룹 선택</h2>
           </div>
           <button class="ghost-button small-button" type="button" data-action="close-dialog">${iconLabel("x", "닫기")}</button>
@@ -1447,13 +1450,13 @@ function renderCollectionStudyDialog() {
         ${renderStudyGroupSelection(groups)}
         <section class="study-start-panel">
           <div>
-            <span class="today-action-label">묶음 학습</span>
+            <span class="today-action-label">기록 없는 연습</span>
             <strong>${selectedGroups.length}개 소그룹 · 카드 ${selectedCardCount}개</strong>
-            <p>${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]}</p>
+            <p>${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]} · 학습 이력에 저장 안 함</p>
           </div>
           <div class="study-start-actions">
             <button class="primary-button full" type="button" data-action="start-bundle-study" ${canStart ? "" : "disabled"}>
-              ${iconLabel("play", "학습 시작")}
+              ${iconLabel("play", "연습 시작")}
             </button>
             <button class="ghost-button full" type="button" data-action="preview-bundle-cards" ${canStart ? "" : "disabled"}>
               ${iconLabel("eye", "미리보기")}
@@ -1747,7 +1750,7 @@ function isCardExamplesExpanded(session, card) {
 }
 
 function getSessionTitle(session) {
-  if (session.studyMode === "bundle") return "묶음 학습";
+  if (session.studyMode === "practice") return "묶음 연습";
   return session.studyMode === "weak" ? "약점 복습" : `${session.roundNo}회독`;
 }
 
@@ -1763,8 +1766,8 @@ function renderStudySession() {
     const completionTitle =
       session.studyMode === "weak"
         ? "약점 카드 복습 완료"
-        : session.studyMode === "bundle"
-          ? "묶음 학습 완료"
+        : session.studyMode === "practice"
+          ? "묶음 연습 완료"
           : `${round.round_no}회독 완료`;
     views.study.innerHTML = `
       <div id="completion-summary" class="panel stack completion-panel">
@@ -1913,7 +1916,7 @@ function renderCompletionScoreboard(summary, round) {
 }
 
 function getPreviousRoundForComparison(round, session) {
-  if (session.studyMode === "weak" || session.studyMode === "bundle") return null;
+  if (session.studyMode === "weak" || session.studyMode === "practice") return null;
   if (session.previousRound) return session.previousRound;
   const previousRoundNo = number(round.round_no) - 1;
   if (round.collection_id) {
@@ -1992,7 +1995,7 @@ function renderCompletionDetails(summary, session) {
 
 function renderCompletionFocus(summary, session) {
   const hardest = summary.wrongCardSummaries[0];
-  const sessionLabel = session.studyMode === "weak" ? "복습" : session.studyMode === "bundle" ? "학습" : "회독";
+  const sessionLabel = session.studyMode === "weak" ? "복습" : session.studyMode === "practice" ? "연습" : "회독";
   if (!hardest) {
     return `
       <section class="completion-focus good">
@@ -2014,7 +2017,7 @@ function renderCompletionFocus(summary, session) {
 }
 
 function renderWrongReview(summary, session) {
-  const sessionLabel = session.studyMode === "weak" ? "복습" : session.studyMode === "bundle" ? "학습" : "회독";
+  const sessionLabel = session.studyMode === "weak" ? "복습" : session.studyMode === "practice" ? "연습" : "회독";
   return `
     <section id="wrong-review" class="completion-section">
       <div class="completion-header">
@@ -2890,8 +2893,8 @@ async function startBundleStudy() {
   );
   if (!data.cards.length) return showToast("선택한 소그룹에는 카드가 없습니다.");
   state.session = {
-    studyMode: "bundle",
-    group: { id: null, name: `${data.collection.name} 묶음` },
+    studyMode: "practice",
+    group: { id: null, name: `${data.collection.name} 묶음 연습` },
     collection: data.collection,
     selectedGroups: data.groups,
     roundNo: data.round_no,
@@ -2946,6 +2949,25 @@ function startWeakStudy() {
   render();
 }
 
+function buildPracticeRound(session) {
+  const correctCount = session.results.filter((item) => item.result === "correct").length;
+  const wrongCount = session.results.filter((item) => item.result === "wrong").length;
+  return {
+    id: null,
+    group_id: null,
+    group_name: session.group.name,
+    round_no: "연습",
+    order_mode: session.orderMode,
+    total_cards: session.results.length,
+    correct_count: correctCount,
+    wrong_count: wrongCount,
+    started_at: session.startedAtIso,
+    duration_seconds: elapsedSeconds(session),
+    completed_at: new Date().toISOString(),
+    practice: true,
+  };
+}
+
 async function answerCard(result) {
   const session = state.session;
   if (!session || session.savedRound || session.saving || session.isAnswering || !session.showingBack) return;
@@ -2978,6 +3000,13 @@ async function answerCard(result) {
     showToast(`틀린 카드 ${wrongAttempts.length}개를 다시 반복합니다.`);
     return;
   }
+  if (session.studyMode === "practice") {
+    session.previousRound = null;
+    session.savedRound = buildPracticeRound(session);
+    state.completionCorrectOpen = false;
+    render();
+    return;
+  }
   session.saving = true;
   try {
     const payload = {
@@ -2986,10 +3015,7 @@ async function answerCard(result) {
       duration_seconds: elapsedSeconds(session),
       results: session.results,
     };
-    if (session.studyMode === "bundle") {
-      payload.collection_id = session.collection.id;
-      payload.group_ids = session.selectedGroups.map((group) => group.id);
-    } else if (session.studyMode !== "weak") {
+    if (session.studyMode !== "weak") {
       payload.group_id = session.group.id;
     }
     const data = await request(session.studyMode === "weak" ? "/api/weak-rounds" : "/api/rounds", {
@@ -3373,9 +3399,9 @@ document.addEventListener("click", async (event) => {
       return;
     }
     if (state.session?.savedRound && nextTab !== "study") {
-      if (state.session.studyMode === "bundle") state.selectedCollectionId = state.session.collection.id;
+      if (state.session.studyMode === "practice") state.selectedCollectionId = state.session.collection.id;
       else if (state.session.studyMode !== "weak") state.selectedGroupId = state.session.group.id;
-      state.studyStep = state.session.studyMode === "bundle" || state.session.studyMode === "weak" ? "select" : "ready";
+      state.studyStep = state.session.studyMode === "practice" ? "collection" : state.session.studyMode === "weak" ? "select" : "ready";
       state.session = null;
       state.completionCorrectOpen = false;
     }
@@ -3609,9 +3635,9 @@ document.addEventListener("click", async (event) => {
     if (action === "confirm-restore-backup") await restoreBackup();
     if (action === "confirm-quit-study") {
       if (state.session) {
-        if (state.session.studyMode === "bundle") state.selectedCollectionId = state.session.collection.id;
+        if (state.session.studyMode === "practice") state.selectedCollectionId = state.session.collection.id;
         else if (state.session.studyMode !== "weak") state.selectedGroupId = state.session.group.id;
-        state.studyStep = state.session.studyMode === "bundle" || state.session.studyMode === "weak" ? "select" : "ready";
+        state.studyStep = state.session.studyMode === "practice" ? "collection" : state.session.studyMode === "weak" ? "select" : "ready";
         state.session = null;
       }
       state.activeDialog = null;
@@ -3622,9 +3648,9 @@ document.addEventListener("click", async (event) => {
     if (action === "confirm-leave-study") {
       const nextTab = state.pendingTab || "study";
       if (state.session) {
-        if (state.session.studyMode === "bundle") state.selectedCollectionId = state.session.collection.id;
+        if (state.session.studyMode === "practice") state.selectedCollectionId = state.session.collection.id;
         else if (state.session.studyMode !== "weak") state.selectedGroupId = state.session.group.id;
-        state.studyStep = state.session.studyMode === "bundle" || state.session.studyMode === "weak" ? "select" : "ready";
+        state.studyStep = state.session.studyMode === "practice" ? "collection" : state.session.studyMode === "weak" ? "select" : "ready";
         state.session = null;
       }
       state.activeDialog = null;
@@ -3651,12 +3677,12 @@ document.addEventListener("click", async (event) => {
     if (action === "confirm-end-study") {
       const completedMode = state.session?.studyMode;
       if (state.session) {
-        if (state.session.studyMode === "bundle") state.selectedCollectionId = state.session.collection.id;
+        if (state.session.studyMode === "practice") state.selectedCollectionId = state.session.collection.id;
         else if (state.session.studyMode !== "weak") state.selectedGroupId = state.session.group.id;
       }
       state.session = null;
       state.completionCorrectOpen = false;
-      state.studyStep = completedMode === "weak" ? "select" : completedMode === "bundle" ? "collection" : "ready";
+      state.studyStep = completedMode === "weak" ? "select" : completedMode === "practice" ? "collection" : "ready";
       state.activeDialog = null;
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
