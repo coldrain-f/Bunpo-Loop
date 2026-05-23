@@ -86,10 +86,10 @@ Core direction:
   - [ ] 9.1 Settings Screen Clarity
   - [ ] 9.2 Backup/Restore Serious Mode
   - [ ] 9.3 Privacy & Auth Expectations
-- [ ] Phase 10. Login, Loading & App Shell
+- [x] Phase 10. Login, Loading & App Shell
   - [x] 10.1 Login Screen Polish
   - [x] 10.2 Loading & Error Shell
-  - [ ] 10.3 Navigation & Orientation
+  - [x] 10.3 Navigation & Orientation
 - [ ] Phase 11. Accessibility & Interaction Reliability
   - [ ] 11.1 Dialog Focus & Keyboard
   - [ ] 11.2 Touch Targets & Screen Reader Semantics
@@ -573,11 +573,11 @@ Purpose:
 모바일 앱처럼 이동 맥락과 복귀 흐름이 자연스럽게 느껴지게 한다.
 
 Tasks:
-- [ ] 대그룹 상세, 소그룹 선택, 카드 form/list 전환에서 현재 위치가 제목/상단 copy로 명확히 보이게 한다.
-- [ ] 앱 내부 back action과 브라우저/안드로이드 뒤로가기 기대치를 비교해 정책을 정한다.
-- [ ] 탭 이동 후 돌아왔을 때 검색어, 선택된 대그룹/소그룹, 스크롤 위치를 어디까지 유지할지 정의한다.
-- [ ] 학습 세션 중 뒤로가기/탭 이동/새로고침 시 데이터 손실 경고 정책을 정리한다.
-- [ ] detail 화면에서 list로 돌아왔을 때 사용자가 방금 보던 항목 근처로 돌아오게 할지 검토한다.
+- [x] 대그룹 상세, 소그룹 선택, 카드 form/list 전환에서 현재 위치가 제목/상단 copy로 명확히 보이게 한다.
+- [x] 앱 내부 back action과 브라우저/안드로이드 뒤로가기 기대치를 비교해 정책을 정한다.
+- [x] 탭 이동 후 돌아왔을 때 검색어, 선택된 대그룹/소그룹, 스크롤 위치를 어디까지 유지할지 정의한다.
+- [x] 학습 세션 중 뒤로가기/탭 이동/새로고침 시 데이터 손실 경고 정책을 정리한다.
+- [x] detail 화면에서 list로 돌아왔을 때 사용자가 방금 보던 항목 근처로 돌아오게 할지 검토한다.
 
 Files:
 - `static/app.js`

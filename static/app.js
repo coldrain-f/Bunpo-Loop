@@ -67,9 +67,12 @@ const state = {
   cardFilterCollectionId: "",
   cardFilterGroupId: "",
   cardSearchQuery: "",
+  studyCollectionSearchQuery: "",
   studyGroupSearchQuery: "",
+  collectionSearchQuery: "",
   studyGroupSortMode: "recent",
   groupSearchQuery: "",
+  scrollPositions: {},
   cardScreen: "list",
   groupScreen: "list",
   groupDetailCollectionId: null,
@@ -515,6 +518,29 @@ function refocusInput(id) {
   }
   const end = input.value.length;
   input.setSelectionRange(end, end);
+}
+
+function saveScrollPosition(key) {
+  if (!key) return;
+  state.scrollPositions[key] = window.scrollY || 0;
+}
+
+function restoreScrollPosition(key) {
+  const position = Number(state.scrollPositions[key] || 0);
+  window.requestAnimationFrame(() => window.scrollTo(0, position));
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderOrientationNote(parts, note) {
+  return `
+    <p class="orientation-note">
+      <span>${parts.map((part) => escapeHtml(part)).join(" / ")}</span>
+      ${note ? `<small>${escapeHtml(note)}</small>` : ""}
+    </p>
+  `;
 }
 
 function getSelectedGroup() {
@@ -1257,7 +1283,7 @@ function renderStudyGroupPicker() {
   const totalCards = state.collections.reduce((sum, collection) => sum + number(collection.card_count), 0);
   const recentGroup = getRecentStudyGroup();
   const visibleCollections = state.collections.filter((collection) =>
-    matchesQuery([collection.name, collection.description], state.studyGroupSearchQuery),
+    matchesQuery([collection.name, collection.description], state.studyCollectionSearchQuery),
   );
   views.study.innerHTML = `
     <div class="panel stack">
@@ -1277,7 +1303,7 @@ function renderStudyGroupPicker() {
           <span class="pill">${visibleCollections.length}개</span>
         </div>
         <div class="study-group-tools">
-          ${renderSearchInput({ id: "study-group-search", value: state.studyGroupSearchQuery, placeholder: "대그룹 검색" })}
+          ${renderSearchInput({ id: "study-collection-search", value: state.studyCollectionSearchQuery, placeholder: "대그룹 검색" })}
         </div>
         <div class="study-group-scroll">
           ${
@@ -1309,6 +1335,7 @@ function renderStudySubgroupPicker(collection) {
           "대그룹 보기",
         )}</button>
       </div>
+      ${renderOrientationNote(["학습", collection.name], "공식 회독은 아래 소그룹 단위로 저장됩니다.")}
       <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
       <div class="stat-grid">
         <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
@@ -2450,6 +2477,10 @@ function renderCards() {
 
 function renderCardEditorPanel(editing, formGroupId) {
   const hasGroups = state.groups.length > 0;
+  const formGroup = state.groups.find((group) => Number(group.id) === Number(formGroupId));
+  const formPath = formGroup
+    ? `저장 위치: ${formGroup.collection_name || "대그룹 없음"} / ${formGroup.name}`
+    : "카드를 저장할 소그룹을 먼저 선택하세요.";
   return `
     <div class="panel stack">
       <div class="row">
@@ -2462,6 +2493,7 @@ function renderCardEditorPanel(editing, formGroupId) {
           "목록 보기",
         )}</button>
       </div>
+      ${renderOrientationNote(["카드 관리", editing ? "카드 수정" : "카드 등록"], formPath)}
       ${
         editing
           ? `<p class="meta">수정한 내용은 저장 후 카드 목록에서 다시 확인할 수 있어요.</p>`
@@ -2763,7 +2795,7 @@ function renderGroups() {
       )
     : [];
   const visibleCollections = state.collections.filter((collection) =>
-    matchesQuery([collection.name, collection.description], state.groupSearchQuery),
+    matchesQuery([collection.name, collection.description], state.collectionSearchQuery),
   );
   if (state.groupScreen === "collection-form" || editingCollection) {
     views.groups.innerHTML = renderCollectionEditorPanel(editingCollection);
@@ -2793,6 +2825,7 @@ function renderCollectionEditorPanel(editing) {
           "목록 보기",
         )}</button>
       </div>
+      ${renderOrientationNote(["묶음", "대그룹 목록", editing ? "대그룹 수정" : "대그룹 만들기"], "대그룹은 소그룹을 담는 상위 구조입니다.")}
       <form id="collection-form" class="stack">
         <label class="field"><span>대그룹명</span><input class="input" name="name" value="${escapeHtml(
           editing?.name || "",
@@ -2812,6 +2845,7 @@ function renderCollectionEditorPanel(editing) {
 function renderGroupEditorPanel(editing) {
   const selectedCollectionId =
     editing?.collection_id ?? state.groupDetailCollectionId ?? state.selectedCollectionId ?? state.collections[0]?.id;
+  const selectedCollection = state.collections.find((collection) => Number(collection.id) === Number(selectedCollectionId));
   return `
     <div class="panel stack">
       <div class="row">
@@ -2824,6 +2858,10 @@ function renderGroupEditorPanel(editing) {
           state.groupDetailCollectionId ? "소그룹 보기" : "목록 보기",
         )}</button>
       </div>
+      ${renderOrientationNote(
+        ["묶음", selectedCollection?.name || "대그룹 선택", editing ? "소그룹 수정" : "소그룹 만들기"],
+        "소그룹은 공식 회독과 통계가 저장되는 학습 단위입니다.",
+      )}
       ${editing ? `<p class="meta">소그룹명과 설명만 바뀌고, 카드와 학습 기록은 유지됩니다.</p>` : ""}
       <form id="group-form" class="stack">
         <label class="field"><span>대그룹</span><select class="select" name="collection_id" required>${collectionOptions(
@@ -2858,7 +2896,7 @@ function renderGroupListPanel(visibleCollections) {
         "plus",
         "대그룹 만들기",
       )}</button>
-      ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "대그룹 검색" })}
+      ${renderSearchInput({ id: "collection-search", value: state.collectionSearchQuery, placeholder: "대그룹 검색" })}
       <div class="group-list">
         ${
           visibleCollections.length
@@ -2883,6 +2921,7 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
           "대그룹 보기",
         )}</button>
       </div>
+      ${renderOrientationNote(["묶음", "대그룹 목록", collection.name], "이 대그룹 안에서 소그룹을 만들고 관리합니다.")}
       <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
       <div class="stat-grid">
         <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
@@ -3468,6 +3507,7 @@ async function saveCollection(form) {
   state.editingCollectionId = null;
   state.selectedCollectionId = data.collection.id;
   state.groupDetailCollectionId = data.collection.id;
+  state.collectionSearchQuery = "";
   state.groupSearchQuery = "";
   state.groupScreen = "list";
   await loadData();
@@ -3608,9 +3648,12 @@ function logout() {
     cardFilterCollectionId: "",
     cardFilterGroupId: "",
     cardSearchQuery: "",
+    studyCollectionSearchQuery: "",
     studyGroupSearchQuery: "",
+    collectionSearchQuery: "",
     studyGroupSortMode: "recent",
     groupSearchQuery: "",
+    scrollPositions: {},
     cardScreen: "list",
     groupScreen: "list",
     cardEntryMode: "single",
@@ -3793,6 +3836,7 @@ document.addEventListener("click", async (event) => {
     if (action === "choose-study-collection") {
       const collectionId = Number(actionEl.dataset.collectionId);
       if (!state.collections.some((collection) => Number(collection.id) === collectionId)) return;
+      saveScrollPosition("study:collections");
       state.selectedCollectionId = collectionId;
       state.selectedGroupId = null;
       state.studyStep = "collection";
@@ -3810,11 +3854,11 @@ document.addEventListener("click", async (event) => {
       });
     }
     if (action === "back-to-study-collections") {
+      saveScrollPosition(`study:collection:${state.selectedCollectionId || "none"}`);
       state.studyStep = "select";
       state.selectedGroupId = null;
-      state.studyGroupSearchQuery = "";
       render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      restoreScrollPosition("study:collections");
     }
     if (action === "choose-study-group") {
       const groupId = Number(actionEl.dataset.groupId);
@@ -3933,20 +3977,21 @@ document.addEventListener("click", async (event) => {
       state.cardScreen = "form";
       state.bulkPreview = null;
       renderCards();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop();
     }
     if (action === "open-card-form") {
+      saveScrollPosition("cards:list");
       state.editingCardId = null;
       state.cardScreen = "form";
       state.bulkPreview = null;
       renderCards();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop();
     }
     if (action === "show-card-list") {
       state.editingCardId = null;
       state.cardScreen = "list";
       renderCards();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      restoreScrollPosition("cards:list");
     }
     if (action === "preview-study-cards") {
       state.pendingAction = null;
@@ -4076,31 +4121,35 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "confirm-clear-exam-date") await clearExamDate();
     if (action === "open-group-form") {
+      saveScrollPosition(state.groupDetailCollectionId ? `groups:detail:${state.groupDetailCollectionId}` : "groups:collections");
       state.editingGroupId = null;
       state.editingCollectionId = null;
       state.groupDetailCollectionId = state.groupDetailCollectionId || state.selectedCollectionId;
       state.groupScreen = "group-form";
       render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop();
     }
     if (action === "open-collection-form") {
+      saveScrollPosition("groups:collections");
       state.editingCollectionId = null;
       state.editingGroupId = null;
       state.groupDetailCollectionId = null;
       state.groupScreen = "collection-form";
       render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop();
     }
     if (action === "show-group-list") {
+      const detailKey = state.groupDetailCollectionId ? `groups:detail:${state.groupDetailCollectionId}` : "groups:collections";
       state.editingGroupId = null;
       state.editingCollectionId = null;
       state.groupScreen = "list";
       render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      restoreScrollPosition(detailKey);
     }
     if (action === "open-collection-detail") {
       const collectionId = Number(actionEl.dataset.collectionId);
       if (!state.collections.some((collection) => Number(collection.id) === collectionId)) return;
+      saveScrollPosition("groups:collections");
       state.groupDetailCollectionId = collectionId;
       state.selectedCollectionId = collectionId;
       state.groupScreen = "list";
@@ -4108,16 +4157,16 @@ document.addEventListener("click", async (event) => {
       state.editingCollectionId = null;
       state.groupSearchQuery = "";
       render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop();
     }
     if (action === "back-to-collections") {
+      saveScrollPosition(`groups:detail:${state.groupDetailCollectionId || "none"}`);
       state.groupDetailCollectionId = null;
       state.groupScreen = "list";
       state.editingGroupId = null;
       state.editingCollectionId = null;
-      state.groupSearchQuery = "";
       render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      restoreScrollPosition("groups:collections");
     }
     if (action === "clear-search") {
       const target = actionEl.dataset.target;
@@ -4125,9 +4174,17 @@ document.addEventListener("click", async (event) => {
         state.cardSearchQuery = "";
         renderCards();
       }
+      if (target === "study-collection-search") {
+        state.studyCollectionSearchQuery = "";
+        renderStudy();
+      }
       if (target === "study-group-search") {
         state.studyGroupSearchQuery = "";
         renderStudy();
+      }
+      if (target === "collection-search") {
+        state.collectionSearchQuery = "";
+        renderGroups();
       }
       if (target === "group-search") {
         state.groupSearchQuery = "";
@@ -4158,6 +4215,7 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "edit-card") {
       const card = state.cards.find((item) => Number(item.id) === Number(actionEl.dataset.cardId));
+      saveScrollPosition("cards:list");
       state.editingCardId = Number(actionEl.dataset.cardId);
       if (card) {
         state.selectedGroupId = card.group_id;
@@ -4168,7 +4226,7 @@ document.addEventListener("click", async (event) => {
       state.bulkPreview = null;
       state.activeTab = "cards";
       render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop();
     }
     if (action === "reset-card-form") {
       state.editingCardId = null;
@@ -4185,19 +4243,21 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "edit-group") {
       const group = state.groups.find((item) => item.id === Number(actionEl.dataset.groupId));
+      saveScrollPosition(group ? `groups:detail:${group.collection_id}` : "groups:collections");
       state.editingGroupId = Number(actionEl.dataset.groupId);
       state.editingCollectionId = null;
       if (group) state.groupDetailCollectionId = group.collection_id;
       state.groupScreen = "group-form";
       render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop();
     }
     if (action === "edit-collection") {
+      saveScrollPosition("groups:collections");
       state.editingCollectionId = Number(actionEl.dataset.collectionId);
       state.editingGroupId = null;
       state.groupScreen = "collection-form";
       render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop();
     }
     if (action === "reset-group-form") {
       state.editingGroupId = null;
@@ -4326,10 +4386,20 @@ function updateSearchInput(event) {
     renderCards();
     refocusInput("card-search");
   }
+  if (event.target.id === "study-collection-search") {
+    state.studyCollectionSearchQuery = event.target.value;
+    renderStudy();
+    refocusInput("study-collection-search");
+  }
   if (event.target.id === "study-group-search") {
     state.studyGroupSearchQuery = event.target.value;
     renderStudy();
     refocusInput("study-group-search");
+  }
+  if (event.target.id === "collection-search") {
+    state.collectionSearchQuery = event.target.value;
+    renderGroups();
+    refocusInput("collection-search");
   }
   if (event.target.id === "group-search") {
     state.groupSearchQuery = event.target.value;
@@ -4386,6 +4456,12 @@ document.addEventListener("keydown", async (event) => {
     event.preventDefault();
     await answerCard("correct");
   }
+});
+
+window.addEventListener("beforeunload", (event) => {
+  if (!state.session || state.session.savedRound) return;
+  event.preventDefault();
+  event.returnValue = "";
 });
 
 async function init() {

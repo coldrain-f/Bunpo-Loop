@@ -343,6 +343,31 @@ h3 {
   font-weight: 800;
 }
 
+.orientation-note {
+  display: grid;
+  gap: 3px;
+  margin: -4px 0 2px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.38;
+}
+
+.orientation-note span {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-weight: 850;
+}
+
+.orientation-note small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.38;
+}
+
 .shell-state-panel {
   margin-top: 18px;
 }
