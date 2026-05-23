@@ -2475,9 +2475,9 @@ button:active,
   bottom: calc(72px + env(safe-area-inset-bottom));
   z-index: 18;
   display: grid;
-  grid-template-columns: 0.66fr 1fr 1.2fr;
+  grid-template-columns: 0.64fr 1.08fr 1.38fr;
   width: 100%;
-  gap: 8px;
+  gap: 6px;
   padding: 6px;
   border: 1px solid rgba(214, 224, 219, 0.92);
   border-radius: 8px;
@@ -2488,8 +2488,24 @@ button:active,
 
 .completion-sticky-actions .full {
   min-height: 44px;
-  padding-right: 10px;
-  padding-left: 10px;
+  padding-right: 6px;
+  padding-left: 6px;
+  font-size: 0.8rem;
+}
+
+.completion-sticky-actions .button-content {
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.completion-sticky-actions .button-content span {
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.completion-sticky-actions .icon {
+  width: 16px;
+  height: 16px;
 }
 
 .study-session-controls {

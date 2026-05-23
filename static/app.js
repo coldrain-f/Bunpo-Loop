@@ -364,15 +364,11 @@ function reconcileLoadedState() {
     state.selectedGroupId = selectedCollectionGroups[0]?.id ?? null;
   }
 
-  if (
-    state.cardFilterCollectionId &&
-    state.cardFilterCollectionId !== "all" &&
-    !collectionIds.has(Number(state.cardFilterCollectionId))
-  ) {
+  if (state.cardFilterCollectionId === "all") {
     state.cardFilterCollectionId = "";
   }
-  if (!state.cardFilterCollectionId && state.collections.length) {
-    state.cardFilterCollectionId = "all";
+  if (state.cardFilterCollectionId && !collectionIds.has(Number(state.cardFilterCollectionId))) {
+    state.cardFilterCollectionId = "";
   }
   if (state.cardFilterGroupId && !groupById.has(Number(state.cardFilterGroupId))) {
     state.cardFilterGroupId = "";
@@ -382,7 +378,6 @@ function reconcileLoadedState() {
     state.cardFilterCollectionId = String(filteredGroup.collection_id);
   }
   if (
-    state.cardFilterCollectionId !== "all" &&
     state.cardFilterCollectionId &&
     state.cardFilterGroupId &&
     !getGroupsForCollection(state.cardFilterCollectionId).some((group) => String(group.id) === String(state.cardFilterGroupId))
@@ -896,7 +891,7 @@ function roundIncludesGroup(round, groupId) {
 }
 
 function getCardFilterGroups() {
-  if (!state.cardFilterCollectionId || state.cardFilterCollectionId === "all") return [];
+  if (!state.cardFilterCollectionId) return [];
   return getGroupsForCollection(state.cardFilterCollectionId);
 }
 
@@ -931,14 +926,6 @@ function getSelectedCardFilterCopy(filteredCount, visibleCount) {
     return {
       label: "대그룹 없음",
       detail: "카드를 등록하려면 먼저 대그룹과 소그룹이 필요합니다.",
-    };
-  }
-  if (state.cardFilterCollectionId === "all") {
-    return {
-      label: "전체 카드",
-      detail: `대그룹 ${number(state.collections.length)}개 · 소그룹 ${number(state.groups.length)}개 · ${number(
-        visibleCount,
-      )}/${number(filteredCount)}개 표시`,
     };
   }
   const collection = state.collections.find(
@@ -1007,15 +994,11 @@ function renderCardListEmptyState(filteredCards) {
   }
   if (!state.cardFilterCollectionId) {
     return renderActionEmptyState({
-      title: "볼 카드 범위를 선택해 주세요.",
-      body: "대그룹을 고르거나 전체 카드를 선택하면 목록이 나타납니다.",
-      action: "show-all-cards",
-      label: "전체 카드 보기",
-      iconName: "list",
-      buttonClass: "secondary-button",
+      title: "대그룹을 선택해 주세요.",
+      body: "카드 목록을 보려면 위의 대그룹 선택 박스에서 먼저 볼 범위를 고르세요.",
     });
   }
-  if (state.cardFilterCollectionId !== "all" && !getCardFilterGroups().length) {
+  if (!getCardFilterGroups().length) {
     return renderActionEmptyState({
       title: "선택한 대그룹에 소그룹이 없습니다.",
       body: "카드를 등록하려면 먼저 이 대그룹 안에 소그룹을 만들어야 합니다.",
@@ -1024,7 +1007,7 @@ function renderCardListEmptyState(filteredCards) {
       attrs: `data-collection-id="${state.cardFilterCollectionId}"`,
     });
   }
-  const target = state.cardFilterGroupId ? "소그룹" : state.cardFilterCollectionId === "all" ? "앱" : "대그룹";
+  const target = state.cardFilterGroupId ? "소그룹" : "대그룹";
   return renderActionEmptyState({
     title: `이 ${target}에는 아직 카드가 없습니다.`,
     body: "첫 카드를 등록하면 학습 탭에서 바로 회독을 시작할 수 있습니다.",
@@ -3235,13 +3218,10 @@ function renderCards() {
   const hasCollectionFilter = state.collections.some(
     (collection) => String(collection.id) === String(state.cardFilterCollectionId),
   );
-  const showAllCards = state.cardFilterCollectionId === "all";
   const hasGroupFilter = getCardFilterGroups().some((group) => String(group.id) === String(state.cardFilterGroupId));
   const filteredCards = hasGroupFilter
     ? state.cards.filter((card) => String(card.group_id) === String(state.cardFilterGroupId))
-    : showAllCards
-      ? state.cards
-      : hasCollectionFilter
+    : hasCollectionFilter
       ? state.cards.filter((card) => String(card.collection_id) === String(state.cardFilterCollectionId))
       : [];
   const visibleCards = filteredCards.filter((card) =>
@@ -3333,10 +3313,7 @@ function renderCardListPanel(visibleCards, filteredCards = visibleCards) {
         state.collections.length
           ? `<div class="card-filter-grid">
               <select id="card-collection-filter" class="select" aria-label="카드 대그룹 필터">
-                <option value="all" ${state.cardFilterCollectionId === "all" ? "selected" : ""}>전체 카드</option>
-                <option value="" ${
-                  state.cardFilterCollectionId || state.cardFilterCollectionId === "all" ? "" : "selected"
-                }>대그룹 선택</option>
+                <option value="" ${state.cardFilterCollectionId ? "" : "selected"}>대그룹 선택</option>
                 ${state.collections
                   .map(
                     (collection) =>
@@ -3347,14 +3324,12 @@ function renderCardListPanel(visibleCards, filteredCards = visibleCards) {
                   .join("")}
               </select>
               <select id="card-group-filter" class="select" aria-label="카드 소그룹 필터" ${
-                state.cardFilterCollectionId && state.cardFilterCollectionId !== "all" ? "" : "disabled"
+                state.cardFilterCollectionId ? "" : "disabled"
               }>
                 <option value="" ${state.cardFilterGroupId ? "" : "selected"}>${
-                  state.cardFilterCollectionId === "all"
-                    ? "전체 보기"
-                    : state.cardFilterCollectionId
+                  state.cardFilterCollectionId
                       ? "소그룹 전체"
-                      : "대그룹을 먼저 선택"
+                      : "-"
                 }</option>
                 ${collectionGroups
                   .map(
@@ -4829,6 +4804,7 @@ document.addEventListener("click", async (event) => {
     if (action === "retry-load-data") await retryLoadData();
     if (action === "open-study-groups") {
       state.studyStep = state.selectedCollectionId ? "collection" : "select";
+      state.selectedGroupId = null;
       state.studyOptionsOpen = false;
       render();
       focusAfterRender([
@@ -5252,12 +5228,6 @@ document.addEventListener("click", async (event) => {
         state.groupSearchQuery = "";
         renderGroups();
       }
-    }
-    if (action === "show-all-cards") {
-      state.cardFilterCollectionId = "all";
-      state.cardFilterGroupId = "";
-      resetCardListLimit();
-      renderCards();
     }
     if (action === "show-more-cards") {
       state.cardListLimit = number(state.cardListLimit) + CARD_LIST_PAGE_SIZE;
