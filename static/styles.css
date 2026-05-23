@@ -2302,6 +2302,14 @@ button:active,
   gap: 12px;
 }
 
+.collection-study-dialog {
+  display: grid;
+  max-height: min(86vh, 760px);
+  gap: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .round-detail-dialog {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;

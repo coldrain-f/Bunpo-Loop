@@ -1348,10 +1348,10 @@ class AppHandler(BaseHTTPRequestHandler):
                     cards = cards_payload(conn, group_ids=selected_group_ids, order_mode=order_mode)
                     self.send_json(
                         {
-                            "scope_type": "collection",
+                            "scope_type": "bundle",
                             "collection": row_to_dict(collection),
                             "groups": [row_to_dict(group) for group in selected_groups],
-                            "round_no": collection_round_no(conn, collection_id),
+                            "round_no": group_round_no(conn, selected_group_ids[0]),
                             "order_mode": order_mode,
                             "cards": cards,
                         }
@@ -1712,6 +1712,7 @@ class AppHandler(BaseHTTPRequestHandler):
         scope_type = "group"
         primary_group_id: int | None = None
         selected_group_ids: list[int]
+        round_collection_id: int | None = None
         if collection_id:
             if get_collection(conn, collection_id) is None:
                 raise ValueError("대그룹을 찾을 수 없습니다.")
@@ -1720,22 +1721,23 @@ class AppHandler(BaseHTTPRequestHandler):
                 raise ValueError("학습한 소그룹 정보가 없습니다.")
             selected_groups = groups_for_collection(conn, collection_id, selected_group_ids)
             selected_group_ids = [int(group["id"]) for group in selected_groups]
-            scope_type = "collection"
-            round_no = collection_round_no(conn, collection_id)
+            primary_group_id = selected_group_ids[0] if len(selected_group_ids) == 1 else None
+            round_no = group_round_no(conn, selected_group_ids[0])
             previous_round = conn.execute(
                 """
-                SELECT * FROM study_rounds
-                WHERE collection_id = ?
+                SELECT sr.*
+                FROM study_rounds sr
+                JOIN study_round_groups rg ON rg.round_id = sr.id
+                WHERE rg.group_id = ?
                 ORDER BY completed_at DESC, id DESC
                 LIMIT 1
                 """,
-                (collection_id,),
+                (selected_group_ids[0],),
             ).fetchone()
         else:
             group = get_group(conn, group_id)
             if group is None:
                 raise ValueError("그룹을 찾을 수 없습니다.")
-            collection_id = int(group["collection_id"])
             primary_group_id = group_id
             selected_group_ids = [group_id]
             round_no = group_round_no(conn, group_id)
@@ -1768,7 +1770,7 @@ class AppHandler(BaseHTTPRequestHandler):
         card_placeholders = ",".join("?" for _ in unique_card_ids)
         rows = conn.execute(
             f"""
-            SELECT id FROM cards
+            SELECT id, group_id FROM cards
             WHERE group_id IN ({group_placeholders})
               AND id IN ({card_placeholders})
             """,
@@ -1797,7 +1799,7 @@ class AppHandler(BaseHTTPRequestHandler):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                collection_id,
+                round_collection_id,
                 primary_group_id,
                 scope_type,
                 round_no,
@@ -1916,7 +1918,12 @@ class AppHandler(BaseHTTPRequestHandler):
                     FROM study_round_groups rg2
                     JOIN groups g2 ON g2.id = rg2.group_id
                     WHERE rg2.round_id = sr.id
-                ) AS selected_group_names
+                ) AS selected_group_names,
+                (
+                    SELECT group_concat(rg2.group_id, ',')
+                    FROM study_round_groups rg2
+                    WHERE rg2.round_id = sr.id
+                ) AS selected_group_ids
             FROM study_rounds sr
             LEFT JOIN groups g ON g.id = sr.group_id
             LEFT JOIN collections c ON c.id = sr.collection_id
@@ -2021,6 +2028,11 @@ class AppHandler(BaseHTTPRequestHandler):
                     JOIN groups g2 ON g2.id = rg2.group_id
                     WHERE rg2.round_id = sr.id
                 ) AS selected_group_names,
+                (
+                    SELECT group_concat(rg2.group_id, ',')
+                    FROM study_round_groups rg2
+                    WHERE rg2.round_id = sr.id
+                ) AS selected_group_ids,
                 COALESCE(first_attempts.first_attempt_total, sr.total_cards) AS first_attempt_total,
                 COALESCE(first_attempts.first_attempt_correct_count, sr.correct_count) AS first_attempt_correct_count
             FROM study_rounds sr
