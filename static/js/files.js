@@ -18,8 +18,11 @@
     return file.text();
   }
 
-  window.JLPTFiles = {
+  const files = {
     downloadJson,
     readTextFile,
   };
+
+  window.ByeorakchigiFiles = files;
+  window.JLPTFiles = files;
 })();

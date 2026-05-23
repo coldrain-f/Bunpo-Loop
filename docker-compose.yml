@@ -10,7 +10,7 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 8000
-      JLPT_DB: /data/bunpo-loop.sqlite3
+      BYEORAKCHIGI_DB: /data/bunpo-loop.sqlite3
       APP_USER: ${APP_USER:-}
       APP_PASSWORD: ${APP_PASSWORD:-}
     volumes:

@@ -9,7 +9,6 @@
   --line-strong: #c8d3cd;
   --teal: #176f66;
   --teal-soft: #e8f3ef;
-  --indigo: #4e5574;
   --red: #b94a43;
   --red-soft: #f8e3df;
   --gold: #b97918;
@@ -272,9 +271,9 @@ h3 {
 .header-user .small-button {
   min-height: 34px;
   padding: 0 11px;
-  border-radius: 999px;
+  border-radius: 8px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--surface);
   color: var(--ink);
   font-size: 0.8rem;
   box-shadow: var(--shadow-soft);
@@ -291,9 +290,9 @@ h3 {
 .panel {
   margin-bottom: 16px;
   padding: 18px;
-  border: 1px solid rgba(219, 228, 223, 0.92);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.97);
+  background: var(--surface);
   box-shadow: var(--shadow-soft);
 }
 
@@ -423,7 +422,7 @@ h3 {
 .study-start-panel .primary-button {
   background: var(--teal);
   color: white;
-  box-shadow: 0 8px 18px rgba(23, 111, 102, 0.14);
+  box-shadow: var(--shadow-soft);
 }
 
 .study-start-panel .ghost-button {
@@ -516,7 +515,7 @@ h3 {
 }
 
 .today-badge.pending {
-  background: #e7ede9;
+  background: var(--surface-strong);
   color: var(--muted);
 }
 
@@ -549,7 +548,6 @@ h3 {
 .order-option.active {
   border-color: var(--teal);
   background: var(--teal-soft);
-  box-shadow: 0 0 0 3px rgba(22, 107, 98, 0.1);
 }
 
 .order-option span {
@@ -611,7 +609,7 @@ h3 {
   min-height: 46px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fdfefe;
+  background: var(--surface);
   color: var(--ink);
   outline: none;
 }
@@ -662,7 +660,7 @@ h3 {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #e7efeb;
+  background: var(--surface-strong);
   color: var(--muted);
   transform: translateY(-50%);
 }
@@ -691,6 +689,7 @@ textarea[name="example_japanese"] {
   line-height: 1.5;
 }
 
+.bulk-textarea,
 .backup-textarea {
   font-family: var(--font-mono);
   font-size: 0.86rem;
@@ -700,7 +699,7 @@ textarea[name="example_japanese"] {
 .select:focus,
 .textarea:focus {
   border-color: var(--teal);
-  box-shadow: 0 0 0 3px rgba(15, 117, 108, 0.16);
+  box-shadow: var(--focus-ring);
 }
 
 .segmented {
@@ -710,7 +709,7 @@ textarea[name="example_japanese"] {
   padding: 5px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #edf3ef;
+  background: var(--surface-strong);
 }
 
 .segmented.two {
@@ -749,7 +748,7 @@ textarea[name="example_japanese"] {
 .primary-button {
   background: var(--teal);
   color: white;
-  box-shadow: 0 8px 18px rgba(23, 111, 102, 0.14);
+  box-shadow: var(--shadow-soft);
 }
 
 .secondary-button {
@@ -901,7 +900,7 @@ button:active,
 
 .study-subgroup-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .quick-practice-grid {
@@ -925,7 +924,7 @@ button:active,
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .study-subgroup-option.active {
@@ -1019,7 +1018,7 @@ button:active,
 .today-action-card.primary .primary-button {
   background: var(--teal);
   color: white;
-  box-shadow: 0 8px 18px rgba(23, 111, 102, 0.14);
+  box-shadow: var(--shadow-soft);
 }
 
 .today-action-buttons {
@@ -1091,7 +1090,6 @@ button:active,
 
 .weak-card-item.open {
   border-color: rgba(178, 70, 62, 0.36);
-  box-shadow: 0 0 0 3px rgba(178, 70, 62, 0.08);
 }
 
 .weak-card-main {
@@ -1246,9 +1244,8 @@ button:active,
 
 .group-item.active {
   border-color: var(--teal);
-  box-shadow:
-    0 0 0 3px rgba(15, 117, 108, 0.12),
-    var(--shadow-soft);
+  background: var(--teal-soft);
+  box-shadow: var(--shadow-soft);
 }
 
 .group-choice {
@@ -1318,7 +1315,7 @@ button:active,
   min-height: 24px;
   padding: 0 8px;
   border-radius: 999px;
-  background: #e7ede9;
+  background: var(--surface-strong);
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 900;
@@ -1387,7 +1384,7 @@ button:active,
   min-height: 26px;
   padding: 0 8px;
   border-radius: 999px;
-  background: #e7ede9;
+  background: var(--surface-strong);
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 800;
@@ -1801,7 +1798,7 @@ button:active,
   border: 1px solid rgba(214, 224, 219, 0.92);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 16px 38px rgba(27, 48, 43, 0.18);
+  box-shadow: var(--shadow);
   transform: translateX(-50%);
   backdrop-filter: blur(18px);
 }
@@ -1861,17 +1858,13 @@ button:active,
 
 .study-card.answer-feedback-correct {
   border-color: rgba(22, 107, 98, 0.62);
-  box-shadow:
-    0 0 0 4px rgba(22, 107, 98, 0.12),
-    var(--shadow);
+  box-shadow: var(--shadow);
   transform: translateY(-2px);
 }
 
 .study-card.answer-feedback-wrong {
   border-color: rgba(178, 70, 62, 0.64);
-  box-shadow:
-    0 0 0 4px rgba(178, 70, 62, 0.13),
-    var(--shadow);
+  box-shadow: var(--shadow);
   transform: translateY(-2px);
 }
 
@@ -1888,7 +1881,7 @@ button:active,
   color: white;
   font-size: 0.82rem;
   font-weight: 900;
-  box-shadow: 0 10px 26px rgba(27, 48, 43, 0.16);
+  box-shadow: var(--shadow-soft);
 }
 
 .answer-feedback-label.answer-feedback-correct {
@@ -2038,14 +2031,14 @@ button:active,
   overflow: hidden;
   height: 8px;
   border-radius: 999px;
-  background: #dfe8e3;
+  background: var(--line);
 }
 
 .progress span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--teal), var(--indigo));
+  background: var(--teal);
   transition: width 180ms ease;
 }
 
@@ -2063,7 +2056,7 @@ button:active,
   border: 1px solid rgba(214, 224, 219, 0.92);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 16px 38px rgba(27, 48, 43, 0.16);
+  box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
 }
 
@@ -2106,7 +2099,7 @@ button:active,
 .study-action-bar.answer-feedback-wrong .answer-wrong,
 .study-action-bar.answer-feedback-correct .answer-correct {
   opacity: 1;
-  box-shadow: 0 10px 24px rgba(27, 48, 43, 0.18);
+  box-shadow: var(--shadow-soft);
 }
 
 @keyframes study-card-enter {
@@ -2123,9 +2116,9 @@ button:active,
 
 .empty-state {
   padding: 20px 16px;
-  border: 1px dashed #bfd0c9;
+  border: 1px dashed var(--line-strong);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--surface-strong);
   color: var(--muted);
   line-height: 1.55;
   text-align: center;
@@ -2290,7 +2283,6 @@ button:active,
   border-color: var(--teal);
   background: var(--teal-soft);
   color: var(--teal);
-  box-shadow: 0 0 0 3px rgba(15, 117, 108, 0.12);
 }
 
 .date-select-grid {

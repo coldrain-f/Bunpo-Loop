@@ -17,7 +17,8 @@ from urllib.parse import parse_qs, unquote, urlparse
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
 DATA_DIR = ROOT / "data"
-DB_PATH = Path(os.environ.get("JLPT_DB", DATA_DIR / "jlpt_cards.sqlite3"))
+DB_ENV = os.environ.get("BYEORAKCHIGI_DB") or os.environ.get("BUNPO_LOOP_DB") or os.environ.get("JLPT_DB")
+DB_PATH = Path(DB_ENV or DATA_DIR / "jlpt_cards.sqlite3")
 APP_USER = os.environ.get("APP_USER")
 APP_PASSWORD = os.environ.get("APP_PASSWORD")
 DEFAULT_WEAK_CARD_THRESHOLD = 16
@@ -236,8 +237,8 @@ def reset_learning_schema(conn: sqlite3.Connection) -> None:
 
 def seed_data(conn: sqlite3.Connection) -> None:
     collections = [
-        ("JLPT N1 핵심문법", "N1 문법을 소그룹으로 나누어 회독합니다."),
-        ("JLPT N1 어휘 표현", "문장 흐름을 잡는 표현 묶음입니다."),
+        ("일본어 시험 표현", "문법과 표현을 소그룹으로 나누어 회독합니다."),
+        ("영어 단어 벼락치기", "단어와 예문을 빠르게 반복합니다."),
     ]
     collection_ids: dict[str, int] = {}
     for name, description in collections:
@@ -248,9 +249,9 @@ def seed_data(conn: sqlite3.Connection) -> None:
         collection_ids[name] = int(cur.lastrowid)
 
     groups = [
-        ("JLPT N1 핵심문법", "조사", "조사와 결합하는 핵심 문형"),
-        ("JLPT N1 핵심문법", "문형", "문장 끝과 연결 표현"),
-        ("JLPT N1 어휘 표현", "부사", "문장 흐름을 잡는 표현"),
+        ("일본어 시험 표현", "문법 표현", "문장 끝과 연결 표현"),
+        ("일본어 시험 표현", "부사 표현", "문장 흐름을 잡는 표현"),
+        ("영어 단어 벼락치기", "동사구", "시험과 회화에 자주 나오는 표현"),
     ]
     group_ids: dict[str, int] = {}
     for collection_name, name, description in groups:
@@ -262,7 +263,7 @@ def seed_data(conn: sqlite3.Connection) -> None:
 
     cards = [
         (
-            "조사",
+            "문법 표현",
             "〜あまり",
             "~한 나머지",
             [
@@ -271,7 +272,7 @@ def seed_data(conn: sqlite3.Connection) -> None:
             ],
         ),
         (
-            "문형",
+            "문법 표현",
             "〜に至っては",
             "~에 이르러서는",
             [
@@ -280,7 +281,7 @@ def seed_data(conn: sqlite3.Connection) -> None:
             ],
         ),
         (
-            "문형",
+            "문법 표현",
             "〜をもって",
             "~로써 / ~을 기해",
             [
@@ -289,12 +290,21 @@ def seed_data(conn: sqlite3.Connection) -> None:
             ],
         ),
         (
-            "부사",
+            "부사 표현",
             "いかにも",
             "정말로 / 참으로",
             [
                 ("いかにも彼らしい答えだ。", "정말 그다운 대답이다."),
                 ("いかにも高そうな時計をしている。", "참으로 비싸 보이는 시계를 차고 있다."),
+            ],
+        ),
+        (
+            "동사구",
+            "carry out",
+            "수행하다 / 실행하다",
+            [
+                ("We need to carry out the plan by Friday.", "금요일까지 그 계획을 실행해야 한다."),
+                ("The team carried out a quick review.", "팀은 빠른 검토를 수행했다."),
             ],
         ),
     ]
@@ -1470,8 +1480,16 @@ class AppHandler(BaseHTTPRequestHandler):
         )
 
     def current_user(self, conn: sqlite3.Connection) -> sqlite3.Row | None:
-        user_id = self.headers.get("X-JLPT-User-Id", "").strip()
-        access_code = self.headers.get("X-JLPT-Code", "").strip()
+        user_id = (
+            self.headers.get("X-Byeorakchigi-User-Id")
+            or self.headers.get("X-JLPT-User-Id")
+            or ""
+        ).strip()
+        access_code = (
+            self.headers.get("X-Byeorakchigi-Code")
+            or self.headers.get("X-JLPT-Code")
+            or ""
+        ).strip()
         if not access_code:
             return None
         if user_id:
@@ -1482,7 +1500,11 @@ class AppHandler(BaseHTTPRequestHandler):
                 (int(user_id),),
             ).fetchone()
         else:
-            nickname = self.headers.get("X-JLPT-Nickname", "").strip()
+            nickname = (
+                self.headers.get("X-Byeorakchigi-Nickname")
+                or self.headers.get("X-JLPT-Nickname")
+                or ""
+            ).strip()
             if not nickname:
                 return None
             user = conn.execute(

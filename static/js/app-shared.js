@@ -17,7 +17,8 @@
     accessCode: "960725",
   };
 
-  const USER_STORAGE_KEY = "jlptGrammarUser";
+  const USER_STORAGE_KEY = "byeorakchigiUser";
+  const LEGACY_USER_STORAGE_KEY = "jlptGrammarUser";
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (char) => {
@@ -60,8 +61,9 @@
     return `${minutes}:${two(rest)}`;
   }
 
-  window.JLPTShared = {
+  const shared = {
     DEFAULT_LOGIN,
+    LEGACY_USER_STORAGE_KEY,
     ORDER_LABELS,
     TAB_LABELS,
     USER_STORAGE_KEY,
@@ -70,4 +72,7 @@
     formatDuration,
     number,
   };
+
+  window.ByeorakchigiShared = shared;
+  window.JLPTShared = shared;
 })();

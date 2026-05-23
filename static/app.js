@@ -6,9 +6,9 @@ const {
   formatDate,
   formatDuration,
   number,
-} = window.JLPTShared;
-const { clearStoredUser, loadStoredUser, saveStoredUser } = window.JLPTStorage;
-const { downloadJson, readTextFile } = window.JLPTFiles;
+} = window.ByeorakchigiShared || window.JLPTShared;
+const { clearStoredUser, loadStoredUser, saveStoredUser } = window.ByeorakchigiStorage || window.JLPTStorage;
+const { downloadJson, readTextFile } = window.ByeorakchigiFiles || window.JLPTFiles;
 
 const ORDER_DESCRIPTIONS = {
   sequence: "등록한 순서 그대로 차분히 봅니다.",
@@ -121,8 +121,8 @@ function showToast(message) {
 async function request(path, options = {}) {
   const headers = { Accept: "application/json", ...(options.headers || {}) };
   if (state.user) {
-    headers["X-JLPT-User-Id"] = String(state.user.id);
-    headers["X-JLPT-Code"] = state.user.accessCode;
+    headers["X-Byeorakchigi-User-Id"] = String(state.user.id);
+    headers["X-Byeorakchigi-Code"] = state.user.accessCode;
   }
   if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
   const response = await fetch(path, { ...options, headers });
@@ -902,7 +902,7 @@ function renderDialog() {
     renderConfirmDialog({
       eyebrow: "초기화",
       title: "학습 목표를 초기화할까요?",
-      message: "목표 이름, JLPT 급수, 목표일을 모두 미정으로 돌립니다.",
+      message: "목표 이름, 선택 급수, 목표일을 모두 미정으로 돌립니다.",
       confirmLabel: "초기화",
       confirmAction: "confirm-clear-exam-date",
     });
@@ -2338,7 +2338,7 @@ function renderCardListPanel(visibleCards) {
               }>
                 <option value="" ${state.cardFilterGroupId ? "" : "selected"}>${
                   state.cardFilterCollectionId === "all"
-                    ? "전체 카드 보기 중"
+                    ? "전체 보기"
                     : state.cardFilterCollectionId
                       ? "소그룹 전체"
                       : "대그룹을 먼저 선택"
@@ -2848,8 +2848,8 @@ function renderLevelOptions() {
   const currentLevel = state.settings?.jlpt_level || "";
   return `
     <div class="field">
-      <span>JLPT 급수</span>
-      <div class="level-options" role="radiogroup" aria-label="JLPT 급수">
+      <span>JLPT 급수 (선택)</span>
+      <div class="level-options" role="radiogroup" aria-label="JLPT 급수 선택">
         ${["", ...JLPT_LEVELS]
           .map(
             (level) => `
@@ -3408,7 +3408,7 @@ function logout() {
 
 async function exportBackup() {
   const data = await request("/api/backup");
-  downloadJson(`byeorak-jjitgi-backup-${new Date().toISOString().slice(0, 10)}.json`, data.backup);
+  downloadJson(`byeorakchigi-backup-${new Date().toISOString().slice(0, 10)}.json`, data.backup);
   showToast("백업 파일을 만들었습니다.");
 }
 

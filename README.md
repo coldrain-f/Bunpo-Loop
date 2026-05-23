@@ -79,10 +79,10 @@ HOST=0.0.0.0 PORT=8000 python3 app.py
 APP_USER=myname APP_PASSWORD='strong-password' HOST=0.0.0.0 PORT=8000 python3 app.py
 ```
 
-SQLite 파일은 기본으로 `data/jlpt_cards.sqlite3`에 생성됩니다. 다른 위치를 쓰려면 `JLPT_DB`를 지정하세요.
+SQLite 파일은 기본으로 `data/jlpt_cards.sqlite3`에 생성됩니다. 다른 위치를 쓰려면 `BYEORAKCHIGI_DB`를 지정하세요. 기존 배포 호환을 위해 `BUNPO_LOOP_DB`, `JLPT_DB`도 계속 인식합니다.
 
 ```bash
-JLPT_DB=/var/lib/bunpo-loop/bunpo-loop.sqlite3 HOST=0.0.0.0 PORT=8000 python3 app.py
+BYEORAKCHIGI_DB=/var/lib/bunpo-loop/bunpo-loop.sqlite3 HOST=0.0.0.0 PORT=8000 python3 app.py
 ```
 
 ## 기능
