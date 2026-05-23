@@ -74,6 +74,10 @@ body.auth-mode .bottom-nav {
   display: none;
 }
 
+body.shell-mode .bottom-nav {
+  display: none;
+}
+
 body.study-mode .bottom-nav {
   display: none;
 }
@@ -319,7 +323,8 @@ h3 {
 }
 
 .auth-note,
-.auth-error {
+.auth-error,
+.backup-error {
   margin: 0;
   padding: 10px 12px;
   border: 1px solid var(--line);
@@ -330,11 +335,61 @@ h3 {
   line-height: 1.42;
 }
 
-.auth-error {
+.auth-error,
+.backup-error {
   border-color: rgba(185, 74, 67, 0.28);
   background: var(--red-soft);
   color: var(--red);
   font-weight: 800;
+}
+
+.shell-state-panel {
+  margin-top: 18px;
+}
+
+.shell-state-panel .button-row {
+  margin-top: 2px;
+}
+
+.loading-lines {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.loading-lines span {
+  display: block;
+  height: 12px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--surface-strong), var(--teal-soft), var(--surface-strong));
+  background-size: 220% 100%;
+  animation: loading-sheen 1.4s ease-in-out infinite;
+}
+
+.loading-lines span:nth-child(2) {
+  width: 82%;
+  animation-delay: 0.12s;
+}
+
+.loading-lines span:nth-child(3) {
+  width: 58%;
+  animation-delay: 0.24s;
+}
+
+@keyframes loading-sheen {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-lines span {
+    animation: none;
+  }
 }
 
 .row {

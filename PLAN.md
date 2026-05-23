@@ -88,7 +88,7 @@ Core direction:
   - [ ] 9.3 Privacy & Auth Expectations
 - [ ] Phase 10. Login, Loading & App Shell
   - [x] 10.1 Login Screen Polish
-  - [ ] 10.2 Loading & Error Shell
+  - [x] 10.2 Loading & Error Shell
   - [ ] 10.3 Navigation & Orientation
 - [ ] Phase 11. Accessibility & Interaction Reliability
   - [ ] 11.1 Dialog Focus & Keyboard
@@ -551,11 +551,11 @@ Purpose:
 데이터를 불러오는 중이거나 요청이 실패했을 때도 제품처럼 보이게 한다.
 
 Tasks:
-- [ ] 초기 데이터 loading state를 빈 화면이 아니라 calm loading surface로 보여준다.
-- [ ] API 요청 실패 시 재시도 CTA와 원인 copy를 제공한다.
-- [ ] 저장/삭제/복원 중 버튼 disabled와 pending label을 통일한다.
-- [ ] toast는 성공/짧은 알림에만 쓰고, 복구가 필요한 오류는 화면 안에 남긴다.
-- [ ] 서버 연결 실패, 인증 만료, 잘못된 백업 JSON을 서로 다른 상태로 구분한다.
+- [x] 초기 데이터 loading state를 빈 화면이 아니라 calm loading surface로 보여준다.
+- [x] API 요청 실패 시 재시도 CTA와 원인 copy를 제공한다.
+- [x] 저장/삭제/복원 중 버튼 disabled와 pending label을 통일한다.
+- [x] toast는 성공/짧은 알림에만 쓰고, 복구가 필요한 오류는 화면 안에 남긴다.
+- [x] 서버 연결 실패, 인증 만료, 잘못된 백업 JSON을 서로 다른 상태로 구분한다.
 
 Files:
 - `static/app.js`

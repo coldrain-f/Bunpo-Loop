@@ -44,6 +44,11 @@ const state = {
   authError: "",
   authPending: false,
   authValues: { ...DEFAULT_LOGIN },
+  appStatus: "idle",
+  appError: null,
+  backupError: "",
+  backupDraftText: "",
+  pendingRequest: null,
   collections: [],
   groups: [],
   cards: [],
@@ -121,6 +126,12 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => toastEl.classList.remove("show"), 2200);
 }
 
+function makeRequestError(message, details = {}) {
+  const error = new Error(message);
+  Object.assign(error, details);
+  return error;
+}
+
 async function request(path, options = {}) {
   const headers = { Accept: "application/json", ...(options.headers || {}) };
   if (state.user) {
@@ -128,9 +139,23 @@ async function request(path, options = {}) {
     headers["X-Byeorakchigi-Code"] = state.user.accessCode;
   }
   if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
-  const response = await fetch(path, { ...options, headers });
+  let response;
+  try {
+    response = await fetch(path, { ...options, headers });
+  } catch (error) {
+    throw makeRequestError("서버에 연결하지 못했습니다. 실행 중인지 확인한 뒤 다시 시도하세요.", {
+      code: "network",
+      cause: error,
+    });
+  }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "요청을 처리하지 못했습니다.");
+  if (!response.ok) {
+    throw makeRequestError(data.error || "요청을 처리하지 못했습니다.", {
+      status: response.status,
+      code: response.status === 401 ? "auth" : "api",
+      detail: data.detail || "",
+    });
+  }
   return data;
 }
 
@@ -205,7 +230,44 @@ async function loadData() {
   }
 }
 
+function handleLoadDataError(error) {
+  if (error?.status === 401 || error?.code === "auth") {
+    clearStoredUser();
+    state.user = null;
+    state.appStatus = "idle";
+    state.appError = null;
+    state.authPending = false;
+    state.authError = "로그인 정보가 맞지 않습니다. 닉네임과 6자리 코드를 다시 확인하세요.";
+    render();
+    return;
+  }
+  state.appStatus = "error";
+  state.appError = error;
+  state.authPending = false;
+  render();
+}
+
+async function retryLoadData() {
+  if (!state.user) {
+    render();
+    return;
+  }
+  state.appStatus = "loading";
+  state.appError = null;
+  render();
+  try {
+    await loadData();
+    state.appStatus = "ready";
+    state.appError = null;
+    render();
+  } catch (error) {
+    handleLoadDataError(error);
+  }
+}
+
 function getHeaderContext() {
+  if (state.appStatus === "loading") return "데이터 불러오는 중";
+  if (state.appStatus === "error") return "연결 확인 필요";
   if (!state.user) return "로그인";
   if (state.activeTab === "study") {
     if (state.session?.savedRound) return `${state.session.group.name} · 완료`;
@@ -743,13 +805,24 @@ function render() {
   const inActiveStudy = Boolean(state.user && state.activeTab === "study" && state.session && !state.session.savedRound);
   document.body.classList.toggle("study-mode", inActiveStudy);
   if (!state.user) {
+    state.appStatus = "idle";
+    document.body.classList.remove("shell-mode");
     renderHeader();
     renderAuth();
     renderDialog();
     syncStudyTimer();
     return;
   }
-  document.body.classList.remove("auth-mode");
+  if (state.appStatus === "loading" || state.appStatus === "error") {
+    document.body.classList.remove("auth-mode", "study-mode");
+    document.body.classList.add("shell-mode");
+    renderHeader();
+    renderAppShellState();
+    renderDialog();
+    syncStudyTimer();
+    return;
+  }
+  document.body.classList.remove("auth-mode", "shell-mode");
   renderHeader();
   setTab(state.activeTab);
   renderStudy();
@@ -758,6 +831,59 @@ function render() {
   renderSettings();
   renderDialog();
   syncStudyTimer();
+}
+
+function getAppErrorCopy(error = state.appError) {
+  if (error?.code === "network") {
+    return {
+      eyebrow: "연결 실패",
+      title: "서버에 연결하지 못했습니다",
+      message: "개인 서버나 로컬 실행 상태를 확인한 뒤 다시 시도하세요. 입력한 데이터는 이 화면에서 지워지지 않습니다.",
+    };
+  }
+  if (error?.status === 401 || error?.code === "auth") {
+    return {
+      eyebrow: "로그인 필요",
+      title: "다시 들어가야 합니다",
+      message: "저장된 로그인 정보가 맞지 않거나 만료되었습니다. 로그인 화면에서 닉네임과 6자리 코드를 다시 확인하세요.",
+    };
+  }
+  return {
+    eyebrow: "불러오기 실패",
+    title: "데이터를 불러오지 못했습니다",
+    message: error?.message || "잠시 뒤 다시 시도하세요.",
+  };
+}
+
+function renderAppShellState() {
+  document.querySelectorAll(".nav-button").forEach((button) => button.classList.remove("active"));
+  Object.entries(views).forEach(([key, view]) => {
+    view.classList.toggle("active", key === "study");
+    if (key !== "study") view.innerHTML = "";
+  });
+  if (state.appStatus === "loading") {
+    views.study.innerHTML = `
+      <div class="panel stack shell-state-panel" aria-live="polite">
+        <p class="eyebrow">불러오는 중</p>
+        <h2 id="study-title">학습 데이터를 준비하고 있어요</h2>
+        <p class="meta">대그룹, 소그룹, 카드와 회독 기록을 한 번에 확인하는 중입니다.</p>
+        <div class="loading-lines" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+    `;
+    return;
+  }
+  const copy = getAppErrorCopy();
+  views.study.innerHTML = `
+    <div class="panel stack shell-state-panel error-state" role="alert">
+      <p class="eyebrow">${escapeHtml(copy.eyebrow)}</p>
+      <h2 id="study-title">${escapeHtml(copy.title)}</h2>
+      <p class="meta">${escapeHtml(copy.message)}</p>
+      <div class="button-row">
+        <button class="primary-button" type="button" data-action="retry-load-data">${iconLabel("repeat-2", "다시 시도")}</button>
+        <button class="ghost-button" type="button" data-action="logout">${iconLabel("log-out", "로그인 화면")}</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderAuth() {
@@ -808,6 +934,7 @@ function renderAuth() {
 function renderConfirmDialog({ eyebrow, title, message, confirmLabel, confirmAction, tone = "danger" }) {
   const buttonClass = tone === "primary" ? "primary-button" : "danger-button";
   const confirmIcon = tone === "primary" ? "check" : "alert-triangle";
+  const isPending = state.pendingRequest?.action === confirmAction;
   dialogRoot.innerHTML = `
     <div class="dialog-backdrop" role="presentation">
       <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title" aria-describedby="study-dialog-message">
@@ -815,12 +942,48 @@ function renderConfirmDialog({ eyebrow, title, message, confirmLabel, confirmAct
         <h2 id="study-dialog-title">${escapeHtml(title)}</h2>
         <p id="study-dialog-message" class="meta">${escapeHtml(message)}</p>
         <div class="button-row">
-          <button class="ghost-button" type="button" data-action="close-dialog">${iconLabel("x", "취소")}</button>
-          <button class="${buttonClass}" type="button" data-action="${confirmAction}">${iconLabel(confirmIcon, confirmLabel)}</button>
+          <button class="ghost-button" type="button" data-action="close-dialog" ${isPending ? "disabled" : ""}>${iconLabel(
+            "x",
+            "취소",
+          )}</button>
+          <button class="${buttonClass}" type="button" data-action="${confirmAction}" ${isPending ? "disabled" : ""}>${iconLabel(
+            confirmIcon,
+            isPending ? state.pendingRequest.label : confirmLabel,
+          )}</button>
         </div>
       </section>
     </div>
   `;
+}
+
+async function runDialogRequest(action, label, task) {
+  if (state.pendingRequest) return;
+  state.pendingRequest = { action, label };
+  renderDialog();
+  try {
+    await task();
+  } finally {
+    state.pendingRequest = null;
+    if (state.activeDialog) renderDialog();
+  }
+}
+
+async function runFormRequest(form, label, task) {
+  const button = form.querySelector('button[type="submit"]');
+  const originalMarkup = button?.innerHTML || "";
+  if (button?.disabled) return;
+  if (button) {
+    button.disabled = true;
+    button.innerHTML = iconLabel("save", label);
+  }
+  try {
+    await task();
+  } finally {
+    if (button?.isConnected) {
+      button.disabled = false;
+      button.innerHTML = originalMarkup;
+    }
+  }
 }
 
 function renderDialog() {
@@ -1015,6 +1178,7 @@ function renderDialog() {
 }
 
 function closeDialog() {
+  if (state.pendingRequest) return;
   state.activeDialog = null;
   state.roundDetail = null;
   state.pendingTab = null;
@@ -2766,7 +2930,14 @@ function renderBackupPanel() {
               <label class="ghost-button file-button">${iconLabel("upload", "파일 선택")}<input id="backup-file-input" type="file" accept="application/json,.json" /></label>
             </div>
             <form id="backup-import-form" class="stack">
-              <textarea class="textarea backup-textarea" name="backup_json" placeholder="백업 JSON"></textarea>
+              <textarea id="backup-json" class="textarea backup-textarea" name="backup_json" placeholder="백업 JSON" aria-describedby="backup-error">${escapeHtml(
+                state.backupDraftText,
+              )}</textarea>
+              ${
+                state.backupError
+                  ? `<p id="backup-error" class="backup-error" role="alert">${escapeHtml(state.backupError)}</p>`
+                  : ""
+              }
               <button class="danger-button full" type="submit">${iconLabel("alert-triangle", "백업 복원")}</button>
             </form>
           `
@@ -3330,17 +3501,26 @@ async function login(form) {
     saveStoredUser(state.user);
     state.activeTab = "study";
     state.studyStep = "select";
+    state.appStatus = "loading";
+    state.appError = null;
+    render();
     await loadData();
     state.authPending = false;
     state.authError = "";
+    state.appStatus = "ready";
     render();
     showToast(`${state.user.nickname}님, 들어왔습니다.`);
   } catch (error) {
+    state.authPending = false;
+    if (state.user) {
+      handleLoadDataError(error);
+      return;
+    }
     clearStoredUser();
     state.user = null;
-    state.authPending = false;
+    state.appStatus = "idle";
     state.authError = error.message;
-    renderAuth();
+    render();
   }
 }
 
@@ -3456,12 +3636,20 @@ async function exportBackup() {
 
 function prepareBackupRestore(form) {
   const raw = form.elements.backup_json.value.trim();
-  if (!raw) throw new Error("백업 JSON을 넣어주세요.");
+  state.backupDraftText = raw;
+  if (!raw) {
+    state.backupError = "복원할 백업 JSON을 넣어주세요.";
+    renderSettings();
+    return;
+  }
   try {
     state.pendingAction = { type: "restore-backup", backup: JSON.parse(raw) };
   } catch {
-    throw new Error("백업 JSON 형식이 올바르지 않습니다.");
+    state.backupError = "백업 JSON 형식이 올바르지 않습니다. 파일 내용이 온전한지 확인하세요.";
+    renderSettings();
+    return;
   }
+  state.backupError = "";
   state.activeDialog = "restore-backup";
   renderDialog();
 }
@@ -3469,13 +3657,21 @@ function prepareBackupRestore(form) {
 async function restoreBackup() {
   const backup = state.pendingAction?.backup;
   if (!backup) return;
-  const data = await request("/api/backup", { method: "POST", body: JSON.stringify(backup) });
-  state.pendingAction = null;
-  state.activeDialog = null;
-  state.session = null;
-  await loadData();
-  render();
-  showToast(`복원 완료: 카드 ${data.restored.cards}개`);
+  try {
+    const data = await request("/api/backup", { method: "POST", body: JSON.stringify(backup) });
+    state.pendingAction = null;
+    state.activeDialog = null;
+    state.session = null;
+    state.backupError = "";
+    state.backupDraftText = "";
+    await loadData();
+    render();
+    showToast(`복원 완료: 카드 ${data.restored.cards}개`);
+  } catch (error) {
+    state.activeDialog = null;
+    state.backupError = error.message || "백업을 복원하지 못했습니다.";
+    render();
+  }
 }
 
 async function deletePendingCard() {
@@ -3587,6 +3783,7 @@ document.addEventListener("click", async (event) => {
       renderDialog();
     }
     if (action === "confirm-logout") logout();
+    if (action === "retry-load-data") await retryLoadData();
     if (action === "open-study-groups") {
       state.studyStep = state.selectedCollectionId ? "collection" : "select";
       state.studyOptionsOpen = false;
@@ -3806,12 +4003,13 @@ document.addEventListener("click", async (event) => {
       renderDialog();
     }
     if (action === "close-dialog") closeDialog();
-    if (action === "confirm-delete-card") await deletePendingCard();
-    if (action === "confirm-reset-history") await resetPendingHistory();
-    if (action === "confirm-reset-collection-history") await resetPendingCollectionHistory();
-    if (action === "confirm-delete-group") await deletePendingGroup();
-    if (action === "confirm-delete-collection") await deletePendingCollection();
-    if (action === "confirm-restore-backup") await restoreBackup();
+    if (action === "confirm-delete-card") await runDialogRequest(action, "삭제 중", deletePendingCard);
+    if (action === "confirm-reset-history") await runDialogRequest(action, "초기화 중", resetPendingHistory);
+    if (action === "confirm-reset-collection-history")
+      await runDialogRequest(action, "초기화 중", resetPendingCollectionHistory);
+    if (action === "confirm-delete-group") await runDialogRequest(action, "삭제 중", deletePendingGroup);
+    if (action === "confirm-delete-collection") await runDialogRequest(action, "삭제 중", deletePendingCollection);
+    if (action === "confirm-restore-backup") await runDialogRequest(action, "복원 중", restoreBackup);
     if (action === "confirm-quit-study") {
       if (state.session) {
         if (state.session.studyMode === "practice") state.selectedCollectionId = state.session.collection.id;
@@ -4097,6 +4295,8 @@ document.addEventListener("change", async (event) => {
       const textarea = document.querySelector('[name="backup_json"]');
       if (textarea && text) {
         textarea.value = text;
+        state.backupDraftText = text;
+        state.backupError = "";
         showToast("백업 파일을 불러왔습니다.");
       }
     }
@@ -4112,6 +4312,14 @@ function updateSearchInput(event) {
   if (event.target.closest("#bulk-card-form") && event.target.name === "bulk_text") {
     state.bulkDraftText = event.target.value;
     state.bulkPreview = null;
+  }
+  if (event.target.closest("#backup-import-form") && event.target.name === "backup_json" && state.backupError) {
+    state.backupDraftText = event.target.value;
+    state.backupError = "";
+    renderSettings();
+    refocusInput("backup-json");
+  } else if (event.target.closest("#backup-import-form") && event.target.name === "backup_json") {
+    state.backupDraftText = event.target.value;
   }
   if (event.target.id === "card-search") {
     state.cardSearchQuery = event.target.value;
@@ -4141,14 +4349,15 @@ document.addEventListener("compositionend", (event) => {
 
 document.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const form = event.target;
   try {
-    if (event.target.id === "login-form") await login(event.target);
-    if (event.target.id === "card-form") await saveCard(event.target);
-    if (event.target.id === "bulk-card-form") previewBulkCards(event.target);
-    if (event.target.id === "collection-form") await saveCollection(event.target);
-    if (event.target.id === "group-form") await saveGroup(event.target);
-    if (event.target.id === "backup-import-form") prepareBackupRestore(event.target);
-    if (event.target.id === "settings-form") await saveSettings(event.target);
+    if (form.id === "login-form") await login(form);
+    if (form.id === "card-form") await runFormRequest(form, "저장 중", () => saveCard(form));
+    if (form.id === "bulk-card-form") previewBulkCards(form);
+    if (form.id === "collection-form") await runFormRequest(form, "저장 중", () => saveCollection(form));
+    if (form.id === "group-form") await runFormRequest(form, "저장 중", () => saveGroup(form));
+    if (form.id === "backup-import-form") prepareBackupRestore(form);
+    if (form.id === "settings-form") await runFormRequest(form, "저장 중", () => saveSettings(form));
   } catch (error) {
     showToast(error.message);
   }
@@ -4156,6 +4365,7 @@ document.addEventListener("submit", async (event) => {
 
 document.addEventListener("keydown", async (event) => {
   if (event.key === "Escape" && state.activeDialog) {
+    if (state.pendingRequest) return;
     closeDialog();
     return;
   }
@@ -4184,14 +4394,15 @@ async function init() {
     render();
     return;
   }
+  state.appStatus = "loading";
+  state.appError = null;
+  render();
   try {
     await loadData();
+    state.appStatus = "ready";
     render();
   } catch (error) {
-    clearStoredUser();
-    state.user = null;
-    render();
-    showToast(error.message);
+    handleLoadDataError(error);
   }
 }
 
