@@ -1,14 +1,14 @@
-﻿# 벼락치기 Product Design Improvement Plan
+# 꼬꼬회독 Product Design Improvement Plan
 
 ## Goal
 
-벼락치기를 "기능이 있는 MVP"에서 "매일 쓰고 싶은 모바일 학습 제품" 수준으로 끌어올린다. 기준은 `DESIGN.md`이며, 방향은 **읽기 좋은 민트 포인트 학습 도구**다.
+꼬꼬회독을 "기능이 있는 MVP"에서 "매일 쓰고 싶은 모바일 학습 제품" 수준으로 끌어올린다. 기준은 `DESIGN.md`이며, 방향은 **읽기 좋은 민트 포인트 학습 도구**다.
 
 이 계획은 새 기능을 많이 추가하기보다, 핵심 화면의 정보 구조, 시각 위계, 빈 상태, 학습 루프를 제품 수준으로 다듬는 데 집중한다.
 
 ## Product Definition
 
-- 앱 이름: 벼락치기
+- 앱 이름: 꼬꼬회독
 - 핵심 구조: 대그룹 > 소그룹 > 카드
 - 공식 학습 단위: 소그룹
 - 보조 학습: 여러 소그룹을 묶는 기록 없는 연습
@@ -35,7 +35,7 @@ Core direction:
 - 소그룹 단위 공식 학습과 기록 없는 묶음 연습이 분리됐다.
 - 카드 탭에 대그룹/소그룹 dependent select가 들어갔다.
 - 묶음 탭은 대그룹 진입 후 소그룹 관리 흐름으로 바뀌었다.
-- 앱 이름과 디자인 기준이 `벼락치기`로 정리됐다.
+- 앱 이름과 디자인 기준이 `꼬꼬회독`으로 정리됐다.
 
 ### Not Yet Product-Level
 
@@ -638,14 +638,14 @@ Acceptance Criteria:
 ### 12.1 Generic Subject Cleanup
 
 Purpose:
-벼락치기를 JLPT 전용 앱이 아니라 범용 암기 앱으로 느끼게 한다.
+꼬꼬회독을 JLPT 전용 앱이 아니라 범용 암기 앱으로 느끼게 한다.
 
 Tasks:
 - [x] UI copy에서 JLPT가 필수 전제처럼 보이는 문구를 제거하거나 optional로 낮춘다.
 - [x] `jlpt_*`, `X-JLPT-*`, `JLPTStorage` 같은 legacy naming은 사용자 영향과 migration risk를 검토한다.
 - [x] DB/env 이름 `JLPT_DB`, `jlpt_cards.sqlite3`는 호환 유지/새 alias 제공 중 어느 쪽이 나은지 결정한다.
 - [x] 테스트 데이터가 일본어 문법에 치우치더라도 첫 사용 흐름은 범용 예시로 보이게 한다.
-- [x] README의 실행/기능 설명에서 벼락치기 브랜드와 범용성을 일관되게 맞춘다.
+- [x] README의 실행/기능 설명에서 꼬꼬회독 브랜드와 범용성을 일관되게 맞춘다.
 
 Files:
 - `static/app.js`
@@ -909,7 +909,7 @@ Reason:
 
 ## Definition Of Product-Level
 
-벼락치기가 product-level이라고 판단하려면 다음을 만족해야 한다.
+꼬꼬회독이 product-level이라고 판단하려면 다음을 만족해야 한다.
 
 - 새 사용자가 문서 없이 첫 카드 등록과 첫 학습을 완료할 수 있다.
 - 기존 사용자가 앱을 열자마자 오늘 할 학습을 알 수 있다.

@@ -42,6 +42,24 @@ const STATS_RANGE_LABELS = {
   days90: "90일",
 };
 
+const COMPLETION_MASCOTS = [
+  {
+    id: "medal",
+    src: "/static/assets/celebration-niwatori-medal.png",
+    label: "니와토리가 번개 메달을 보여주는 중",
+  },
+  {
+    id: "study",
+    src: "/static/assets/celebration-niwatori-study.png",
+    label: "니와토리가 카드 더미 옆에서 축하하는 중",
+  },
+  {
+    id: "flag",
+    src: "/static/assets/celebration-niwatori-flag.png",
+    label: "니와토리가 번개 깃발을 흔드는 중",
+  },
+];
+
 const JLPT_LEVELS = ["N1", "N2", "N3", "N4", "N5"];
 const DEFAULT_WEAK_CARD_THRESHOLD = 16;
 const DEFAULT_WEAK_RECENT_ROUNDS = 3;
@@ -560,7 +578,7 @@ function getHeaderContext() {
     return "대그룹 관리";
   }
   if (state.activeTab === "settings") return "설정";
-  return TAB_LABELS[state.activeTab] || "벼락치기";
+  return TAB_LABELS[state.activeTab] || "꼬꼬회독";
 }
 
 function getExamDateInfo() {
@@ -3283,6 +3301,52 @@ function getSessionOrderLabel(session) {
   return session.studyMode === "weak" ? "오답순" : ORDER_LABELS[session.orderMode];
 }
 
+function hashString(value) {
+  return String(value || "").split("").reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0);
+}
+
+function getCompletionMascot(session) {
+  if (!session.completionMascotId) {
+    const round = session.savedRound || {};
+    const seed = [session.studyMode, session.group?.name, round.id, round.completed_at, session.results?.length].join("|");
+    session.completionMascotId = COMPLETION_MASCOTS[hashString(seed) % COMPLETION_MASCOTS.length].id;
+  }
+  return COMPLETION_MASCOTS.find((item) => item.id === session.completionMascotId) || COMPLETION_MASCOTS[0];
+}
+
+function getCompletionMascotCopy(session, summary, round) {
+  if (session.studyMode === "practice") {
+    return {
+      title: "기록은 안 남겼지만 감각은 남았어요.",
+      body: `${number(summary.uniqueCardCount)}개 카드를 묶어서 훑었습니다.`,
+    };
+  }
+  if (session.studyMode === "weak") {
+    return {
+      title: "흔들린 카드까지 다시 잡았어요.",
+      body: `약점 카드 ${number(summary.uniqueCardCount)}개를 끝까지 확인했습니다.`,
+    };
+  }
+  return {
+    title: `${number(round.round_no)}회독을 닫았습니다.`,
+    body: `첫 시도 ${number(summary.firstPassCorrectCount)}/${number(summary.uniqueCardCount)} · 니와토리도 고개를 끄덕이는 중`,
+  };
+}
+
+function renderCompletionMascot(session, summary, round) {
+  const mascot = getCompletionMascot(session);
+  const copy = getCompletionMascotCopy(session, summary, round);
+  return `
+    <section class="completion-celebration" aria-label="회독 완료 축하">
+      <img class="completion-mascot" src="${mascot.src}" alt="${escapeHtml(mascot.label)}" loading="lazy" />
+      <div>
+        <strong>${escapeHtml(copy.title)}</strong>
+        <p>${escapeHtml(copy.body)}</p>
+      </div>
+    </section>
+  `;
+}
+
 function renderStudySession() {
   const session = state.session;
   if (session.savedRound) {
@@ -3303,6 +3367,7 @@ function renderStudySession() {
           </div>
           ${renderCompletionRecordBadge(session)}
         </div>
+        ${renderCompletionMascot(session, summary, round)}
         ${renderCompletionRecordNote(session)}
         ${renderCompletionScoreboard(summary, round, session)}
         ${renderDurationComparison(round, session)}
@@ -4287,7 +4352,7 @@ function renderCollectionEditorPanel(editing) {
       <form id="collection-form" class="stack">
         <label class="field"><span>대그룹명</span><input class="input" name="name" value="${escapeHtml(
           editing?.name || "",
-        )}" placeholder="영어 단어 벼락세트" required /></label>
+        )}" placeholder="영어 단어 꼬꼬세트" required /></label>
         <label class="field"><span>설명</span><textarea class="textarea" name="description" placeholder="시험 전 단어와 표현을 소그룹으로 나누어 회독">${escapeHtml(
           editing?.description || "",
         )}</textarea></label>

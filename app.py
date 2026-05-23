@@ -194,6 +194,20 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
         ),
     )
+    conn.execute(
+        """
+        UPDATE collections
+        SET name = ?
+        WHERE name IN (?, ?)
+          AND description = ?
+        """,
+        (
+            "영어 단어 꼬꼬회독",
+            "영어 단어 벼락회독",
+            "영어 단어 벼락치기",
+            "단어와 예문을 빠르게 반복합니다.",
+        ),
+    )
 
 
 def table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
@@ -240,7 +254,7 @@ def reset_learning_schema(conn: sqlite3.Connection) -> None:
 def seed_data(conn: sqlite3.Connection) -> None:
     collections = [
         ("일본어 시험 표현", "문법과 표현을 소그룹으로 나누어 회독합니다."),
-        ("영어 단어 벼락치기", "단어와 예문을 빠르게 반복합니다."),
+        ("영어 단어 꼬꼬회독", "단어와 예문을 빠르게 반복합니다."),
     ]
     collection_ids: dict[str, int] = {}
     for name, description in collections:
@@ -253,7 +267,7 @@ def seed_data(conn: sqlite3.Connection) -> None:
     groups = [
         ("일본어 시험 표현", "문법 표현", "문장 끝과 연결 표현"),
         ("일본어 시험 표현", "부사 표현", "문장 흐름을 잡는 표현"),
-        ("영어 단어 벼락치기", "동사구", "시험과 회화에 자주 나오는 표현"),
+        ("영어 단어 꼬꼬회독", "동사구", "시험과 회화에 자주 나오는 표현"),
     ]
     group_ids: dict[str, int] = {}
     for collection_name, name, description in groups:
@@ -2230,7 +2244,7 @@ def main() -> None:
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
     server = ThreadingHTTPServer((host, port), AppHandler)
-    print(f"벼락치기 running at http://{host}:{port}")
+    print(f"꼬꼬회독 running at http://{host}:{port}")
     print(f"SQLite database: {DB_PATH}")
     server.serve_forever()
 

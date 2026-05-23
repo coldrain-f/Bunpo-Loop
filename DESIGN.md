@@ -1,8 +1,8 @@
-# 벼락치기 DESIGN.md
+# 꼬꼬회독 DESIGN.md
 
 ## Overview
 
-벼락치기는 시험 전 짧은 시간에 여러 카드 묶음을 반복해서 외우는 모바일 중심 회독 학습 앱이다. 일본어 문법에서 시작했지만, 영어 단어, 중국어 표현, 자격증 암기, 면접 질문처럼 사용자가 직접 만든 모든 암기 카드에 대응한다.
+꼬꼬회독은 시험 전 짧은 시간에 여러 카드 묶음을 반복해서 외우는 모바일 중심 회독 학습 앱이다. 일본어 문법에서 시작했지만, 영어 단어, 중국어 표현, 자격증 암기, 면접 질문처럼 사용자가 직접 만든 모든 암기 카드에 대응한다.
 
 디자인 방향은 **Mintlify의 documentation UI에서 영감을 받은, 읽기 좋은 민트 포인트 학습 도구**다. 마케팅 페이지처럼 화려하게 보여주는 것이 아니라, 사용자가 매일 열어도 피로하지 않고 바로 학습을 시작할 수 있어야 한다.
 
@@ -233,8 +233,9 @@ Rules:
 
 - 모바일 우선 max-width는 560px.
 - 배경은 밝은 캔버스.
-- 상단 헤더는 앱 이름, 현재 위치, D-day/사용자 상태를 작게 보여준다.
-- 하단 nav는 항상 4개 탭: 학습, 카드, 묶음, 설정.
+- 상단 헤더는 꼬꼬회독 로고, 앱 이름, 현재 위치, D-day/사용자 상태를 작게 보여준다.
+- 로고는 `static/assets/logo.svg`를 기준으로 쓰고, 앱 안에서는 44px 전후의 작은 브랜드 마크로만 사용한다.
+- 하단 nav는 항상 5개 탭: 학습, 묶음, 카드, 통계, 설정.
 - 하단 nav active는 민트 배경 + 민트 텍스트.
 
 ### Panel
@@ -479,7 +480,8 @@ Rules:
 - Show accuracy, wrong count, duration, card count.
 - Wrong cards are easy to review.
 - Practice mode explicitly says records were not saved.
-- No confetti, no cartoon celebration, no oversized hero.
+- A small completion mascot panel is allowed after explicit product direction, but it must stay compact and secondary to the result.
+- No confetti, oversized hero, or full-screen celebration.
 
 ### Cards Tab
 
@@ -537,7 +539,7 @@ Tone:
 - Korean-first, clear, concise.
 - Friendly but not childish.
 - Avoid excessive slang.
-- "벼락치기" is the product name; playful expressions can appear sparingly after completion.
+- "꼬꼬회독" is the product name; playful expressions can appear sparingly after completion.
 
 Good:
 - "오늘 학습할 소그룹을 골라보세요."
