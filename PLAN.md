@@ -104,11 +104,11 @@ Core direction:
 - [x] Phase 14. Performance & Large Data UX
   - [x] 14.1 List Rendering & Search Responsiveness
   - [x] 14.2 Network/Request Feedback
-- [ ] Phase 15. Product QA Pass
-  - [ ] 15.1 Visual QA
+- [x] Phase 15. Product QA Pass
+  - [x] 15.1 Visual QA
   - [x] 15.2 Functional QA
   - [x] 15.3 Technical QA
-  - [ ] 15.4 Accessibility QA
+  - [x] 15.4 Accessibility QA
   - [x] 15.5 Data Integrity QA
   - [x] 15.6 Release Readiness QA
 
@@ -819,10 +819,10 @@ Acceptance Criteria:
 ### 15.1 Visual QA
 
 Checklist:
-- [ ] 360px mobile width에서 모든 버튼 텍스트가 들어간다.
-- [ ] 390px mobile width에서 하단 nav가 안정적이다.
-- [ ] 긴 대그룹/소그룹/카드 이름이 layout을 깨지 않는다.
-- [ ] 일본어 긴 예문과 긴 한국어 번역이 readable하다.
+- [x] 360px mobile width에서 모든 버튼 텍스트가 들어간다.
+- [x] 390px mobile width에서 하단 nav가 안정적이다.
+- [x] 긴 대그룹/소그룹/카드 이름이 layout을 깨지 않는다.
+- [x] 일본어 긴 예문과 긴 한국어 번역이 readable하다.
 - [x] dialog가 86vh 안에서 스크롤된다.
 - [x] active/disabled/focus states가 구분된다.
 
@@ -862,7 +862,7 @@ Browser checks:
 ### 15.4 Accessibility QA
 
 Checklist:
-- [ ] keyboard만으로 로그인, 탭 이동, 카드 등록, 학습 시작을 완료한다.
+- [x] keyboard만으로 로그인, 탭 이동, 카드 등록, 학습 시작을 완료한다.
 - [x] dialog open/close focus 위치가 자연스럽다.
 - [x] Escape key가 confirm flow를 위험하게 만들지 않는다.
 - [x] screen reader label이 없는 icon-only button이 없다.

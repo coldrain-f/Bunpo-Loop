@@ -217,11 +217,79 @@ function trapDialogFocus(event) {
   }
 }
 
+function focusAfterRender(selectors) {
+  const selectorList = Array.isArray(selectors) ? selectors : [selectors];
+  window.requestAnimationFrame(() => {
+    const candidates = selectorList.flatMap((selector) => [...document.querySelectorAll(selector)]);
+    const target = candidates.find((element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.closest("[hidden]")) return false;
+      return Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+    });
+    if (!(target instanceof HTMLElement)) return;
+    if (!target.matches(FOCUSABLE_SELECTOR) && !target.hasAttribute("tabindex")) {
+      target.setAttribute("tabindex", "-1");
+    }
+    target.focus({ preventScroll: true });
+  });
+}
+
 function isTypingTarget(target) {
   return (
     target instanceof HTMLElement &&
     (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable)
   );
+}
+
+function submitFormFromKeyboard(event) {
+  if (
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.key !== "Enter" ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey
+  ) {
+    return false;
+  }
+  const target = event.target;
+  if (
+    !(target instanceof HTMLElement) ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    target.isContentEditable
+  ) {
+    return false;
+  }
+  const form = target.closest("form");
+  if (!(form instanceof HTMLFormElement)) return false;
+  const submitter = form.querySelector('button[type="submit"]:not([disabled])');
+  if (!(submitter instanceof HTMLElement)) return false;
+  event.preventDefault();
+  if (typeof form.requestSubmit === "function") form.requestSubmit(submitter);
+  else submitter.click();
+  return true;
+}
+
+function activateControlFromKeyboard(event) {
+  if (
+    event.defaultPrevented ||
+    event.isComposing ||
+    (event.key !== "Enter" && event.key !== " ") ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey
+  ) {
+    return false;
+  }
+  const target = event.target;
+  if (!(target instanceof HTMLElement) || isTypingTarget(target)) return false;
+  const control = target.closest('button[data-tab], button[data-action], [role="button"][data-action]');
+  if (!(control instanceof HTMLElement) || control.hasAttribute("disabled")) return false;
+  event.preventDefault();
+  control.click();
+  return true;
 }
 
 function makeRequestError(message, details = {}) {
@@ -4077,6 +4145,7 @@ async function startStudy() {
   };
   state.activeDialog = null;
   render();
+  focusAfterRender(['.study-card[data-action="flip-card"]', '.reveal-button[data-action="flip-card"]']);
 }
 
 async function startBundleStudy() {
@@ -4286,6 +4355,7 @@ async function saveCard(form) {
   resetCardListLimit();
   await loadData();
   render();
+  focusAfterRender("#cards-title");
   showToast(isEditing ? "카드를 저장했습니다." : "카드를 등록했습니다.");
 }
 
@@ -4411,6 +4481,7 @@ async function login(form) {
     state.authError = "";
     state.appStatus = "ready";
     render();
+    focusAfterRender(["#study-collection-search", '[data-action="choose-study-collection"]', "#study-title"]);
     showToast(`${state.user.nickname}님, 들어왔습니다.`);
   } catch (error) {
     state.authPending = false;
@@ -4668,6 +4739,7 @@ document.addEventListener("click", async (event) => {
     }
     state.activeTab = nextTab;
     render();
+    focusAfterRender(`#view-${nextTab}.active h2`);
     return;
   }
   const actionEl = event.target.closest("[data-action]");
@@ -4681,6 +4753,7 @@ document.addEventListener("click", async (event) => {
       state.editingCollectionId = null;
       state.editingGroupId = null;
       render();
+      focusAfterRender('#collection-form [name="name"], #view-groups.active h2');
     }
     if (action === "logout") {
       state.activeDialog = "logout";
@@ -4692,6 +4765,12 @@ document.addEventListener("click", async (event) => {
       state.studyStep = state.selectedCollectionId ? "collection" : "select";
       state.studyOptionsOpen = false;
       render();
+      focusAfterRender([
+        "#study-group-search",
+        '[data-action="choose-study-group"]',
+        "#study-collection-search",
+        '[data-action="choose-study-collection"]',
+      ]);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "choose-study-collection") {
@@ -4705,11 +4784,13 @@ document.addEventListener("click", async (event) => {
       state.recentRoundsOpen = false;
       state.studyOptionsOpen = false;
       render();
+      focusAfterRender(["#study-group-search", '[data-action="choose-study-group"]']);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "focus-study-collections") {
       state.studyStep = "select";
       render();
+      focusAfterRender(["#study-collection-search", '[data-action="choose-study-collection"]']);
       window.requestAnimationFrame(() => {
         document.getElementById("study-collection-browser")?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
@@ -4719,6 +4800,7 @@ document.addEventListener("click", async (event) => {
       state.studyStep = "select";
       state.selectedGroupId = null;
       render();
+      focusAfterRender(["#study-collection-search", '[data-action="choose-study-collection"]']);
       restoreScrollPosition("study:collections");
     }
     if (action === "choose-study-group") {
@@ -4731,6 +4813,7 @@ document.addEventListener("click", async (event) => {
       state.recentRoundsOpen = false;
       state.studyOptionsOpen = false;
       render();
+      focusAfterRender('[data-action="start-study"]');
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "open-collection-study-dialog") {
@@ -4755,6 +4838,7 @@ document.addEventListener("click", async (event) => {
       state.editingCardId = null;
       state.bulkPreview = null;
       render();
+      focusAfterRender(['#card-form [name="front"]', '#card-form [name="collection_id"]']);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "open-group-form-for-collection") {
@@ -4768,6 +4852,7 @@ document.addEventListener("click", async (event) => {
       state.editingGroupId = null;
       state.editingCollectionId = null;
       render();
+      focusAfterRender('#group-form [name="name"]');
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "toggle-study-subgroup") {
@@ -4838,6 +4923,11 @@ document.addEventListener("click", async (event) => {
       state.cardScreen = "form";
       state.bulkPreview = null;
       renderCards();
+      focusAfterRender(
+        state.cardEntryMode === "bulk"
+          ? ['#bulk-card-form [name="bulk_text"]', '#bulk-card-form [name="collection_id"]']
+          : ['#card-form [name="front"]', '#card-form [name="collection_id"]'],
+      );
       scrollToTop();
     }
     if (action === "open-card-form") {
@@ -4846,12 +4936,14 @@ document.addEventListener("click", async (event) => {
       state.cardScreen = "form";
       state.bulkPreview = null;
       renderCards();
+      focusAfterRender(['#card-form [name="front"]', '#card-form [name="collection_id"]']);
       scrollToTop();
     }
     if (action === "show-card-list") {
       state.editingCardId = null;
       state.cardScreen = "list";
       renderCards();
+      focusAfterRender("#cards-title");
       restoreScrollPosition("cards:list");
     }
     if (action === "preview-study-cards") {
@@ -5224,6 +5316,7 @@ document.addEventListener("change", async (event) => {
       state.selectedCollectionId = collectionId;
       state.selectedGroupId = nextGroup?.id || null;
       renderCards();
+      focusAfterRender('#card-form [name="group_id"]');
     }
     if (event.target.id === "card-form-group") {
       state.selectedGroupId = Number(event.target.value);
@@ -5236,6 +5329,7 @@ document.addEventListener("change", async (event) => {
       state.bulkDraftGroupId = nextGroup?.id || null;
       state.bulkPreview = null;
       renderCards();
+      focusAfterRender('#bulk-card-form [name="group_id"]');
     }
     if (event.target.id === "bulk-card-group") {
       state.bulkDraftGroupId = Number(event.target.value);
@@ -5328,6 +5422,7 @@ document.addEventListener("submit", async (event) => {
 });
 
 document.addEventListener("keydown", async (event) => {
+  if (submitFormFromKeyboard(event)) return;
   if (state.activeDialog) {
     if (event.key === "Tab") {
       trapDialogFocus(event);
@@ -5340,9 +5435,11 @@ document.addEventListener("keydown", async (event) => {
       else dialogRoot.querySelector('[data-action="close-dialog"]')?.focus({ preventScroll: true });
       return;
     }
+    if (activateControlFromKeyboard(event)) return;
     return;
   }
   const target = event.target;
+  if (activateControlFromKeyboard(event)) return;
   if (isTypingTarget(target) || !state.session || state.session.savedRound) return;
   if (state.session.isAnswering) return;
   if (event.key === " " || event.key === "Enter") {
