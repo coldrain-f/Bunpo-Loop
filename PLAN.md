@@ -90,9 +90,9 @@ Core direction:
   - [x] 10.1 Login Screen Polish
   - [x] 10.2 Loading & Error Shell
   - [x] 10.3 Navigation & Orientation
-- [ ] Phase 11. Accessibility & Interaction Reliability
-  - [ ] 11.1 Dialog Focus & Keyboard
-  - [ ] 11.2 Touch Targets & Screen Reader Semantics
+- [x] Phase 11. Accessibility & Interaction Reliability
+  - [x] 11.1 Dialog Focus & Keyboard
+  - [x] 11.2 Touch Targets & Screen Reader Semantics
 - [x] Phase 12. Language Neutrality & Product Copy
   - [x] 12.1 Generic Subject Cleanup
   - [x] 12.2 Copy Inventory & Tone Pass
@@ -596,11 +596,11 @@ Purpose:
 dialog, 학습 세션, 탭 이동이 키보드와 보조기기에서도 안정적으로 동작하게 한다.
 
 Tasks:
-- [ ] dialog open 시 첫 의미 있는 버튼/제목으로 focus를 이동한다.
-- [ ] dialog close 시 원래 trigger로 focus를 돌린다.
-- [ ] Escape로 닫을 수 있는 dialog와 닫으면 안 되는 confirm flow를 구분한다.
-- [ ] dialog 안에서 Tab focus가 밖으로 새지 않도록 검토한다.
-- [ ] 학습 중 Space/Arrow key 동작이 form 입력과 충돌하지 않는지 확인한다.
+- [x] dialog open 시 첫 의미 있는 버튼/제목으로 focus를 이동한다.
+- [x] dialog close 시 원래 trigger로 focus를 돌린다.
+- [x] Escape로 닫을 수 있는 dialog와 닫으면 안 되는 confirm flow를 구분한다.
+- [x] dialog 안에서 Tab focus가 밖으로 새지 않도록 검토한다.
+- [x] 학습 중 Space/Arrow key 동작이 form 입력과 충돌하지 않는지 확인한다.
 
 Files:
 - `static/app.js`
@@ -617,11 +617,11 @@ Purpose:
 모바일 한 손 조작과 기본 접근성 품질을 확보한다.
 
 Tasks:
-- [ ] 모든 button, select, checkbox, search clear action이 최소 44px touch target을 가진다.
-- [ ] icon-only button에는 `aria-label`이 있다.
-- [ ] segmented control은 현재 선택 상태를 시각/semantics 양쪽에서 알 수 있다.
-- [ ] toast와 answer feedback의 live region 사용을 정리한다.
-- [ ] list item 전체 클릭 영역과 내부 edit/delete 버튼의 충돌을 점검한다.
+- [x] 모든 button, select, checkbox, search clear action이 최소 44px touch target을 가진다.
+- [x] icon-only button에는 `aria-label`이 있다.
+- [x] segmented control은 현재 선택 상태를 시각/semantics 양쪽에서 알 수 있다.
+- [x] toast와 answer feedback의 live region 사용을 정리한다.
+- [x] list item 전체 클릭 영역과 내부 edit/delete 버튼의 충돌을 점검한다.
 
 Files:
 - `static/app.js`

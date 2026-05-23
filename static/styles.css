@@ -273,7 +273,7 @@ h3 {
 }
 
 .header-user .small-button {
-  min-height: 34px;
+  min-height: 44px;
   padding: 0 11px;
   border-radius: 8px;
   border: 1px solid var(--line);
@@ -806,7 +806,7 @@ h3 {
 }
 
 .search-field .input {
-  padding-right: 42px;
+  padding-right: 52px;
   padding-left: 42px;
 }
 
@@ -828,10 +828,10 @@ h3 {
 .search-clear {
   position: absolute;
   top: 50%;
-  right: 7px;
+  right: 3px;
   display: inline-flex;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
@@ -896,7 +896,7 @@ textarea[name="example_japanese"] {
 }
 
 .segment {
-  min-height: 42px;
+  min-height: 44px;
   border-radius: 6px;
   background: transparent;
   color: var(--muted);
@@ -993,7 +993,7 @@ button:active,
 }
 
 .small-button {
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 12px;
   white-space: nowrap;
 }
@@ -1088,7 +1088,7 @@ button:active,
 }
 
 .quick-practice-grid .ghost-button {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 8px;
   font-size: 0.78rem;
 }
@@ -1412,7 +1412,7 @@ button:active,
 
 .quiet-actions .ghost-button,
 .quiet-actions .danger-button {
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .round-item-button {
@@ -1911,6 +1911,10 @@ button:active,
 }
 
 .group-card-count {
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
   border: 1px solid transparent;
   transition:
     border-color 160ms ease,
@@ -1982,7 +1986,7 @@ button:active,
 }
 
 .danger-zone summary {
-  min-height: 42px;
+  min-height: 44px;
   padding: 11px 12px;
   cursor: pointer;
   list-style-position: inside;
@@ -2468,7 +2472,7 @@ button:active,
 }
 
 .study-session-controls .small-button {
-  min-height: 34px;
+  min-height: 44px;
   padding: 0 10px;
   background: var(--surface);
   color: var(--muted);

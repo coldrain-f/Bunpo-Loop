@@ -112,7 +112,19 @@ const headerUserEl = document.querySelector("#header-user");
 const headerGreetingEl = document.querySelector("#header-greeting");
 const headerContextEl = document.querySelector("#header-context");
 let studyTimerId = null;
+let renderedDialogName = null;
+let dialogReturnFocusEl = null;
+let shouldFocusDialogOnRender = false;
 const ANSWER_FEEDBACK_MS = 230;
+const FOCUSABLE_SELECTOR = [
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "a[href]",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+const DISMISSIBLE_DIALOGS = new Set(["preview", "round-detail", "collection-study-picker"]);
 
 function icon(name, extraClass = "") {
   return `<svg class="icon${extraClass ? ` ${extraClass}` : ""}" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
@@ -127,6 +139,84 @@ function showToast(message) {
   toastEl.classList.add("show");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => toastEl.classList.remove("show"), 2200);
+}
+
+function getFocusableElements(container = document) {
+  return [...container.querySelectorAll(FOCUSABLE_SELECTOR)].filter((element) => {
+    if (!(element instanceof HTMLElement)) return false;
+    if (element.closest("[hidden]")) return false;
+    return Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+  });
+}
+
+function focusDialogContent() {
+  const dialog = dialogRoot.querySelector('[role="dialog"]');
+  if (!dialog) return;
+  const focusTarget = getFocusableElements(dialog)[0] || dialog.querySelector("h2") || dialog;
+  if (focusTarget instanceof HTMLElement) {
+    if (!focusTarget.matches(FOCUSABLE_SELECTOR) && !focusTarget.hasAttribute("tabindex")) {
+      focusTarget.setAttribute("tabindex", "-1");
+    }
+    focusTarget.focus({ preventScroll: true });
+  }
+}
+
+function beginDialogRender() {
+  if (!state.activeDialog) return;
+  const isNewDialog = renderedDialogName !== state.activeDialog;
+  if (!isNewDialog) return;
+  const activeElement = document.activeElement;
+  dialogReturnFocusEl =
+    activeElement instanceof HTMLElement && activeElement !== document.body && !dialogRoot.contains(activeElement)
+      ? activeElement
+      : null;
+  shouldFocusDialogOnRender = true;
+}
+
+function finishDialogRender() {
+  renderedDialogName = state.activeDialog;
+  if (!shouldFocusDialogOnRender) return;
+  shouldFocusDialogOnRender = false;
+  window.requestAnimationFrame(focusDialogContent);
+}
+
+function restoreDialogFocus() {
+  const target = dialogReturnFocusEl;
+  dialogReturnFocusEl = null;
+  renderedDialogName = null;
+  shouldFocusDialogOnRender = false;
+  if (target?.isConnected) window.requestAnimationFrame(() => target.focus({ preventScroll: true }));
+}
+
+function canDismissActiveDialogWithEscape() {
+  return Boolean(state.activeDialog && DISMISSIBLE_DIALOGS.has(state.activeDialog));
+}
+
+function trapDialogFocus(event) {
+  const dialog = dialogRoot.querySelector('[role="dialog"]');
+  if (!dialog) return;
+  const focusable = getFocusableElements(dialog);
+  if (!focusable.length) {
+    event.preventDefault();
+    if (dialog instanceof HTMLElement) dialog.focus({ preventScroll: true });
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus({ preventScroll: true });
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus({ preventScroll: true });
+  }
+}
+
+function isTypingTarget(target) {
+  return (
+    target instanceof HTMLElement &&
+    (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable)
+  );
 }
 
 function makeRequestError(message, details = {}) {
@@ -362,7 +452,10 @@ function setTab(tab) {
   state.activeTab = tab;
   views.auth.classList.remove("active");
   document.querySelectorAll(".nav-button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.tab === tab);
+    const active = button.dataset.tab === tab;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
   });
   Object.entries(views).forEach(([key, view]) => {
     if (key !== "auth") view.classList.toggle("active", key === tab);
@@ -1167,6 +1260,7 @@ function renderConfirmDialog({ eyebrow, title, message, confirmLabel, confirmAct
       </section>
     </div>
   `;
+  finishDialogRender();
 }
 
 async function runDialogRequest(action, label, task) {
@@ -1200,9 +1294,11 @@ async function runFormRequest(form, label, task) {
 }
 
 function renderDialog() {
+  beginDialogRender();
   document.body.classList.toggle("dialog-open", Boolean(state.activeDialog));
   if (!state.activeDialog) {
     dialogRoot.innerHTML = "";
+    restoreDialogFocus();
     return;
   }
   const selectedGroup = getSelectedGroup();
@@ -1258,6 +1354,7 @@ function renderDialog() {
         </section>
       </div>
     `;
+    finishDialogRender();
     return;
   }
   if (state.activeDialog === "round-detail") {
@@ -1597,7 +1694,9 @@ function renderStudyGroupSortOptions() {
       ${Object.entries(STUDY_GROUP_SORT_LABELS)
         .map(
           ([mode, label]) => `
-            <button class="segment ${state.studyGroupSortMode === mode ? "active" : ""}" type="button" data-action="set-study-group-sort" data-sort="${mode}">
+            <button class="segment ${state.studyGroupSortMode === mode ? "active" : ""}" type="button" data-action="set-study-group-sort" data-sort="${mode}" aria-pressed="${
+              state.studyGroupSortMode === mode ? "true" : "false"
+            }">
               ${label}
             </button>
           `,
@@ -1969,6 +2068,7 @@ function renderCollectionStudyDialog() {
       </section>
     </div>
   `;
+  finishDialogRender();
 }
 
 function renderStudyStartPanel(group) {
@@ -2069,7 +2169,9 @@ function renderOrderOptions() {
         ${Object.entries(ORDER_LABELS)
           .map(
             ([mode, label]) => `
-              <button class="order-option ${state.orderMode === mode ? "active" : ""}" type="button" data-action="set-order" data-order="${mode}">
+              <button class="order-option ${state.orderMode === mode ? "active" : ""}" type="button" data-action="set-order" data-order="${mode}" aria-pressed="${
+                state.orderMode === mode ? "true" : "false"
+              }">
                 <span>${label}</span>
                 <small>${ORDER_DESCRIPTIONS[mode]}</small>
               </button>
@@ -2092,7 +2194,9 @@ function renderExampleDisplayOptions() {
         ${Object.entries(EXAMPLE_DISPLAY_LABELS)
           .map(
             ([mode, label]) => `
-              <button class="order-option ${state.exampleDisplayMode === mode ? "active" : ""}" type="button" data-action="set-example-display" data-example-display="${mode}">
+              <button class="order-option ${state.exampleDisplayMode === mode ? "active" : ""}" type="button" data-action="set-example-display" data-example-display="${mode}" aria-pressed="${
+                state.exampleDisplayMode === mode ? "true" : "false"
+              }">
                 <span>${label}</span>
                 <small>${EXAMPLE_DISPLAY_DESCRIPTIONS[mode]}</small>
               </button>
@@ -2181,13 +2285,14 @@ function renderRoundDetailDialog() {
   if (!detail || detail.loading) {
     dialogRoot.innerHTML = `
       <div class="dialog-backdrop" role="presentation">
-        <section class="dialog-panel round-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title">
+        <section class="dialog-panel round-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title" tabindex="-1">
           <p class="eyebrow">회독 기록</p>
           <h2 id="study-dialog-title">자세히 불러오는 중</h2>
           <p class="meta">최근 회독의 풀이 기록을 정리하고 있습니다.</p>
         </section>
       </div>
     `;
+    finishDialogRender();
     return;
   }
   const stats = getRoundDetailStats(detail);
@@ -2358,7 +2463,7 @@ function renderStudySession() {
       }>
         ${
           session.answerFeedback
-            ? `<div class="answer-feedback-label ${feedbackClass}" aria-live="polite">${feedbackLabel}</div>`
+            ? `<div class="answer-feedback-label ${feedbackClass}" role="status" aria-live="polite" aria-atomic="true">${feedbackLabel}</div>`
             : ""
         }
         ${
@@ -2850,6 +2955,7 @@ function renderCardBack(card, examplesExpanded = false) {
       </section>
     </div>
   `;
+  finishDialogRender();
 }
 
 function renderStudyCardMeta(label, card, japanese = false) {
@@ -2918,8 +3024,12 @@ function renderCardEditorPanel(editing, formGroupId) {
         editing
           ? `<p class="meta">수정한 내용은 저장 후 카드 목록에서 다시 확인할 수 있어요.</p>`
           : `<div class="segmented two" role="group" aria-label="카드 등록 방식">
-              <button class="segment ${state.cardEntryMode === "single" ? "active" : ""}" type="button" data-action="set-card-entry-mode" data-mode="single">한 장</button>
-              <button class="segment ${state.cardEntryMode === "bulk" ? "active" : ""}" type="button" data-action="set-card-entry-mode" data-mode="bulk">여러 장</button>
+              <button class="segment ${state.cardEntryMode === "single" ? "active" : ""}" type="button" data-action="set-card-entry-mode" data-mode="single" aria-pressed="${
+                state.cardEntryMode === "single" ? "true" : "false"
+              }">한 장</button>
+              <button class="segment ${state.cardEntryMode === "bulk" ? "active" : ""}" type="button" data-action="set-card-entry-mode" data-mode="bulk" aria-pressed="${
+                state.cardEntryMode === "bulk" ? "true" : "false"
+              }">여러 장</button>
             </div>`
       }
       ${
@@ -5067,14 +5177,22 @@ document.addEventListener("submit", async (event) => {
 });
 
 document.addEventListener("keydown", async (event) => {
-  if (event.key === "Escape" && state.activeDialog) {
-    if (state.pendingRequest) return;
-    closeDialog();
+  if (state.activeDialog) {
+    if (event.key === "Tab") {
+      trapDialogFocus(event);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      if (state.pendingRequest) return;
+      if (canDismissActiveDialogWithEscape()) closeDialog();
+      else dialogRoot.querySelector('[data-action="close-dialog"]')?.focus({ preventScroll: true });
+      return;
+    }
     return;
   }
   const target = event.target;
-  const isTyping = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
-  if (isTyping || !state.session || state.session.savedRound) return;
+  if (isTypingTarget(target) || !state.session || state.session.savedRound) return;
   if (state.session.isAnswering) return;
   if (event.key === " " || event.key === "Enter") {
     event.preventDefault();
