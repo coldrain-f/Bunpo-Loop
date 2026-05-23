@@ -7,8 +7,9 @@
 
   const TAB_LABELS = {
     study: "학습",
-    cards: "카드",
     groups: "묶음",
+    cards: "카드",
+    stats: "통계",
     settings: "설정",
   };
 

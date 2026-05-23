@@ -114,6 +114,12 @@
         <circle cx="12" cy="12" r="6" />
         <circle cx="12" cy="12" r="2" />
       </symbol>
+      <symbol id="icon-chart-column" viewBox="0 0 24 24">
+        <path d="M3 3v18h18" />
+        <path d="M18 17V9" />
+        <path d="M13 17V5" />
+        <path d="M8 17v-3" />
+      </symbol>
       <symbol id="icon-alert-triangle" viewBox="0 0 24 24">
         <path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
         <path d="M12 9v4" />
@@ -136,8 +142,9 @@
       <main>
         <section id="view-auth" class="view active" aria-labelledby="auth-title"></section>
         <section id="view-study" class="view" aria-labelledby="study-title"></section>
-        <section id="view-cards" class="view" aria-labelledby="cards-title"></section>
         <section id="view-groups" class="view" aria-labelledby="groups-title"></section>
+        <section id="view-cards" class="view" aria-labelledby="cards-title"></section>
+        <section id="view-stats" class="view" aria-labelledby="stats-title"></section>
         <section id="view-settings" class="view" aria-labelledby="settings-title"></section>
       </main>
     </div>
@@ -147,13 +154,17 @@
         <span class="nav-icon" aria-hidden="true"><svg class="icon"><use href="#icon-repeat-2"></use></svg></span>
         <span>학습</span>
       </button>
+      <button class="nav-button" type="button" data-tab="groups">
+        <span class="nav-icon" aria-hidden="true"><svg class="icon"><use href="#icon-folder"></use></svg></span>
+        <span>묶음</span>
+      </button>
       <button class="nav-button" type="button" data-tab="cards">
         <span class="nav-icon" aria-hidden="true"><svg class="icon"><use href="#icon-copy"></use></svg></span>
         <span>카드</span>
       </button>
-      <button class="nav-button" type="button" data-tab="groups">
-        <span class="nav-icon" aria-hidden="true"><svg class="icon"><use href="#icon-folder"></use></svg></span>
-        <span>묶음</span>
+      <button class="nav-button" type="button" data-tab="stats">
+        <span class="nav-icon" aria-hidden="true"><svg class="icon"><use href="#icon-chart-column"></use></svg></span>
+        <span>통계</span>
       </button>
       <button class="nav-button" type="button" data-tab="settings">
         <span class="nav-icon" aria-hidden="true"><svg class="icon"><use href="#icon-settings"></use></svg></span>

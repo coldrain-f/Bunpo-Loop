@@ -86,6 +86,7 @@ const state = {
   bulkPreview: null,
   dataPanelOpen: false,
   recentRoundsOpen: false,
+  statsRecentRoundsOpen: false,
   orderMode: "sequence",
   exampleDisplayMode: "collapsed",
   studyStep: "select",
@@ -107,8 +108,9 @@ const state = {
 const views = {
   auth: document.querySelector("#view-auth"),
   study: document.querySelector("#view-study"),
-  cards: document.querySelector("#view-cards"),
   groups: document.querySelector("#view-groups"),
+  cards: document.querySelector("#view-cards"),
+  stats: document.querySelector("#view-stats"),
   settings: document.querySelector("#view-settings"),
 };
 const toastEl = document.querySelector("#toast");
@@ -523,6 +525,7 @@ function getHeaderContext() {
     }
     return "학습 · 대그룹 선택";
   }
+  if (state.activeTab === "stats") return "통계 · 공식 회독";
   if (state.activeTab === "cards") {
     if (state.editingCardId) return "카드 · 수정";
     return state.cardScreen === "form" ? "카드 · 등록" : "카드 관리";
@@ -1262,6 +1265,431 @@ function getWeakCards() {
     );
 }
 
+function clampPercent(value) {
+  return Math.min(100, Math.max(0, number(value)));
+}
+
+function getRate(correct, total) {
+  const base = number(total);
+  if (!base) return null;
+  return Math.round((number(correct) / base) * 100);
+}
+
+function rateText(rate) {
+  return rate === null ? "-" : `${rate}%`;
+}
+
+function getStatsSummary() {
+  const totalCards = state.cards.length;
+  const learnedCards = state.cards.filter((card) => cardAttemptCount(card) > 0).length;
+  const totalGroups = state.groups.length;
+  const studiedGroups = state.groups.filter((group) => number(group.completed_rounds) > 0).length;
+  const studyReadyGroups = state.groups.filter((group) => number(group.card_count) > 0);
+  const todayGroups = studyReadyGroups.filter((group) => isToday(group.last_studied_at));
+  const pendingTodayGroups = studyReadyGroups.filter((group) => !isToday(group.last_studied_at));
+  const totalCorrect = state.cards.reduce((sum, card) => sum + number(card.correct_count), 0);
+  const totalWrong = state.cards.reduce((sum, card) => sum + number(card.wrong_count), 0);
+  const latestFirstAttempt = state.groups.reduce(
+    (acc, group) => {
+      acc.correct += number(group.latest_first_attempt_correct_count);
+      acc.total += number(group.latest_first_attempt_total);
+      return acc;
+    },
+    { correct: 0, total: 0 },
+  );
+  const weakCards = getWeakCards();
+  const recentGroup = getRecentStudyGroup();
+  const recommendedGroup =
+    sortStudyGroups(pendingTodayGroups)[0] || (recentGroup && number(recentGroup.card_count) > 0 ? recentGroup : null);
+  return {
+    totalCards,
+    learnedCards,
+    totalGroups,
+    studiedGroups,
+    studyReadyGroups,
+    todayGroups,
+    pendingTodayGroups,
+    totalCorrect,
+    totalWrong,
+    totalAttempts: totalCorrect + totalWrong,
+    totalSubgroupRounds: state.groups.reduce((sum, group) => sum + number(group.completed_rounds), 0),
+    latestFirstAttemptRate: getRate(latestFirstAttempt.correct, latestFirstAttempt.total),
+    answerRate: getRate(totalCorrect, totalCorrect + totalWrong),
+    weakCards,
+    recentGroup,
+    recommendedGroup,
+  };
+}
+
+function renderStats() {
+  const summary = getStatsSummary();
+  if (!state.collections.length && !state.groups.length && !state.cards.length) {
+    views.stats.innerHTML = `
+      <div class="panel stack">
+        <div>
+          <p class="eyebrow">통계</p>
+          <h2 id="stats-title">학습 통계</h2>
+        </div>
+        ${renderOrientationNote(["통계", "공식 회독"], "소그룹 단위 회독이 쌓이면 통계가 채워집니다.")}
+        ${renderActionEmptyState({
+          title: "아직 통계를 만들 데이터가 없습니다.",
+          body: "대그룹과 소그룹을 만들고 카드를 넣은 뒤 회독을 시작하면 여기에 흐름이 쌓입니다.",
+          action: "go-groups",
+          label: "대그룹 만들기",
+          iconName: "folder",
+          buttonClass: "primary-button",
+        })}
+      </div>
+    `;
+    return;
+  }
+  views.stats.innerHTML = `
+    <div class="stats-page stack">
+      <section class="panel stack stats-today-panel">
+        <div class="row">
+          <div>
+            <p class="eyebrow">통계</p>
+            <h2 id="stats-title">오늘의 상태</h2>
+          </div>
+          <span class="pill">공식 회독</span>
+        </div>
+        ${renderStatsTodayPanel(summary)}
+      </section>
+      ${renderStatsOverviewSection(summary)}
+      ${renderStatsCollectionSection()}
+      ${renderStatsFocusSection(summary)}
+      ${renderStatsRecentRoundSection()}
+    </div>
+  `;
+}
+
+function renderStatsTodayPanel(summary) {
+  const readyCount = summary.studyReadyGroups.length;
+  const todayCount = summary.todayGroups.length;
+  const pendingCount = summary.pendingTodayGroups.length;
+  let action = {
+    tone: "quiet",
+    eyebrow: "추천",
+    title: "첫 학습 단위를 준비하세요.",
+    detail: "카드가 있는 소그룹이 생기면 오늘의 학습 상태를 더 정확히 보여줍니다.",
+    buttonLabel: "묶음으로 이동",
+    icon: "folder",
+    action: "go-groups",
+    attrs: "",
+  };
+  if (summary.weakCards.length) {
+    action = {
+      tone: "danger",
+      eyebrow: "추천",
+      title: `약점 카드 ${number(summary.weakCards.length)}개를 먼저 봐요.`,
+      detail: "설정한 오답 기준에 걸린 카드가 있어 복습 우선순위가 높습니다.",
+      buttonLabel: "복습 시작",
+      icon: "target",
+      action: "start-weak-study",
+      attrs: "",
+    };
+  } else if (pendingCount && summary.recommendedGroup) {
+    action = {
+      tone: "primary",
+      eyebrow: "추천",
+      title: `${number(pendingCount)}개 소그룹이 오늘 아직 남았어요.`,
+      detail: `${summary.recommendedGroup.name}부터 이어가면 좋습니다.`,
+      buttonLabel: "바로 학습",
+      icon: "play",
+      action: "study-stats-group",
+      attrs: `data-group-id="${summary.recommendedGroup.id}"`,
+    };
+  } else if (readyCount && summary.recentGroup) {
+    action = {
+      tone: "good",
+      eyebrow: "완료",
+      title: "오늘 학습 흐름이 깔끔합니다.",
+      detail: `${summary.recentGroup.name}을 한 번 더 돌리거나 다른 소그룹을 추가해도 좋습니다.`,
+      buttonLabel: "한 번 더 회독",
+      icon: "repeat-2",
+      action: "study-stats-group",
+      attrs: `data-group-id="${summary.recentGroup.id}"`,
+    };
+  }
+  const todayRate = getRate(todayCount, readyCount);
+  return `
+    <section class="stats-recommend-card ${action.tone}">
+      <div>
+        <span>${escapeHtml(action.eyebrow)}</span>
+        <strong>${escapeHtml(action.title)}</strong>
+        <p>${escapeHtml(action.detail)}</p>
+      </div>
+      <button class="${action.tone === "danger" ? "secondary-button" : "primary-button"} full" type="button" data-action="${
+        action.action
+      }" ${action.attrs}>${iconLabel(action.icon, action.buttonLabel)}</button>
+    </section>
+    <div class="stats-status-grid">
+      ${renderStatsStatusItem("오늘 완료", `${number(todayCount)}/${number(readyCount)}`, "카드가 있는 소그룹", todayRate)}
+      ${renderStatsStatusItem("남은 소그룹", `${number(pendingCount)}개`, "오늘 아직 지나가지 않음", getRate(readyCount - pendingCount, readyCount))}
+      ${renderStatsStatusItem("약점 카드", `${number(summary.weakCards.length)}개`, "오답 기준에 걸림", summary.weakCards.length ? 100 : 0, summary.weakCards.length ? "danger" : "good")}
+    </div>
+  `;
+}
+
+function renderStatsStatusItem(label, value, detail, rate, tone = "") {
+  return `
+    <article class="stats-status-item ${tone}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <p>${escapeHtml(detail)}</p>
+      ${renderStatsProgress(rate)}
+    </article>
+  `;
+}
+
+function renderStatsOverviewSection(summary) {
+  const learnedRate = getRate(summary.learnedCards, summary.totalCards);
+  const studiedGroupRate = getRate(summary.studiedGroups, summary.totalGroups);
+  const latestName = summary.recentGroup ? summary.recentGroup.name : "기록 없음";
+  const latestDetail = summary.recentGroup
+    ? `${formatDate(summary.recentGroup.last_studied_at)} · ${number(summary.recentGroup.completed_rounds)}회독`
+    : "첫 회독을 완료하면 최근 학습 소그룹이 표시됩니다.";
+  return `
+    <section class="panel stack stats-overview-panel">
+      <div class="completion-header">
+        <h3>전체 흐름</h3>
+        <span class="pill">회독 ${number(summary.totalSubgroupRounds)}회</span>
+      </div>
+      <div class="stats-overview">
+        ${renderStatsMetricCard("카드 풀이", `${number(summary.learnedCards)}/${number(summary.totalCards)}`, "한 번이라도 풀이한 카드", learnedRate)}
+        ${renderStatsMetricCard("소그룹 진행", `${number(summary.studiedGroups)}/${number(summary.totalGroups)}`, "회독 기록이 있는 소그룹", studiedGroupRate)}
+        ${renderStatsMetricCard("첫 풀이 정답률", rateText(summary.latestFirstAttemptRate), "각 소그룹의 최근 회독 기준", summary.latestFirstAttemptRate)}
+        ${renderStatsMetricCard("누적 정답률", rateText(summary.answerRate), `풀이 ${number(summary.totalAttempts)}회`, summary.answerRate)}
+      </div>
+      <section class="stats-insight-strip">
+        <div>
+          <span>최근 학습</span>
+          <strong>${escapeHtml(latestName)}</strong>
+          <p>${escapeHtml(latestDetail)}</p>
+        </div>
+        <div>
+          <span>통계 기준</span>
+          <strong>소그룹 공식 회독</strong>
+          <p>묶음 연습은 합산하지 않습니다.</p>
+        </div>
+      </section>
+    </section>
+  `;
+}
+
+function renderStatsMetricCard(label, value, detail, rate = null) {
+  return `
+    <article class="stats-metric-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <p>${escapeHtml(detail)}</p>
+      ${renderStatsProgress(rate)}
+    </article>
+  `;
+}
+
+function renderStatsProgress(rate, label = "") {
+  if (rate === null || rate === undefined) return `<div class="stats-progress empty" aria-hidden="true"><span></span></div>`;
+  const width = clampPercent(rate);
+  return `
+    <div class="stats-progress" role="img" aria-label="${escapeHtml(label || `${width}%`)}">
+      <span style="width: ${width}%"></span>
+    </div>
+  `;
+}
+
+function getCollectionStats(collection) {
+  const groups = getGroupsForCollection(collection.id);
+  const studiedGroups = groups.filter((group) => number(group.completed_rounds) > 0).length;
+  const totalAttempts = number(collection.correct_total) + number(collection.wrong_total);
+  return {
+    groups,
+    studiedGroups,
+    groupRate: getRate(studiedGroups, groups.length),
+    answerRate: getRate(collection.correct_total, totalAttempts),
+    latestRate: getRate(collection.latest_first_attempt_correct_count, collection.latest_first_attempt_total),
+  };
+}
+
+function renderStatsCollectionSection() {
+  return `
+    <section class="panel stack">
+      <div class="completion-header">
+        <h3>대그룹별 진행</h3>
+        <span class="pill">${number(state.collections.length)}개</span>
+      </div>
+      ${
+        state.collections.length
+          ? `<div class="stats-collection-list">${state.collections.map(renderStatsCollectionItem).join("")}</div>`
+          : renderActionEmptyState({
+              title: "대그룹이 없습니다.",
+              body: "대그룹을 만들면 소그룹별 학습 진행을 모아 볼 수 있습니다.",
+              action: "go-groups",
+              label: "대그룹 만들기",
+              iconName: "folder",
+            })
+      }
+    </section>
+  `;
+}
+
+function renderStatsCollectionItem(collection) {
+  const stats = getCollectionStats(collection);
+  const lastStudy = collection.last_studied_at ? formatDate(collection.last_studied_at) : "학습 기록 없음";
+  return `
+    <article class="stats-collection-item">
+      <div class="stats-item-heading">
+        <div>
+          <strong>${escapeHtml(collection.name)}</strong>
+          <p>${escapeHtml(lastStudy)}</p>
+        </div>
+        <button class="ghost-button small-button" type="button" data-action="open-stats-collection" data-collection-id="${
+          collection.id
+        }">${iconLabel("folder", "소그룹 보기")}</button>
+      </div>
+      <div class="stats-chip-row">
+        <span>소그룹 ${number(stats.studiedGroups)}/${number(stats.groups.length)}</span>
+        <span>카드 ${number(collection.card_count)}</span>
+        <span>하위 회독 ${number(collection.completed_rounds)}</span>
+        <span>최근 ${rateText(stats.latestRate)}</span>
+      </div>
+      <div class="stats-progress-row">
+        <span>소그룹 진행</span>
+        ${renderStatsProgress(stats.groupRate, `소그룹 진행 ${rateText(stats.groupRate)}`)}
+        <strong>${rateText(stats.groupRate)}</strong>
+      </div>
+      <p class="meta">누적 정답률 ${rateText(stats.answerRate)} · 알맞음 ${number(collection.correct_total)} · 틀림 ${number(
+        collection.wrong_total,
+      )}</p>
+    </article>
+  `;
+}
+
+function getStatsFocusGroups() {
+  return [...state.groups]
+    .filter((group) => number(group.card_count) > 0 && number(group.wrong_total) > 0)
+    .sort((left, right) => {
+      const leftAttempts = number(left.correct_total) + number(left.wrong_total);
+      const rightAttempts = number(right.correct_total) + number(right.wrong_total);
+      return (
+        number(right.wrong_total) - number(left.wrong_total) ||
+        number(right.wrong_total) / Math.max(1, rightAttempts) - number(left.wrong_total) / Math.max(1, leftAttempts) ||
+        dateMs(right.last_studied_at) - dateMs(left.last_studied_at) ||
+        compareGroupName(left, right)
+      );
+    })
+    .slice(0, 5);
+}
+
+function renderStatsFocusSection(summary) {
+  const focusGroups = getStatsFocusGroups();
+  if (!focusGroups.length) {
+    return `
+      <section class="stats-healthy-note">
+        <div>
+          <span>오답 관리</span>
+          <strong>누적 오답이 없습니다.</strong>
+          <p>${
+            summary.totalAttempts
+              ? "현재 기준으로 오답이 쌓인 소그룹이 없습니다."
+              : "회독을 완료하면 오답이 많은 소그룹을 우선순위로 보여줍니다."
+          }</p>
+        </div>
+      </section>
+    `;
+  }
+  return `
+    <section class="panel stack">
+      <div class="completion-header">
+        <h3>오답 많은 소그룹</h3>
+        <span class="pill ${focusGroups.length ? "bad" : ""}">${number(focusGroups.length)}개</span>
+      </div>
+      <div class="stats-focus-list">${focusGroups.map(renderStatsFocusGroupItem).join("")}</div>
+    </section>
+  `;
+}
+
+function renderStatsFocusGroupItem(group) {
+  const attempts = number(group.correct_total) + number(group.wrong_total);
+  const wrongRate = getRate(group.wrong_total, attempts);
+  const recentRate = getGroupRecentAccuracy(group);
+  return `
+    <article class="stats-focus-item">
+      <div class="stats-item-heading">
+        <div>
+          <strong>${escapeHtml(group.name)}</strong>
+          <p>${escapeHtml(group.collection_name)} · ${escapeHtml(getGroupLastStudyLabel(group))}</p>
+        </div>
+        <button class="secondary-button small-button" type="button" data-action="study-stats-group" data-group-id="${
+          group.id
+        }">${iconLabel("play", "학습")}</button>
+      </div>
+      <div class="stats-chip-row">
+        <span>카드 ${number(group.card_count)}</span>
+        <span>회독 ${number(group.completed_rounds)}</span>
+        <span>오답 ${number(group.wrong_total)}</span>
+        <span>최근 ${rateText(recentRate)}</span>
+      </div>
+      <div class="stats-progress-row danger">
+        <span>오답 비중</span>
+        ${renderStatsProgress(wrongRate, `오답 비중 ${rateText(wrongRate)}`)}
+        <strong>${rateText(wrongRate)}</strong>
+      </div>
+    </article>
+  `;
+}
+
+function renderStatsRecentRoundSection() {
+  const visibleLimit = state.statsRecentRoundsOpen ? 10 : 3;
+  const rounds = state.rounds.slice(0, visibleLimit);
+  return `
+    <section class="panel stack">
+      <div class="completion-header">
+        <h3>최근 회독</h3>
+        ${
+          state.rounds.length > 3
+            ? `<button class="ghost-button small-button" type="button" data-action="toggle-stats-rounds">
+                ${iconLabel(
+                  state.statsRecentRoundsOpen ? "chevron-up" : "chevron-down",
+                  state.statsRecentRoundsOpen ? "접기" : `더 보기 ${number(state.rounds.length - 3)}`,
+                )}
+              </button>`
+            : `<span class="pill">최근 ${number(rounds.length)}개</span>`
+        }
+      </div>
+      ${
+        rounds.length
+          ? `<div class="stats-round-list">${rounds.map(renderStatsRecentRoundItem).join("")}</div>`
+          : renderActionEmptyState({
+              title: "회독 기록이 없습니다.",
+              body: "소그룹 학습을 완료하면 최근 회독 결과를 여기서 바로 열어볼 수 있습니다.",
+            })
+      }
+    </section>
+  `;
+}
+
+function renderStatsRecentRoundItem(round) {
+  const firstAttemptTotal = number(round.first_attempt_total || round.total_cards);
+  const firstAttemptCorrect = number(round.first_attempt_correct_count);
+  const firstAttemptRate = getRate(firstAttemptCorrect, firstAttemptTotal);
+  const answerRate = getRate(round.correct_count, number(round.correct_count) + number(round.wrong_count));
+  const targetName = round.selected_group_names || round.group_name || round.collection_name || "학습";
+  return `
+    <button class="stats-round-item" type="button" data-action="open-round-detail" data-round-id="${round.id}">
+      <span>
+        <strong>${escapeHtml(targetName)}</strong>
+        <small>${number(round.round_no)}회독 · ${escapeHtml(formatDate(round.completed_at))}</small>
+      </span>
+      <em>
+        <strong>${rateText(firstAttemptRate)}</strong>
+        <small>첫 시도 · 풀이 ${rateText(answerRate)}</small>
+      </em>
+      <i aria-hidden="true">${icon("chevron-right")}</i>
+    </button>
+  `;
+}
+
 function syncStudyTimer() {
   const shouldRun = Boolean(state.session && !state.session.savedRound);
   if (shouldRun && !studyTimerId) studyTimerId = window.setInterval(updateStudyTimer, 1000);
@@ -1310,6 +1738,10 @@ function render() {
 function renderActiveTab() {
   if (state.activeTab === "cards") {
     renderCards();
+    return;
+  }
+  if (state.activeTab === "stats") {
+    renderStats();
     return;
   }
   if (state.activeTab === "groups") {
@@ -4796,6 +5228,33 @@ document.addEventListener("click", async (event) => {
       render();
       focusAfterRender('#collection-form [name="name"], #view-groups.active h2');
     }
+    if (action === "open-stats-collection") {
+      const collectionId = Number(actionEl.dataset.collectionId);
+      if (!state.collections.some((collection) => Number(collection.id) === collectionId)) return;
+      state.activeTab = "groups";
+      state.groupScreen = "list";
+      state.groupDetailCollectionId = collectionId;
+      state.editingCollectionId = null;
+      state.editingGroupId = null;
+      state.groupSearchQuery = "";
+      render();
+      focusAfterRender("#view-groups.active h2");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    if (action === "study-stats-group") {
+      const groupId = Number(actionEl.dataset.groupId);
+      const group = state.groups.find((item) => Number(item.id) === groupId);
+      if (!group || !number(group.card_count)) return showToast("학습할 카드가 있는 소그룹을 선택하세요.");
+      state.activeTab = "study";
+      state.selectedGroupId = groupId;
+      state.selectedCollectionId = group.collection_id;
+      state.studyStep = "ready";
+      state.recentRoundsOpen = false;
+      state.studyOptionsOpen = false;
+      render();
+      focusAfterRender('[data-action="start-study"]');
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
     if (action === "logout") {
       state.activeDialog = "logout";
       renderDialog();
@@ -4964,6 +5423,11 @@ document.addEventListener("click", async (event) => {
     if (action === "toggle-recent-rounds") {
       state.recentRoundsOpen = !state.recentRoundsOpen;
       renderStudy();
+    }
+    if (action === "toggle-stats-rounds") {
+      state.statsRecentRoundsOpen = !state.statsRecentRoundsOpen;
+      renderStats();
+      focusAfterRender('[data-action="toggle-stats-rounds"]');
     }
     if (action === "open-round-detail") {
       await openRoundDetail(Number(actionEl.dataset.roundId));
