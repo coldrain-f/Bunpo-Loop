@@ -1282,6 +1282,7 @@ function renderStudy() {
 function renderStudyGroupPicker() {
   const totalCards = state.collections.reduce((sum, collection) => sum + number(collection.card_count), 0);
   const recentGroup = getRecentStudyGroup();
+  const weakCards = getWeakCards();
   const visibleCollections = state.collections.filter((collection) =>
     matchesQuery([collection.name, collection.description], state.studyCollectionSearchQuery),
   );
@@ -1294,8 +1295,8 @@ function renderStudyGroupPicker() {
         </div>
         <span class="pill">${state.collections.length}대그룹</span>
       </div>
-      <p class="meta">전체 ${totalCards}개의 카드</p>
-      ${renderTodayStudyPanel(recentGroup)}
+      <p class="meta">전체 ${totalCards}개의 카드 · 오늘은 먼저 이어서 회독할 소그룹을 고릅니다.</p>
+      ${renderTodayStudyPanel(recentGroup, weakCards)}
       ${renderWeakCardsPanel()}
       <section id="study-collection-browser" class="group-browser-block">
         <div class="completion-header">
@@ -1382,8 +1383,7 @@ function renderStudyGroupSortOptions() {
   `;
 }
 
-function renderTodayStudyPanel(recentGroup) {
-  const weakCards = getWeakCards();
+function renderTodayStudyPanel(recentGroup, weakCards = getWeakCards()) {
   const totalThreshold = getWeakCardThreshold();
   const recentRounds = getWeakRecentRounds();
   const recentThreshold = getWeakRecentWrongThreshold();
@@ -1392,27 +1392,37 @@ function renderTodayStudyPanel(recentGroup) {
     ? `${nextRoundNo}회독 준비 · 마지막 ${formatDate(recentGroup.last_studied_at)}`
     : "아래에서 대그룹을 선택한 뒤 소그룹 회독을 시작하세요.";
   const weakMeta = weakCards.length
-    ? `최근 ${recentRounds}회독 ${recentThreshold}회 이상 또는 전체 ${totalThreshold}회 이상`
-    : `최근 ${recentRounds}회독 ${recentThreshold}회 이상 또는 전체 ${totalThreshold}회 이상 · 복습할 카드 없음`;
+    ? `기준: 최근 ${recentRounds}회독 ${recentThreshold}회 이상 또는 전체 ${totalThreshold}회 이상`
+    : `기준: 최근 ${recentRounds}회독 ${recentThreshold}회 이상 또는 전체 ${totalThreshold}회 이상`;
+  const weakSummary = weakCards.length
+    ? `${weakCards.length}개`
+    : "없음";
   return `
     <section class="today-study-panel">
-      <div class="today-action-grid">
+      <div class="today-action-card primary today-primary-card">
+        <div>
+          <span class="today-action-label">오늘 바로 할 일</span>
+          <strong>${recentGroup ? escapeHtml(recentGroup.name) : "학습할 대그룹 고르기"}</strong>
+          <p>${escapeHtml(recentMeta)}</p>
+        </div>
+        <button class="primary-button full" type="button" data-action="${
+          recentGroup ? "choose-study-group" : "focus-study-collections"
+        }" ${recentGroup ? `data-group-id="${recentGroup.id}"` : ""}>
+          ${iconLabel(recentGroup ? "play" : "folder", recentGroup ? `${nextRoundNo}회독 시작` : "대그룹 고르기")}
+        </button>
+      </div>
+      <div class="today-secondary-grid">
         <article class="today-action-card primary">
           <div>
-            <span class="today-action-label">이어서 회독</span>
-            <strong>${recentGroup ? escapeHtml(recentGroup.name) : "대그룹 선택"}</strong>
-            <p>${escapeHtml(recentMeta)}</p>
+            <span class="today-action-label">회독 상태</span>
+            <strong>${recentGroup ? `${number(recentGroup.completed_rounds)}회독 완료` : `${number(state.groups.length)}개 소그룹`}</strong>
+            <p>${escapeHtml(recentGroup ? `최근 학습 ${formatDate(recentGroup.last_studied_at)}` : "대그룹을 열고 첫 소그룹 회독을 시작하세요.")}</p>
           </div>
-          <button class="primary-button full" type="button" data-action="${
-            recentGroup ? "choose-study-group" : "focus-study-collections"
-          }" ${recentGroup ? `data-group-id="${recentGroup.id}"` : ""}>
-            ${iconLabel(recentGroup ? "play" : "folder", recentGroup ? "이어가기" : "대그룹 고르기")}
-          </button>
         </article>
-        <article class="today-action-card weak">
+        <article class="today-action-card weak ${weakCards.length ? "has-weak" : "quiet"}">
           <div>
             <span class="today-action-label">약점 복습</span>
-            <strong>${weakCards.length}개</strong>
+            <strong>${weakSummary}</strong>
             <p>${escapeHtml(weakMeta)}</p>
           </div>
           ${
@@ -1420,14 +1430,14 @@ function renderTodayStudyPanel(recentGroup) {
               ? `<div class="today-action-buttons">
                   <button class="secondary-button full" type="button" data-action="start-weak-study">${iconLabel(
                     "rotate-ccw",
-                    "복습",
+                    "복습 시작",
                   )}</button>
                   <button class="ghost-button full" type="button" data-action="toggle-weak-panel">${iconLabel(
                     state.weakPanelOpen ? "chevron-up" : "list",
                     state.weakPanelOpen ? "접기" : "목록 보기",
                   )}</button>
                 </div>`
-              : `<button class="secondary-button full" type="button" disabled>${iconLabel("rotate-ccw", "복습 없음")}</button>`
+              : `<button class="ghost-button full" type="button" disabled>${iconLabel("rotate-ccw", "복습할 카드 없음")}</button>`
           }
         </article>
       </div>
@@ -1464,15 +1474,15 @@ function renderWeakCardsPanel() {
       <div class="row">
         <div>
           <p class="eyebrow">약점 카드</p>
-          <h3>목록 미리보기</h3>
+          <h3>복습 목록</h3>
         </div>
         <span class="pill ${weakCards.length ? "bad" : ""}">${weakCards.length}개</span>
       </div>
-      <p class="meta">최근 ${recentRounds}회독 ${recentThreshold}회 이상 또는 전체 ${totalThreshold}회 이상 · 최근 오답 ${recentWrong}회 · 전체 오답 ${totalWrong}회</p>
+      <p class="meta">기준: 최근 ${recentRounds}회독 ${recentThreshold}회 이상 또는 전체 ${totalThreshold}회 이상 · 최근 오답 ${recentWrong}회 · 전체 오답 ${totalWrong}회</p>
       <div class="weak-card-list">${weakCards.map(renderWeakCardItem).join("")}</div>
       <button class="secondary-button full" type="button" data-action="start-weak-study">${iconLabel(
         "rotate-ccw",
-        "약점 카드만 학습",
+        "복습 시작",
       )}</button>
     </section>
   `;

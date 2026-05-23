@@ -60,9 +60,9 @@ Core direction:
 - [x] Phase 1. Foundation Polish
   - [x] 1.1 Design Token Cleanup
   - [x] 1.2 Layout Rhythm Cleanup
-- [ ] Phase 2. Study Home
-  - [ ] 2.1 "Today First" Home Structure
-  - [ ] 2.2 Weak Review Panel Refinement
+- [x] Phase 2. Study Home
+  - [x] 2.1 "Today First" Home Structure
+  - [x] 2.2 Weak Review Panel Refinement
 - [ ] Phase 3. Subgroup-Centered Study UX
   - [ ] 3.1 Subgroup Card Redesign
   - [ ] 3.2 Collection Detail Refinement
@@ -165,11 +165,11 @@ Purpose:
 앱을 열자마자 오늘 할 행동이 보이게 만든다.
 
 Tasks:
-- [ ] "오늘의 학습" 상단을 action-first 구조로 재정리한다.
-- [ ] 이어서 회독 card를 가장 중요한 primary card로 만든다.
-- [ ] 최근 학습이 없을 때는 "대그룹 고르기" CTA가 자연스럽게 대그룹 목록으로 이동한다.
-- [ ] 약점 복습은 secondary card로 분리하되, 오답 수가 있을 때만 충분히 눈에 띄게 한다.
-- [ ] 대그룹 찾아보기는 아래쪽 탐색 영역으로 유지한다.
+- [x] "오늘의 학습" 상단을 action-first 구조로 재정리한다.
+- [x] 이어서 회독 card를 가장 중요한 primary card로 만든다.
+- [x] 최근 학습이 없을 때는 "대그룹 고르기" CTA가 자연스럽게 대그룹 목록으로 이동한다.
+- [x] 약점 복습은 secondary card로 분리하되, 오답 수가 있을 때만 충분히 눈에 띄게 한다.
+- [x] 대그룹 찾아보기는 아래쪽 탐색 영역으로 유지한다.
 
 Files:
 - `static/app.js`
@@ -186,9 +186,9 @@ Purpose:
 약점 복습이 무섭거나 산만하지 않고, 필요한 순간에만 행동을 유도하게 한다.
 
 Tasks:
-- [ ] 약점 카드 수, 기준, 주요 CTA를 간결하게 보여준다.
-- [ ] 약점 카드 preview는 접힘 상태를 기본으로 유지한다.
-- [ ] 색상은 red-soft를 사용하되 경고처럼 과하게 보이지 않게 조정한다.
+- [x] 약점 카드 수, 기준, 주요 CTA를 간결하게 보여준다.
+- [x] 약점 카드 preview는 접힘 상태를 기본으로 유지한다.
+- [x] 색상은 red-soft를 사용하되 경고처럼 과하게 보이지 않게 조정한다.
 
 Files:
 - `static/app.js`
