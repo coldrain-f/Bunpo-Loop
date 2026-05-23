@@ -397,7 +397,7 @@ def validate_exam_date(value: object) -> str:
     try:
         datetime.strptime(text, "%Y-%m-%d")
     except ValueError as exc:
-        raise ValueError("시험일은 YYYY-MM-DD 형식이어야 합니다.") from exc
+        raise ValueError("목표일은 YYYY-MM-DD 형식이어야 합니다.") from exc
     return text
 
 
@@ -406,7 +406,7 @@ def validate_jlpt_level(value: object) -> str:
     if not text:
         return ""
     if text not in {"N1", "N2", "N3", "N4", "N5"}:
-        raise ValueError("목표 급수는 N1~N5 중에서 선택하세요.")
+        raise ValueError("JLPT 급수는 N1~N5 중에서 선택하세요.")
     return text
 
 

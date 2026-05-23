@@ -250,7 +250,7 @@ function getExamDateInfo() {
 }
 
 function getJlptTargetLabel() {
-  return state.settings?.jlpt_level ? `JLPT ${state.settings.jlpt_level}` : "JLPT";
+  return state.settings?.jlpt_level ? `JLPT ${state.settings.jlpt_level}` : "목표";
 }
 
 function renderHeader() {
@@ -477,18 +477,33 @@ function getCardFilterGroups() {
   return getGroupsForCollection(state.cardFilterCollectionId);
 }
 
+function getCardFormSelection(groupId) {
+  const requestedGroupId = Number(groupId || 0);
+  const requestedGroup = state.groups.find((group) => Number(group.id) === requestedGroupId);
+  const collectionId =
+    requestedGroup?.collection_id ??
+    (Number(state.selectedCollectionId || 0) ||
+      Number(state.cardFilterCollectionId || 0) ||
+      state.groups[0]?.collection_id ||
+      state.collections[0]?.id ||
+      null);
+  const groups = getGroupsForCollection(collectionId);
+  const selectedGroupId = groups.some((group) => Number(group.id) === requestedGroupId)
+    ? requestedGroupId
+    : groups[0]?.id || null;
+  return { collectionId, groups, groupId: selectedGroupId };
+}
+
 function getGroupLabel(group) {
   const groupName = group?.name || group?.group_name || "";
   return group?.collection_name ? `${group.collection_name} / ${groupName}` : groupName;
 }
 
-function groupOptions(selectedId) {
-  return state.groups
+function subgroupOptions(groups, selectedId) {
+  return groups
     .map(
       (group) =>
-        `<option value="${group.id}" ${Number(selectedId) === group.id ? "selected" : ""}>${escapeHtml(
-          getGroupLabel(group),
-        )}</option>`,
+        `<option value="${group.id}" ${Number(selectedId) === group.id ? "selected" : ""}>${escapeHtml(group.name)}</option>`,
     )
     .join("");
 }
@@ -856,8 +871,8 @@ function renderDialog() {
   if (state.activeDialog === "clear-exam-date") {
     renderConfirmDialog({
       eyebrow: "초기화",
-      title: "시험 목표를 초기화할까요?",
-      message: "목표 급수와 시험일을 모두 미정으로 돌립니다.",
+      title: "학습 목표를 초기화할까요?",
+      message: "JLPT 급수와 목표일을 모두 미정으로 돌립니다.",
       confirmLabel: "초기화",
       confirmAction: "confirm-clear-exam-date",
     });
@@ -1907,7 +1922,7 @@ function renderCompletionScoreboard(summary, round) {
       </div>
       <div class="completion-metric-grid">
         <div><strong>${summary.totalAttempts}</strong><span>총 풀이</span></div>
-        <div><strong>${round.wrong_count}</strong><span>오답 누적</span></div>
+        <div><strong>${round.wrong_count}</strong><span>오답</span></div>
         <div><strong>${summary.repeatedCardCount}</strong><span>반복 카드</span></div>
         <div><strong>${attemptRate}%</strong><span>풀이 정답률</span></div>
       </div>
@@ -1936,7 +1951,7 @@ function getPreviousRoundForComparison(round, session) {
 
 function renderDurationComparison(round, session) {
   const previousRound = getPreviousRoundForComparison(round, session);
-  if (session.studyMode === "weak") return "";
+  if (session.studyMode === "weak" || session.studyMode === "practice") return "";
   if (!previousRound) {
     return `
       <section class="duration-comparison neutral">
@@ -2313,11 +2328,17 @@ function renderCardListPanel(visibleCards) {
 
 function renderCardForm(card, groupId) {
   const examples = card?.examples?.length ? card.examples : [{ japanese: "", korean: "" }];
+  const selection = getCardFormSelection(groupId);
   return `
     <form id="card-form" class="stack">
-      <label class="field"><span>그룹</span><select class="select" name="group_id" required>${groupOptions(
-        groupId,
-      )}</select></label>
+      <div class="card-filter-grid">
+        <label class="field"><span>대그룹</span><select id="card-form-collection" class="select" name="collection_id" required>${collectionOptions(
+          selection.collectionId,
+        )}</select></label>
+        <label class="field"><span>소그룹</span><select id="card-form-group" class="select" name="group_id" required ${
+          selection.groups.length ? "" : "disabled"
+        }>${subgroupOptions(selection.groups, selection.groupId)}</select></label>
+      </div>
       <label class="field"><span>앞면</span><input class="input" name="front" value="${escapeHtml(
         card?.front || "",
       )}" placeholder="〜あまり" required /></label>
@@ -2344,13 +2365,18 @@ function renderCardForm(card, groupId) {
 }
 
 function renderBulkCardForm(groupId) {
-  const selectedGroupId = Number(state.bulkDraftGroupId || groupId);
+  const selection = getCardFormSelection(state.bulkDraftGroupId || groupId);
   const preview = state.bulkPreview;
   return `
     <form id="bulk-card-form" class="stack">
-      <label class="field"><span>그룹</span><select class="select" name="group_id" required>${groupOptions(
-        selectedGroupId,
-      )}</select></label>
+      <div class="card-filter-grid">
+        <label class="field"><span>대그룹</span><select id="bulk-card-collection" class="select" name="collection_id" required>${collectionOptions(
+          selection.collectionId,
+        )}</select></label>
+        <label class="field"><span>소그룹</span><select id="bulk-card-group" class="select" name="group_id" required ${
+          selection.groups.length ? "" : "disabled"
+        }>${subgroupOptions(selection.groups, selection.groupId)}</select></label>
+      </div>
       <label class="field">
         <span>카드</span>
         <textarea class="textarea bulk-textarea" name="bulk_text" placeholder="〜あまり | ~한 나머지 | 메모 | 緊張の[[あまり]]、声が震えた。 => 긴장한 나머지 목소리가 떨렸다.&#10;〜に至っては | ~에 이르러서는">${escapeHtml(
@@ -2515,7 +2541,7 @@ function renderCollectionEditorPanel(editing) {
         <label class="field"><span>대그룹명</span><input class="input" name="name" value="${escapeHtml(
           editing?.name || "",
         )}" placeholder="영어 단어 벼락세트" required /></label>
-        <label class="field"><span>설명</span><textarea class="textarea" name="description" placeholder="시험 전 단어와 문법을 소그룹으로 나누어 회독">${escapeHtml(
+        <label class="field"><span>설명</span><textarea class="textarea" name="description" placeholder="시험 전 단어와 표현을 소그룹으로 나누어 회독">${escapeHtml(
           editing?.description || "",
         )}</textarea></label>
         <div class="form-actions">
@@ -2664,21 +2690,21 @@ function renderSettings() {
     ? examInfo.diffDays > 0
       ? `${escapeHtml(examInfo.dateLabel)}까지 ${number(examInfo.diffDays)}일 남았습니다.`
       : examInfo.diffDays === 0
-        ? `${escapeHtml(examInfo.dateLabel)}, 오늘이 시험일입니다.`
-        : `${escapeHtml(examInfo.dateLabel)} 시험일로부터 ${number(Math.abs(examInfo.diffDays))}일 지났습니다.`
+        ? `${escapeHtml(examInfo.dateLabel)}, 오늘이 목표일입니다.`
+        : `${escapeHtml(examInfo.dateLabel)} 목표일로부터 ${number(Math.abs(examInfo.diffDays))}일 지났습니다.`
     : "설정하면 공통 헤더에서 남은 날짜를 바로 볼 수 있어요.";
   views.settings.innerHTML = `
     <div class="panel stack">
       <div class="row">
         <div>
           <p class="eyebrow">설정</p>
-          <h2 id="settings-title">시험 목표</h2>
+          <h2 id="settings-title">학습 목표</h2>
         </div>
         <span class="pill">${escapeHtml(levelLabel)}${examInfo ? ` · ${escapeHtml(examInfo.label)}` : ""}</span>
       </div>
       <div class="settings-summary ${examInfo ? "" : "empty"}">
-        <span>${escapeHtml(getJlptTargetLabel())} 시험일</span>
-        <strong>${examInfo ? escapeHtml(examInfo.label) : "시험일을 설정하세요"}</strong>
+        <span>${escapeHtml(getJlptTargetLabel())} 목표일</span>
+        <strong>${examInfo ? escapeHtml(examInfo.label) : "목표일을 설정하세요"}</strong>
         <p>${examDateMessage}</p>
       </div>
       <form id="settings-form" class="stack">
@@ -2733,8 +2759,8 @@ function renderLevelOptions() {
   const currentLevel = state.settings?.jlpt_level || "";
   return `
     <div class="field">
-      <span>목표 급수</span>
-      <div class="level-options" role="radiogroup" aria-label="목표 레벨">
+      <span>JLPT 급수</span>
+      <div class="level-options" role="radiogroup" aria-label="JLPT 급수">
         ${["", ...JLPT_LEVELS]
           .map(
             (level) => `
@@ -2773,15 +2799,15 @@ function renderExamDateSelects() {
   const days = Array.from({ length: 31 }, (_, index) => index + 1);
   return `
     <div class="field">
-      <span>시험일</span>
+      <span>목표일</span>
       <div class="date-select-grid">
-        <select class="select" name="exam_year" aria-label="시험 연도">
+        <select class="select" name="exam_year" aria-label="목표 연도">
           ${renderSelectOptions(years, parts.year, "연도")}
         </select>
-        <select class="select" name="exam_month" aria-label="시험 월">
+        <select class="select" name="exam_month" aria-label="목표 월">
           ${renderSelectOptions(months, parts.month, "월")}
         </select>
-        <select class="select" name="exam_day" aria-label="시험 일">
+        <select class="select" name="exam_day" aria-label="목표 일">
           ${renderSelectOptions(days, parts.day, "일")}
         </select>
       </div>
@@ -3220,7 +3246,7 @@ async function clearExamDate() {
   state.settings = data.settings;
   state.activeDialog = null;
   render();
-  showToast("시험 목표를 미정으로 초기화했습니다.");
+  showToast("학습 목표를 미정으로 초기화했습니다.");
 }
 
 function getExamDateFromSettingsForm(form) {
@@ -3228,7 +3254,7 @@ function getExamDateFromSettingsForm(form) {
   const month = form.elements.exam_month.value;
   const day = form.elements.exam_day.value;
   if (!year && !month && !day) return "";
-  if (!year || !month || !day) throw new Error("시험일은 연도, 월, 일을 모두 선택하세요.");
+  if (!year || !month || !day) throw new Error("목표일은 연도, 월, 일을 모두 선택하세요.");
   const date = new Date(Number(year), Number(month) - 1, Number(day));
   if (
     date.getFullYear() !== Number(year) ||
@@ -3289,7 +3315,7 @@ function logout() {
 
 async function exportBackup() {
   const data = await request("/api/backup");
-  downloadJson(`jlpt-grammar-backup-${new Date().toISOString().slice(0, 10)}.json`, data.backup);
+  downloadJson(`byeorak-jjitgi-backup-${new Date().toISOString().slice(0, 10)}.json`, data.backup);
   showToast("백업 파일을 만들었습니다.");
 }
 
@@ -3877,6 +3903,34 @@ document.addEventListener("change", async (event) => {
         .filter((group) => number(group.card_count) > 0)
         .map((group) => group.id);
       renderDialog();
+    }
+    if (event.target.id === "card-form-collection") {
+      const collectionId = Number(event.target.value);
+      const nextGroup = getGroupsForCollection(collectionId)[0];
+      state.selectedCollectionId = collectionId;
+      state.selectedGroupId = nextGroup?.id || null;
+      const form = event.target.closest("#card-form");
+      if (form) {
+        form.elements.group_id.innerHTML = subgroupOptions(getGroupsForCollection(collectionId), state.selectedGroupId);
+        form.elements.group_id.disabled = !state.selectedGroupId;
+        updateSingleDuplicateWarning(form);
+      }
+    }
+    if (event.target.id === "card-form-group") {
+      state.selectedGroupId = Number(event.target.value);
+      updateSingleDuplicateWarning(event.target.closest("#card-form"));
+    }
+    if (event.target.id === "bulk-card-collection") {
+      const collectionId = Number(event.target.value);
+      const nextGroup = getGroupsForCollection(collectionId)[0];
+      state.selectedCollectionId = collectionId;
+      state.bulkDraftGroupId = nextGroup?.id || null;
+      state.bulkPreview = null;
+      renderCards();
+    }
+    if (event.target.id === "bulk-card-group") {
+      state.bulkDraftGroupId = Number(event.target.value);
+      state.bulkPreview = null;
     }
     if (event.target.closest("#card-form") && event.target.name === "group_id") {
       updateSingleDuplicateWarning(event.target.closest("#card-form"));
