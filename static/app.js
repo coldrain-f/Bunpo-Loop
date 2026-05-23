@@ -94,6 +94,7 @@ const state = {
   weakCardOpenId: null,
   completionCorrectOpen: false,
   session: null,
+  collectionStudyReturnContext: null,
   activeDialog: null,
   roundDetail: null,
   pendingTab: null,
@@ -429,6 +430,7 @@ function resetDataScopedUiState() {
     roundDetail: null,
     pendingTab: null,
     pendingAction: null,
+    collectionStudyReturnContext: null,
     editingCardId: null,
     editingGroupId: null,
     editingCollectionId: null,
@@ -857,6 +859,32 @@ function getPracticePresetGroups(preset) {
       .slice(0, 3);
   }
   return groups;
+}
+
+function hasSameSelectedIds(selectedIds, ids) {
+  const normalizedIds = ids.map(Number);
+  return normalizedIds.length === selectedIds.size && normalizedIds.every((id) => selectedIds.has(id));
+}
+
+function renderPracticePresetButton(preset, label, selectedIds) {
+  const presetGroupIds = getPracticePresetGroups(preset).map((group) => group.id);
+  const disabled = !presetGroupIds.length;
+  const active = Boolean(!disabled && hasSameSelectedIds(selectedIds, presetGroupIds));
+  return `<button class="ghost-button preset-button ${active ? "active" : ""}" type="button" data-action="select-practice-preset" data-preset="${preset}" aria-pressed="${active}" ${
+    disabled ? "disabled" : ""
+  }>${escapeHtml(
+    label,
+  )}</button>`;
+}
+
+function getCollectionStudyReturnContext(collectionId = state.selectedCollectionId) {
+  return {
+    tab: state.activeTab,
+    collectionId: Number(collectionId) || null,
+    groupDetailCollectionId: Number(state.groupDetailCollectionId) || null,
+    groupScreen: state.groupScreen,
+    studyStep: state.studyStep,
+  };
 }
 
 function roundIncludesGroup(round, groupId) {
@@ -1665,11 +1693,52 @@ function renderDialog() {
 
 function closeDialog() {
   if (state.pendingRequest) return;
+  if (state.activeDialog === "preview" && state.pendingAction?.returnDialog === "collection-study-picker") {
+    const scrollTop = number(state.pendingAction.returnScrollTop);
+    state.activeDialog = "collection-study-picker";
+    state.pendingAction = null;
+    renderDialog();
+    window.requestAnimationFrame(() => {
+      const panel = dialogRoot.querySelector(".collection-study-dialog");
+      if (!panel) return;
+      const maxScrollTop = Math.max(0, panel.scrollHeight - panel.clientHeight);
+      panel.scrollTop = Math.min(scrollTop, maxScrollTop);
+    });
+    return;
+  }
   state.activeDialog = null;
   state.roundDetail = null;
   state.pendingTab = null;
   state.pendingAction = null;
+  state.collectionStudyReturnContext = null;
   renderDialog();
+}
+
+function rerenderCollectionStudyDialog({ preserveScroll = true, anchorSelector = "" } = {}) {
+  const currentPanel = dialogRoot.querySelector(".collection-study-dialog");
+  const scrollTop = preserveScroll && currentPanel ? currentPanel.scrollTop : 0;
+  const anchorTop = anchorSelector ? currentPanel?.querySelector(anchorSelector)?.getBoundingClientRect().top : null;
+  renderDialog();
+  if (!preserveScroll) return;
+  window.requestAnimationFrame(() => {
+    const nextPanel = dialogRoot.querySelector(".collection-study-dialog");
+    if (!nextPanel) return;
+    const maxScrollTop = Math.max(0, nextPanel.scrollHeight - nextPanel.clientHeight);
+    nextPanel.scrollTop = Math.min(scrollTop, maxScrollTop);
+    if (anchorTop === null) return;
+    const nextAnchor = nextPanel.querySelector(anchorSelector);
+    if (!nextAnchor) return;
+    const nextTop = nextAnchor.getBoundingClientRect().top;
+    nextPanel.scrollTop = Math.min(Math.max(0, nextPanel.scrollTop + nextTop - anchorTop), maxScrollTop);
+  });
+}
+
+function renderStudyPickerUpdate(anchorSelector = "") {
+  if (state.activeDialog === "collection-study-picker") {
+    rerenderCollectionStudyDialog({ anchorSelector });
+    return;
+  }
+  renderStudy();
 }
 
 function getPreviewTarget() {
@@ -1704,6 +1773,24 @@ function getPreviewCards(groupIds, orderMode = state.orderMode) {
     });
   }
   return [...cards].sort((a, b) => number(a.id) - number(b.id));
+}
+
+function restorePracticeReturnContext(session) {
+  const collectionId = Number(session?.collection?.id || session?.returnContext?.collectionId || state.selectedCollectionId);
+  state.selectedCollectionId = collectionId || state.selectedCollectionId;
+  state.selectedStudyGroupIds = (session?.selectedGroups || []).map((group) => group.id);
+
+  if (session?.returnContext?.tab === "groups") {
+    state.activeTab = "groups";
+    state.groupScreen = "list";
+    state.groupDetailCollectionId = collectionId || session.returnContext.groupDetailCollectionId || null;
+    state.editingGroupId = null;
+    state.editingCollectionId = null;
+    return;
+  }
+
+  state.activeTab = "study";
+  state.studyStep = "collection";
 }
 
 function renderPreviewCard(card) {
@@ -2160,9 +2247,9 @@ function renderStudyGroupSelection(groups) {
         <button class="ghost-button" type="button" data-action="clear-study-subgroups">${iconLabel("x", "선택 해제")}</button>
       </div>
       <div class="quick-practice-grid" aria-label="빠른 선택">
-        <button class="ghost-button" type="button" data-action="select-practice-preset" data-preset="today">오늘 미학습</button>
-        <button class="ghost-button" type="button" data-action="select-practice-preset" data-preset="wrong">오답 있음</button>
-        <button class="ghost-button" type="button" data-action="select-practice-preset" data-preset="stale">오래된 3개</button>
+        ${renderPracticePresetButton("today", "오늘 미학습", selectedIds)}
+        ${renderPracticePresetButton("wrong", "오답 있음", selectedIds)}
+        ${renderPracticePresetButton("stale", "오래된 3개", selectedIds)}
       </div>
       <div class="study-subgroup-list">
         ${groups
@@ -2206,7 +2293,7 @@ function renderCollectionStudyDialog() {
   dialogRoot.innerHTML = `
     <div class="dialog-backdrop" role="presentation">
       <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title">
-        <div class="row">
+        <div class="row dialog-header">
           <div>
             <p class="eyebrow">묶음 연습</p>
             <h2 id="study-dialog-title">기록 없이 소그룹 묶기</h2>
@@ -2234,7 +2321,6 @@ function renderCollectionStudyDialog() {
               ${iconLabel("eye", "미리보기")}
             </button>
           </div>
-          ${canStart ? "" : renderDisabledReason(summaryText)}
         </section>
         ${renderStudyGroupSelection(groups)}
         ${renderStudyOptionsPanel()}
@@ -3575,10 +3661,6 @@ function renderCollectionEditorPanel(editing) {
           <p class="eyebrow">대그룹</p>
           <h2 id="groups-title">${editing ? "대그룹 수정" : "대그룹 만들기"}</h2>
         </div>
-        <button class="ghost-button small-button" type="button" data-action="show-group-list">${iconLabel(
-          "list",
-          "목록 보기",
-        )}</button>
       </div>
       ${renderOrientationNote(["묶음", "대그룹 목록", editing ? "대그룹 수정" : "대그룹 만들기"], "대그룹은 소그룹을 담는 상위 구조입니다.")}
       <form id="collection-form" class="stack">
@@ -3620,10 +3702,6 @@ function renderGroupEditorPanel(editing) {
           <p class="eyebrow">소그룹</p>
           <h2 id="groups-title">${editing ? "소그룹 수정" : "소그룹 만들기"}</h2>
         </div>
-        <button class="ghost-button small-button" type="button" data-action="show-group-list">${iconLabel(
-          "list",
-          state.groupDetailCollectionId ? "소그룹 보기" : "목록 보기",
-        )}</button>
       </div>
       ${renderOrientationNote(
         ["묶음", selectedCollection?.name || "대그룹 선택", editing ? "소그룹 수정" : "소그룹 만들기"],
@@ -3765,20 +3843,6 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
             : renderGroupEmptyState(collection)
         }
       </div>
-      <section class="danger-zone">
-        <div>
-          <strong>대그룹 관리</strong>
-          <p>대그룹 삭제는 하위 소그룹과 카드까지 함께 삭제합니다.</p>
-        </div>
-        <div class="danger-zone-actions">
-          <button class="ghost-button" type="button" data-action="edit-collection" data-collection-id="${
-            collection.id
-          }">${iconLabel("pencil", "대그룹 수정")}</button>
-          <button class="danger-button" type="button" data-action="delete-collection" data-collection-id="${
-            collection.id
-          }">${iconLabel("trash", "대그룹 삭제")}</button>
-        </div>
-      </section>
     </div>
   `;
 }
@@ -4098,18 +4162,15 @@ function renderGroupListItem(group) {
           "수정",
         )}</button>
       </div>
-      <details class="danger-zone compact">
-        <summary>기록/삭제 관리</summary>
-        <div class="danger-zone-actions">
-          <button class="ghost-button" type="button" data-action="reset-history" data-group-id="${group.id}" ${
-            hasHistory ? "" : "disabled"
-          }>${iconLabel("rotate-ccw", "기록 초기화")}</button>
-          <button class="danger-button" type="button" data-action="delete-group" data-group-id="${group.id}">${iconLabel(
-            "trash",
-            "소그룹 삭제",
-          )}</button>
-        </div>
-      </details>
+      <div class="danger-zone-actions subgroup-danger-actions" aria-label="기록/삭제 관리">
+        <button class="ghost-button" type="button" data-action="reset-history" data-group-id="${group.id}" ${
+          hasHistory ? "" : "disabled"
+        }>${iconLabel("rotate-ccw", "기록 초기화")}</button>
+        <button class="danger-button" type="button" data-action="delete-group" data-group-id="${group.id}">${iconLabel(
+          "trash",
+          "소그룹 삭제",
+        )}</button>
+      </div>
     </article>
   `;
 }
@@ -4164,6 +4225,7 @@ async function startBundleStudy() {
     roundNo: data.round_no,
     orderMode: data.order_mode,
     exampleDisplayMode: state.exampleDisplayMode,
+    returnContext: state.collectionStudyReturnContext,
     allCards: data.cards,
     cards: data.cards,
     index: 0,
@@ -4180,7 +4242,12 @@ async function startBundleStudy() {
     savedRound: null,
   };
   state.activeDialog = null;
+  state.collectionStudyReturnContext = null;
+  state.activeTab = "study";
+  state.studyStep = "collection";
   render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  focusAfterRender(['.study-card[data-action="flip-card"]', '.reveal-button[data-action="flip-card"]']);
 }
 
 function startWeakStudy() {
@@ -4822,6 +4889,7 @@ document.addEventListener("click", async (event) => {
       state.selectedStudyGroupIds = getGroupsForCollection(collectionId)
         .filter((group) => number(group.card_count) > 0)
         .map((group) => group.id);
+      state.collectionStudyReturnContext = getCollectionStudyReturnContext(collectionId);
       state.activeDialog = "collection-study-picker";
       renderDialog();
     }
@@ -4860,15 +4928,15 @@ document.addEventListener("click", async (event) => {
       if (actionEl.checked) selected.add(groupId);
       else selected.delete(groupId);
       state.selectedStudyGroupIds = [...selected];
-      state.activeDialog === "collection-study-picker" ? renderDialog() : renderStudy();
+      renderStudyPickerUpdate(`[data-action="toggle-study-subgroup"][data-group-id="${groupId}"]`);
     }
     if (action === "select-all-study-subgroups") {
       state.selectedStudyGroupIds = getPracticeSelectableGroups().map((group) => group.id);
-      state.activeDialog === "collection-study-picker" ? renderDialog() : renderStudy();
+      renderStudyPickerUpdate();
     }
     if (action === "clear-study-subgroups") {
       state.selectedStudyGroupIds = [];
-      state.activeDialog === "collection-study-picker" ? renderDialog() : renderStudy();
+      renderStudyPickerUpdate();
     }
     if (action === "select-practice-preset") {
       const picked = getPracticePresetGroups(actionEl.dataset.preset);
@@ -4876,8 +4944,10 @@ document.addEventListener("click", async (event) => {
         showToast("조건에 맞는 소그룹이 없습니다.");
         return;
       }
-      state.selectedStudyGroupIds = picked.map((group) => group.id);
-      state.activeDialog === "collection-study-picker" ? renderDialog() : renderStudy();
+      const selectedIds = new Set(state.selectedStudyGroupIds.map(Number));
+      const pickedIds = picked.map((group) => group.id);
+      state.selectedStudyGroupIds = hasSameSelectedIds(selectedIds, pickedIds) ? [] : pickedIds;
+      renderStudyPickerUpdate(`[data-action="select-practice-preset"][data-preset="${actionEl.dataset.preset}"]`);
     }
     if (action === "set-study-group-sort") {
       state.studyGroupSortMode = actionEl.dataset.sort;
@@ -4899,15 +4969,21 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "set-order") {
       state.orderMode = actionEl.dataset.order;
-      render();
+      state.activeDialog === "collection-study-picker"
+        ? rerenderCollectionStudyDialog({ anchorSelector: `[data-action="set-order"][data-order="${actionEl.dataset.order}"]` })
+        : render();
     }
     if (action === "set-example-display") {
       state.exampleDisplayMode = actionEl.dataset.exampleDisplay;
-      render();
+      state.activeDialog === "collection-study-picker"
+        ? rerenderCollectionStudyDialog({
+            anchorSelector: `[data-action="set-example-display"][data-example-display="${actionEl.dataset.exampleDisplay}"]`,
+          })
+        : render();
     }
     if (action === "toggle-study-options") {
       state.studyOptionsOpen = !state.studyOptionsOpen;
-      state.activeDialog === "collection-study-picker" ? renderDialog() : renderStudy();
+      renderStudyPickerUpdate('[data-action="toggle-study-options"]');
     }
     if (action === "toggle-recent-rounds") {
       state.recentRoundsOpen = !state.recentRoundsOpen;
@@ -4951,10 +5027,13 @@ document.addEventListener("click", async (event) => {
       renderDialog();
     }
     if (action === "preview-bundle-cards") {
+      const pickerPanel = dialogRoot.querySelector(".collection-study-dialog");
       state.pendingAction = {
         type: "preview-bundle-cards",
         id: state.selectedCollectionId,
         groupIds: getSelectedStudyGroups().map((group) => group.id),
+        returnDialog: state.activeDialog === "collection-study-picker" ? "collection-study-picker" : null,
+        returnScrollTop: pickerPanel ? pickerPanel.scrollTop : 0,
       };
       state.activeDialog = "preview";
       renderDialog();
@@ -5009,12 +5088,18 @@ document.addEventListener("click", async (event) => {
     if (action === "confirm-restore-backup") await runDialogRequest(action, "복원 중", restoreBackup);
     if (action === "confirm-quit-study") {
       if (state.session) {
-        if (state.session.studyMode === "practice") state.selectedCollectionId = state.session.collection.id;
-        else if (state.session.studyMode !== "weak") state.selectedGroupId = state.session.group.id;
-        state.studyStep = state.session.studyMode === "practice" ? "collection" : state.session.studyMode === "weak" ? "select" : "ready";
+        if (state.session.studyMode === "practice") {
+          restorePracticeReturnContext(state.session);
+        } else if (state.session.studyMode !== "weak") {
+          state.selectedGroupId = state.session.group.id;
+          state.studyStep = "ready";
+        } else {
+          state.studyStep = "select";
+        }
         state.session = null;
       }
       state.activeDialog = null;
+      state.collectionStudyReturnContext = null;
       state.pendingTab = null;
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
