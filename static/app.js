@@ -41,6 +41,9 @@ const DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8;
 const state = {
   activeTab: "study",
   user: null,
+  authError: "",
+  authPending: false,
+  authValues: { ...DEFAULT_LOGIN },
   collections: [],
   groups: [],
   cards: [],
@@ -228,8 +231,8 @@ function getHeaderContext() {
   if (state.activeTab === "groups") {
     if (state.editingCollectionId) return "대그룹 · 수정";
     if (state.editingGroupId) return "소그룹 · 수정";
-    if (state.groupScreen === "collection-form") return "대그룹 · 등록";
-    if (state.groupScreen === "group-form") return "소그룹 · 등록";
+    if (state.groupScreen === "collection-form") return "대그룹 · 만들기";
+    if (state.groupScreen === "group-form") return "소그룹 · 만들기";
     if (state.groupDetailCollectionId) {
       const collection = state.collections.find((item) => Number(item.id) === Number(state.groupDetailCollectionId));
       return collection ? `묶음 · ${collection.name}` : "묶음 관리";
@@ -762,30 +765,44 @@ function renderAuth() {
   document.body.classList.remove("study-mode");
   document.querySelectorAll(".nav-button").forEach((button) => button.classList.remove("active"));
   Object.entries(views).forEach(([key, view]) => view.classList.toggle("active", key === "auth"));
+  const nickname = state.authValues.nickname ?? DEFAULT_LOGIN.nickname;
+  const accessCode = state.authValues.accessCode ?? DEFAULT_LOGIN.accessCode;
   views.auth.innerHTML = `
     <div class="panel stack auth-panel">
-      <div>
-        <p class="eyebrow">로그인</p>
-        <h2 id="auth-title">시작하기</h2>
+      <div class="auth-heading">
+        <p class="eyebrow">개인 학습 공간</p>
+        <h2 id="auth-title">바로 시작하기</h2>
+        <p id="auth-help" class="meta">닉네임과 6자리 코드는 같은 학습 데이터를 다시 여는 간단한 열쇠입니다.</p>
       </div>
-      <form id="login-form" class="stack">
+      <form id="login-form" class="stack" novalidate>
         <label class="field">
           <span>닉네임</span>
           <input class="input" name="nickname" autocomplete="username" value="${escapeHtml(
-            DEFAULT_LOGIN.nickname,
-          )}" placeholder="예: haru" required maxlength="40" />
+            nickname,
+          )}" placeholder="예: haru" required maxlength="40" aria-describedby="auth-help auth-error" ${
+            state.authError ? 'aria-invalid="true"' : ""
+          } ${state.authPending ? "disabled" : ""} />
         </label>
         <label class="field">
-          <span>숫자 코드</span>
+          <span>6자리 코드</span>
           <input class="input" name="access_code" inputmode="numeric" autocomplete="one-time-code" value="${escapeHtml(
-            DEFAULT_LOGIN.accessCode,
-          )}" placeholder="숫자 6자리" required maxlength="6" pattern="[0-9]{6}" />
+            accessCode,
+          )}" placeholder="숫자 6자리" required maxlength="6" pattern="[0-9]{6}" aria-describedby="auth-help auth-error" ${
+            state.authError ? 'aria-invalid="true"' : ""
+          } ${state.authPending ? "disabled" : ""} />
         </label>
-        <button class="primary-button full" type="submit">${iconLabel("log-in", "들어가기")}</button>
+        ${state.authError ? `<p id="auth-error" class="auth-error" role="alert">${escapeHtml(state.authError)}</p>` : ""}
+        <button class="primary-button full" type="submit" ${state.authPending ? "disabled" : ""}>${iconLabel(
+          "log-in",
+          state.authPending ? "확인 중" : "들어가기",
+        )}</button>
       </form>
-      <p class="meta">처음 쓰는 닉네임이면 이 코드로 바로 시작합니다.</p>
+      <p class="auth-note">처음 쓰는 닉네임이면 새 학습 공간을 만들고, 같은 닉네임이면 이 코드로 다시 들어갑니다.</p>
     </div>
   `;
+  if (!state.authPending) {
+    window.requestAnimationFrame(() => views.auth.querySelector('input[name="nickname"]')?.focus({ preventScroll: true }));
+  }
 }
 
 function renderConfirmDialog({ eyebrow, title, message, confirmLabel, confirmAction, tone = "danger" }) {
@@ -947,8 +964,8 @@ function renderDialog() {
     if (!target) return closeDialog();
     renderConfirmDialog({
       eyebrow: "초기화",
-      title: "대그룹 학습기록을 초기화할까요?",
-      message: `${target.name} 대그룹 아래의 회독 기록과 카드 통계를 초기화합니다. 카드와 예문은 유지됩니다.`,
+      title: "하위 소그룹 기록을 초기화할까요?",
+      message: `${target.name} 대그룹의 모든 소그룹 회독 기록과 카드 통계를 초기화합니다. 카드와 예문은 유지됩니다.`,
       confirmLabel: "초기화",
       confirmAction: "confirm-reset-collection-history",
     });
@@ -982,7 +999,7 @@ function renderDialog() {
     renderConfirmDialog({
       eyebrow: "복원",
       title: "백업을 복원할까요?",
-      message: "현재 묶음, 카드, 예문, 회독 기록을 지우고 백업 내용으로 교체합니다.",
+      message: "현재 대그룹, 소그룹, 카드, 예문, 회독 기록을 지우고 백업 내용으로 교체합니다.",
       confirmLabel: "복원",
       confirmAction: "confirm-restore-backup",
     });
@@ -1018,7 +1035,7 @@ function getPreviewTarget() {
   if (state.pendingAction?.type === "preview-bundle-cards") {
     const collection = state.collections.find((item) => item.id === Number(state.pendingAction.id));
     const groupIds = state.pendingAction.groupIds || [];
-    return collection ? { name: `${collection.name} 묶음`, groupIds } : null;
+    return collection ? { name: `${collection.name} 묶음 연습`, groupIds } : null;
   }
   const group = getSelectedGroup();
   return group ? { name: getGroupLabel(group), groupIds: [group.id] } : null;
@@ -1125,7 +1142,7 @@ function renderStudySubgroupPicker(collection) {
         </div>
         <button class="ghost-button small-button" type="button" data-action="back-to-study-collections">${iconLabel(
           "arrow-left",
-          "대그룹",
+          "대그룹 보기",
         )}</button>
       </div>
       <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
@@ -1133,10 +1150,10 @@ function renderStudySubgroupPicker(collection) {
         <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
         <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
       </div>
-      <p class="meta">회독 기록은 소그룹별로 저장되고, 묶음 연습은 기록에 넣지 않습니다.</p>
+      <p class="meta">회독 기록은 소그룹별로 저장되고, 묶음 연습은 공식 기록에 저장되지 않습니다.</p>
       <button class="secondary-button full" type="button" data-action="open-collection-study-dialog" ${
         number(collection.card_count) ? "" : "disabled"
-      }>${iconLabel("repeat-2", "소그룹 묶어 연습")}</button>
+      }>${iconLabel("repeat-2", "묶음 연습")}</button>
       <section class="group-browser-block">
         <div class="completion-header">
           <h3>소그룹 선택</h3>
@@ -1216,7 +1233,7 @@ function renderTodayStudyPanel(recentGroup) {
                   )}</button>
                   <button class="ghost-button full" type="button" data-action="toggle-weak-panel">${iconLabel(
                     state.weakPanelOpen ? "chevron-up" : "list",
-                    state.weakPanelOpen ? "접기" : "목록",
+                    state.weakPanelOpen ? "접기" : "목록 보기",
                   )}</button>
                 </div>`
               : `<button class="secondary-button full" type="button" disabled>${iconLabel("rotate-ccw", "복습 없음")}</button>`
@@ -1349,7 +1366,7 @@ function renderStudyCollectionChoiceItem(collection) {
           ? ""
           : `<button class="secondary-button full group-choice-empty-action" type="button" data-action="open-group-form-for-collection" data-collection-id="${collection.id}">${iconLabel(
               "plus",
-              "소그룹 등록",
+              "소그룹 만들기",
             )}</button>`
       }
     </article>
@@ -1506,7 +1523,7 @@ function renderCollectionStudyDialog() {
           <div>
             <span class="today-action-label">기록 없는 연습</span>
             <strong>${selectedGroups.length}개 소그룹 · 카드 ${selectedCardCount}개</strong>
-            <p>${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]} · 학습 이력에 저장 안 함</p>
+            <p>${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]} · 공식 기록에 저장 안 함</p>
           </div>
           <div class="study-start-actions">
             <button class="primary-button full" type="button" data-action="start-bundle-study" ${canStart ? "" : "disabled"}>
@@ -1836,7 +1853,7 @@ function renderStudySession() {
         ${renderCompletionDetails(summary, session)}
         <div class="completion-sticky-actions" aria-label="결과 화면 작업">
           <button class="ghost-button full" type="button" data-action="scroll-completion-section" data-target="completion-summary">
-            ${iconLabel("chevron-up", "요약으로")}
+            ${iconLabel("chevron-up", "요약 보기")}
           </button>
           <button class="primary-button full" type="button" data-action="end-study">${iconLabel(
             "arrow-left",
@@ -2278,7 +2295,7 @@ function renderCardEditorPanel(editing, formGroupId) {
         </div>
         <button class="ghost-button small-button" type="button" data-action="show-card-list">${iconLabel(
           "list",
-          "목록",
+          "목록 보기",
         )}</button>
       </div>
       ${
@@ -2605,11 +2622,11 @@ function renderCollectionEditorPanel(editing) {
       <div class="row">
         <div>
           <p class="eyebrow">대그룹</p>
-          <h2 id="groups-title">${editing ? "대그룹 수정" : "대그룹 등록"}</h2>
+          <h2 id="groups-title">${editing ? "대그룹 수정" : "대그룹 만들기"}</h2>
         </div>
         <button class="ghost-button small-button" type="button" data-action="show-group-list">${iconLabel(
           "list",
-          "목록",
+          "목록 보기",
         )}</button>
       </div>
       <form id="collection-form" class="stack">
@@ -2621,7 +2638,7 @@ function renderCollectionEditorPanel(editing) {
         )}</textarea></label>
         <div class="form-actions">
           <button class="ghost-button" type="button" data-action="show-group-list">${iconLabel("x", "취소")}</button>
-          <button class="primary-button" type="submit">${iconLabel("save", editing ? "저장" : "등록")}</button>
+          <button class="primary-button" type="submit">${iconLabel("save", editing ? "저장" : "만들기")}</button>
         </div>
       </form>
     </div>
@@ -2636,11 +2653,11 @@ function renderGroupEditorPanel(editing) {
       <div class="row">
         <div>
           <p class="eyebrow">소그룹</p>
-          <h2 id="groups-title">${editing ? "소그룹 수정" : "소그룹 등록"}</h2>
+          <h2 id="groups-title">${editing ? "소그룹 수정" : "소그룹 만들기"}</h2>
         </div>
         <button class="ghost-button small-button" type="button" data-action="show-group-list">${iconLabel(
           "list",
-          state.groupDetailCollectionId ? "소그룹" : "목록",
+          state.groupDetailCollectionId ? "소그룹 보기" : "목록 보기",
         )}</button>
       </div>
       ${editing ? `<p class="meta">소그룹명과 설명만 바뀌고, 카드와 학습 기록은 유지됩니다.</p>` : ""}
@@ -2656,7 +2673,7 @@ function renderGroupEditorPanel(editing) {
         )}</textarea></label>
         <div class="form-actions">
           <button class="ghost-button" type="button" data-action="show-group-list">${iconLabel("x", "취소")}</button>
-          <button class="primary-button" type="submit">${iconLabel("save", editing ? "저장" : "등록")}</button>
+          <button class="primary-button" type="submit">${iconLabel("save", editing ? "저장" : "만들기")}</button>
         </div>
       </form>
     </div>
@@ -2675,7 +2692,7 @@ function renderGroupListPanel(visibleCollections) {
       </div>
       <button class="primary-button full" type="button" data-action="open-collection-form">${iconLabel(
         "plus",
-        "대그룹 등록",
+        "대그룹 만들기",
       )}</button>
       ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "대그룹 검색" })}
       <div class="group-list">
@@ -2699,7 +2716,7 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
         </div>
         <button class="ghost-button small-button" type="button" data-action="back-to-collections">${iconLabel(
           "arrow-left",
-          "대그룹",
+          "대그룹 보기",
         )}</button>
       </div>
       <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
@@ -2707,10 +2724,10 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
         <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
         <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
       </div>
-      <p class="meta">소그룹 합산 · 묶음 연습은 기록에 넣지 않습니다.</p>
+      <p class="meta">소그룹 합산 · 묶음 연습은 공식 기록 제외</p>
       <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${
         collection.id
-      }">${iconLabel("plus", "소그룹 등록")}</button>
+      }">${iconLabel("plus", "소그룹 만들기")}</button>
       ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "소그룹 검색" })}
       <div class="group-list">
         ${
@@ -2917,7 +2934,7 @@ function renderCollectionListItem(collection) {
           <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
           <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
         </div>
-        <p class="meta">소그룹 합산 · 묶음 연습은 기록 제외</p>
+        <p class="meta">소그룹 합산 · 묶음 연습은 공식 기록 제외</p>
       </button>
       <div class="card-actions">
         <button class="secondary-button" type="button" data-action="edit-collection" data-collection-id="${
@@ -3267,7 +3284,7 @@ async function saveGroup(form) {
   state.groupScreen = "list";
   await loadData();
   render();
-  showToast(isEditing ? "소그룹을 저장했습니다." : "소그룹을 등록했습니다.");
+  showToast(isEditing ? "소그룹을 저장했습니다." : "소그룹을 만들었습니다.");
 }
 
 async function saveCollection(form) {
@@ -3284,22 +3301,47 @@ async function saveCollection(form) {
   state.groupScreen = "list";
   await loadData();
   render();
-  showToast(isEditing ? "대그룹을 저장했습니다." : "대그룹을 등록했습니다.");
+  showToast(isEditing ? "대그룹을 저장했습니다." : "대그룹을 만들었습니다.");
 }
 
 async function login(form) {
+  const nickname = form.elements.nickname.value.trim();
   const accessCode = form.elements.access_code.value.trim();
-  const data = await request("/api/auth", {
-    method: "POST",
-    body: JSON.stringify({ nickname: form.elements.nickname.value.trim(), access_code: accessCode }),
-  });
-  state.user = { id: data.user.id, nickname: data.user.nickname, accessCode };
-  saveStoredUser(state.user);
-  state.activeTab = "study";
-  state.studyStep = "select";
-  await loadData();
-  render();
-  showToast(`${state.user.nickname}님, 들어왔습니다.`);
+  state.authValues = { nickname, accessCode };
+  if (!nickname) {
+    state.authError = "닉네임을 입력하세요.";
+    renderAuth();
+    return;
+  }
+  if (!/^\d{6}$/.test(accessCode)) {
+    state.authError = "6자리 숫자 코드를 입력하세요.";
+    renderAuth();
+    return;
+  }
+  state.authError = "";
+  state.authPending = true;
+  renderAuth();
+  try {
+    const data = await request("/api/auth", {
+      method: "POST",
+      body: JSON.stringify({ nickname, access_code: accessCode }),
+    });
+    state.user = { id: data.user.id, nickname: data.user.nickname, accessCode };
+    saveStoredUser(state.user);
+    state.activeTab = "study";
+    state.studyStep = "select";
+    await loadData();
+    state.authPending = false;
+    state.authError = "";
+    render();
+    showToast(`${state.user.nickname}님, 들어왔습니다.`);
+  } catch (error) {
+    clearStoredUser();
+    state.user = null;
+    state.authPending = false;
+    state.authError = error.message;
+    renderAuth();
+  }
 }
 
 async function saveSettings(form) {
@@ -3468,7 +3510,7 @@ async function resetPendingCollectionHistory() {
   state.activeDialog = null;
   await loadData();
   render();
-  showToast("대그룹 학습기록을 초기화했습니다.");
+  showToast("하위 소그룹 기록을 초기화했습니다.");
 }
 
 async function deletePendingGroup() {

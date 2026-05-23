@@ -309,6 +309,34 @@ h3 {
   margin-top: 18px;
 }
 
+.auth-heading {
+  display: grid;
+  gap: 6px;
+}
+
+.auth-heading h2 {
+  margin-bottom: 0;
+}
+
+.auth-note,
+.auth-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.42;
+}
+
+.auth-error {
+  border-color: rgba(185, 74, 67, 0.28);
+  background: var(--red-soft);
+  color: var(--red);
+  font-weight: 800;
+}
+
 .row {
   display: flex;
   align-items: center;

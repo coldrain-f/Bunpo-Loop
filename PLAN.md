@@ -87,15 +87,15 @@ Core direction:
   - [ ] 9.2 Backup/Restore Serious Mode
   - [ ] 9.3 Privacy & Auth Expectations
 - [ ] Phase 10. Login, Loading & App Shell
-  - [ ] 10.1 Login Screen Polish
+  - [x] 10.1 Login Screen Polish
   - [ ] 10.2 Loading & Error Shell
   - [ ] 10.3 Navigation & Orientation
 - [ ] Phase 11. Accessibility & Interaction Reliability
   - [ ] 11.1 Dialog Focus & Keyboard
   - [ ] 11.2 Touch Targets & Screen Reader Semantics
-- [ ] Phase 12. Language Neutrality & Product Copy
+- [x] Phase 12. Language Neutrality & Product Copy
   - [x] 12.1 Generic Subject Cleanup
-  - [ ] 12.2 Copy Inventory & Tone Pass
+  - [x] 12.2 Copy Inventory & Tone Pass
 - [ ] Phase 13. Data Integrity & State Resilience
   - [ ] 13.1 Official vs Practice Stats Audit
   - [ ] 13.2 Destructive Actions & Restore Safety
@@ -233,8 +233,8 @@ Purpose:
 
 Tasks:
 - [ ] 대그룹 상세 상단에 aggregate stats를 명확히 표시한다.
-- [ ] "소그룹 합산 · 묶음 연습은 기록 제외" 문구를 더 자연스럽게 다듬는다.
-- [ ] 소그룹 등록 CTA를 명확히 배치한다.
+- [ ] "소그룹 합산 · 묶음 연습은 공식 기록 제외" 문구를 더 자연스럽게 다듬는다.
+- [ ] 소그룹 만들기 CTA를 명확히 배치한다.
 - [ ] 묶음 연습 CTA는 secondary로 유지한다.
 
 Files:
@@ -362,7 +362,7 @@ Files:
 - `static/styles.css`
 
 Acceptance Criteria:
-- 카드 목록에서 앞면과 소속 묶음이 빠르게 읽힌다.
+- 카드 목록에서 앞면과 소속 대그룹/소그룹이 빠르게 읽힌다.
 - 관리 action은 보이지만 시선을 빼앗지 않는다.
 
 ### 6.2 Single/Bulk Form UX
@@ -411,7 +411,7 @@ Purpose:
 
 Tasks:
 - [ ] 대그룹 상세 상단에 back action과 title hierarchy를 정리한다.
-- [ ] 소그룹 등록 form에서 대그룹 select가 필요한 경우와 아닌 경우를 구분한다.
+- [ ] 소그룹 만들기 form에서 대그룹 select가 필요한 경우와 아닌 경우를 구분한다.
 - [ ] 삭제/초기화 action은 danger zone처럼 분리한다.
 
 Files:
@@ -529,11 +529,11 @@ Purpose:
 로그인도 제품의 첫인상이므로 학습 앱의 톤과 신뢰감을 맞춘다.
 
 Tasks:
-- [ ] 로그인 화면을 `DESIGN.md`의 밝은 shell/panel 규칙에 맞춘다.
-- [ ] 닉네임과 6자리 코드 입력의 목적을 짧고 명확하게 설명한다.
-- [ ] 로그인 실패, 빈 값, 코드 형식 오류 상태를 inline copy로 정리한다.
-- [ ] 기본 focus 위치와 submit 후 loading/disabled 상태를 정의한다.
-- [ ] 로그인 후 학습 홈으로 들어오는 전환이 어색하지 않게 한다.
+- [x] 로그인 화면을 `DESIGN.md`의 밝은 shell/panel 규칙에 맞춘다.
+- [x] 닉네임과 6자리 코드 입력의 목적을 짧고 명확하게 설명한다.
+- [x] 로그인 실패, 빈 값, 코드 형식 오류 상태를 inline copy로 정리한다.
+- [x] 기본 focus 위치와 submit 후 loading/disabled 상태를 정의한다.
+- [x] 로그인 후 학습 홈으로 들어오는 전환이 어색하지 않게 한다.
 
 Files:
 - `static/app.js`
@@ -666,11 +666,11 @@ Purpose:
 화면마다 말투와 용어를 통일한다.
 
 Tasks:
-- [ ] 주요 용어 사전을 정한다: 대그룹, 소그룹, 묶음, 카드, 회독, 연습, 약점.
-- [ ] "대그룹"과 "묶음"이 섞이는 지점을 찾아 탭명/구조명/도움말의 역할을 정한다.
-- [ ] CTA는 동사형으로 통일한다: 시작, 만들기, 저장, 돌아가기, 복원.
-- [ ] 위험 action copy에는 대상 이름을 넣는다.
-- [ ] 완료 화면의 playful copy는 절제하고 결과/다음 행동을 우선한다.
+- [x] 주요 용어 사전을 정한다: 대그룹, 소그룹, 묶음, 카드, 회독, 연습, 약점.
+- [x] "대그룹"과 "묶음"이 섞이는 지점을 찾아 탭명/구조명/도움말의 역할을 정한다.
+- [x] CTA는 동사형으로 통일한다: 시작, 만들기, 저장, 돌아가기, 복원.
+- [x] 위험 action copy에는 대상 이름을 넣는다.
+- [x] 완료 화면의 playful copy는 절제하고 결과/다음 행동을 우선한다.
 
 Files:
 - `static/app.js`

@@ -289,7 +289,7 @@ Examples:
 Examples:
 - 취소
 - 선택 해제
-- 목록
+- 목록 보기
 - 설정 열기
 
 #### Danger Button
@@ -446,7 +446,7 @@ Goal: 소그룹 단위로 official study starts.
 Rules:
 - 소그룹 list is the main surface.
 - Each subgroup should clearly show whether it was studied today.
-- "소그룹 묶어 연습" is secondary and clearly marked as 기록 없음.
+- "묶음 연습" is secondary and clearly marked as 기록 없음.
 - Sorting controls remain compact.
 
 ### Bundle Practice Dialog
@@ -515,6 +515,24 @@ Rules:
 
 ## Content Voice
 
+### Product Vocabulary
+
+- `대그룹`: 여러 소그룹을 담는 상위 구조다. 공식 학습 기록을 직접 갖는 단위처럼 말하지 않는다.
+- `소그룹`: 공식 회독과 통계가 저장되는 기본 학습 단위다.
+- `묶음`: 하단 탭 이름으로는 사용할 수 있지만, 데이터 구조를 설명할 때는 `대그룹`을 쓴다.
+- `묶음 연습`: 여러 소그룹을 임시로 합쳐 하는 기록 없는 연습이다. 공식 회독, 통계, 학습 이력에 저장되지 않는다고 명확히 말한다.
+- `카드`: 앞면, 뒷면, 메모, 예문을 가진 암기 항목이다.
+- `회독`: 소그룹 단위로 저장되는 공식 학습 기록이다.
+- `연습`: 공식 기록에 저장되지 않는 보조 학습이다.
+- `약점`: 오답 기준에 걸린 카드 묶음이다. 경고처럼 과장하지 않는다.
+
+Copy rules:
+- CTA는 동사형으로 쓴다: `시작`, `만들기`, `저장`, `돌아가기`, `복원`.
+- 구조를 말할 때는 `대그룹 > 소그룹 > 카드`를 유지한다.
+- `묶음`은 탭명 또는 `묶음 연습` 맥락에서만 쓴다.
+- 위험 action은 대상 이름과 영향 범위를 문장 안에 넣는다.
+- 완료 화면은 결과와 다음 행동을 우선하고, 장난스러운 표현은 아주 절제해서 쓴다.
+
 Tone:
 - Korean-first, clear, concise.
 - Friendly but not childish.
@@ -523,7 +541,7 @@ Tone:
 
 Good:
 - "오늘 학습할 소그룹을 골라보세요."
-- "묶음 연습은 기록에 저장되지 않습니다."
+- "묶음 연습은 공식 기록에 저장되지 않습니다."
 - "카드를 등록하려면 소그룹이 필요해요."
 - "같은 소그룹에 이미 같은 앞면 카드가 있습니다."
 
