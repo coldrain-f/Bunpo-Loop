@@ -3926,8 +3926,8 @@ function renderTargetNameField() {
       <span>목표 이름</span>
       <input class="input" name="target_name" value="${escapeHtml(
         state.settings?.target_name || "",
-      )}" placeholder="JLPT N1, HSK 5급, 토익 단어처럼 직접 입력" maxlength="80" />
-      <small class="form-hint">헤더와 학습 화면에 보일 이름입니다. 비워두면 일반 목표로 표시됩니다.</small>
+      )}" placeholder="예: 토익 단어" maxlength="80" aria-describedby="target-name-hint" />
+      <small id="target-name-hint" class="form-hint">예: JLPT N1, HSK 5급, 토익 단어. 헤더와 학습 화면에 보일 이름입니다.</small>
     </label>
   `;
 }
@@ -4032,7 +4032,7 @@ function renderExamDateSelects() {
 
 function renderCollectionListItem(collection) {
   return `
-    <article class="group-item collection-item ${collection.id === state.selectedCollectionId ? "active" : ""}">
+    <article class="group-item collection-item">
       <button class="collection-list-main" type="button" data-action="open-collection-detail" data-collection-id="${collection.id}">
         <div class="collection-card-heading">
           <div>
@@ -4065,10 +4065,9 @@ function renderGroupListItem(group) {
   const hasHistory =
     number(group.completed_rounds) > 0 || number(group.correct_total) > 0 || number(group.wrong_total) > 0;
   const cardCount = number(group.card_count);
-  const active = Number(group.id) === Number(state.selectedGroupId);
   const lastStudyText = getGroupLastStudyLabel(group);
   return `
-    <article class="group-item subgroup-management-item ${active ? "active" : ""} ${cardCount ? "" : "empty"}">
+    <article class="group-item subgroup-management-item ${cardCount ? "" : "empty"}">
       <div class="subgroup-item-main">
         <div class="item-title">
           <strong>${escapeHtml(group.name)}</strong>
