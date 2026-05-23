@@ -230,7 +230,7 @@ function getHeaderContext() {
     return "그룹 관리";
   }
   if (state.activeTab === "settings") return "설정";
-  return TAB_LABELS[state.activeTab] || "JLPT 문법 학습";
+  return TAB_LABELS[state.activeTab] || "벼락찢기";
 }
 
 function getExamDateInfo() {
@@ -2428,7 +2428,7 @@ function renderExampleEditorRow(example = {}, index = 0, collapsed = index > 0) 
           example.korean || "",
         )}</textarea>
         <button class="ghost-button" type="button" data-action="remove-example">${iconLabel("trash", "예문 삭제")}</button>
-        <p class="form-hint">강조할 문법 조각은 [[ ]]로 감싸세요.</p>
+        <p class="form-hint">강조할 조각은 [[ ]]로 감싸세요.</p>
       </div>
     </div>
   `;
@@ -2511,8 +2511,8 @@ function renderCollectionEditorPanel(editing) {
       <form id="collection-form" class="stack">
         <label class="field"><span>대그룹명</span><input class="input" name="name" value="${escapeHtml(
           editing?.name || "",
-        )}" placeholder="JLPT N1 핵심문법" required /></label>
-        <label class="field"><span>설명</span><textarea class="textarea" name="description" placeholder="N1 문법을 소그룹으로 나누어 회독">${escapeHtml(
+        )}" placeholder="영어 단어 벼락세트" required /></label>
+        <label class="field"><span>설명</span><textarea class="textarea" name="description" placeholder="시험 전 단어와 문법을 소그룹으로 나누어 회독">${escapeHtml(
           editing?.description || "",
         )}</textarea></label>
         <div class="form-actions">
@@ -2731,7 +2731,7 @@ function renderLevelOptions() {
   return `
     <div class="field">
       <span>목표 급수</span>
-      <div class="level-options" role="radiogroup" aria-label="목표 JLPT 급수">
+      <div class="level-options" role="radiogroup" aria-label="목표 레벨">
         ${["", ...JLPT_LEVELS]
           .map(
             (level) => `
@@ -2770,7 +2770,7 @@ function renderExamDateSelects() {
   const days = Array.from({ length: 31 }, (_, index) => index + 1);
   return `
     <div class="field">
-      <span>JLPT 시험일</span>
+      <span>시험일</span>
       <div class="date-select-grid">
         <select class="select" name="exam_year" aria-label="시험 연도">
           ${renderSelectOptions(years, parts.year, "연도")}
