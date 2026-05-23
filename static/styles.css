@@ -234,16 +234,15 @@ h1 {
 }
 
 .header-greeting {
+  display: grid;
+  gap: 5px;
   grid-column: 1 / -1;
   min-width: 0;
   margin: -2px 0 0;
-  overflow: hidden;
   color: var(--teal);
   font-size: 0.84rem;
   font-weight: 850;
   line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .header-greeting[hidden] {
@@ -253,6 +252,7 @@ h1 {
 .dday-badge {
   display: inline-flex;
   align-items: center;
+  justify-self: start;
   min-height: 24px;
   padding: 0 8px;
   border: 1px solid rgba(23, 111, 102, 0.22);
@@ -307,6 +307,10 @@ h3 {
   display: block;
 }
 
+.view h2[tabindex="-1"]:focus {
+  outline: none;
+}
+
 .panel {
   margin-bottom: 16px;
   padding: 18px;
@@ -327,6 +331,32 @@ h3 {
 
 .auth-panel {
   margin-top: 18px;
+}
+
+.auth-mascot-card {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 138px;
+  padding: 12px;
+  border: 1px solid rgba(23, 111, 102, 0.2);
+  border-radius: 8px;
+  background: var(--teal-soft);
+}
+
+.auth-mascot {
+  display: block;
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+}
+
+.auth-mascot-card strong {
+  display: block;
+  color: var(--teal);
+  font-size: 1.02rem;
+  line-height: 1.32;
 }
 
 .auth-heading {
@@ -733,6 +763,19 @@ h3 {
   padding: 14px;
   border-color: rgba(23, 111, 102, 0.22);
   background: var(--teal-soft);
+}
+
+.stats-healthy-note.has-mascot {
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.stats-healthy-mascot {
+  display: block;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
 }
 
 .stats-healthy-note span {
@@ -1630,6 +1673,22 @@ button:active,
   background: var(--surface-strong);
 }
 
+.today-action-card.has-mascot {
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: center;
+}
+
+.today-action-card.has-mascot .today-card-actions {
+  grid-column: 1 / -1;
+}
+
+.today-card-mascot {
+  display: block;
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+}
+
 .today-action-label {
   display: block;
   margin-bottom: 5px;
@@ -1681,6 +1740,11 @@ button:active,
 .today-action-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.today-card-actions {
+  display: grid;
   gap: 8px;
 }
 
@@ -3365,6 +3429,14 @@ button:active,
   display: grid;
   gap: 10px;
   justify-items: center;
+}
+
+.empty-state-mascot {
+  display: block;
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+  margin-bottom: -2px;
 }
 
 .empty-state.action-empty strong {

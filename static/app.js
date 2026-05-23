@@ -42,22 +42,44 @@ const STATS_RANGE_LABELS = {
   days90: "90일",
 };
 
-const COMPLETION_MASCOTS = [
-  {
-    id: "medal",
+const KOKKO_MASCOTS = {
+  welcome: {
+    src: "/static/assets/kokko-welcome.png",
+    label: "꼬꼬가 회독 카드를 들고 반기는 중",
+  },
+  empty: {
+    src: "/static/assets/kokko-empty.png",
+    label: "꼬꼬가 빈 카드 상자에서 기다리는 중",
+  },
+  stats: {
+    src: "/static/assets/kokko-stats.png",
+    label: "꼬꼬가 회독 통계를 보여주는 중",
+  },
+  shield: {
+    src: "/static/assets/kokko-shield.png",
+    label: "꼬꼬가 좋은 상태를 지켜주는 중",
+  },
+  medal: {
     src: "/static/assets/celebration-niwatori-medal.png",
-    label: "니와토리가 번개 메달을 보여주는 중",
+    label: "꼬꼬가 번개 메달을 보여주는 중",
   },
-  {
-    id: "study",
+  study: {
     src: "/static/assets/celebration-niwatori-study.png",
-    label: "니와토리가 카드 더미 옆에서 축하하는 중",
+    label: "꼬꼬가 카드 더미 옆에서 축하하는 중",
   },
-  {
-    id: "flag",
+  flag: {
     src: "/static/assets/celebration-niwatori-flag.png",
-    label: "니와토리가 번개 깃발을 흔드는 중",
+    label: "꼬꼬가 번개 깃발을 흔드는 중",
   },
+};
+
+const COMPLETION_MASCOTS = [
+  { id: "welcome", ...KOKKO_MASCOTS.welcome },
+  { id: "medal", ...KOKKO_MASCOTS.medal },
+  { id: "study", ...KOKKO_MASCOTS.study },
+  { id: "flag", ...KOKKO_MASCOTS.flag },
+  { id: "stats", ...KOKKO_MASCOTS.stats },
+  { id: "shield", ...KOKKO_MASCOTS.shield },
 ];
 
 const JLPT_LEVELS = ["N1", "N2", "N3", "N4", "N5"];
@@ -264,6 +286,10 @@ function focusAfterRender(selectors) {
     }
     target.focus({ preventScroll: true });
   });
+}
+
+function shouldMoveFocusAfterClick(event) {
+  return event.detail === 0;
 }
 
 function isTypingTarget(target) {
@@ -615,7 +641,7 @@ function renderHeader() {
   if (headerGreetingEl) {
     headerGreetingEl.hidden = !state.user;
     headerGreetingEl.innerHTML = state.user
-      ? `<span>${escapeHtml(state.user.nickname)}님, 오늘도 한 회독 가볍게 가볼까요?</span>`
+      ? `<span>${escapeHtml(state.user.nickname)}님, 오늘도 한 회독 가볍게 가볼까요?</span>${ddayMarkup}`
       : "";
   }
   if (!headerUserEl) return;
@@ -626,7 +652,6 @@ function renderHeader() {
   }
   headerUserEl.hidden = false;
   headerUserEl.innerHTML = `
-    ${ddayMarkup}
     <button class="ghost-button small-button" type="button" data-action="logout">${iconLabel("log-out", "로그아웃")}</button>
   `;
 }
@@ -832,9 +857,15 @@ function renderOrientationNote(parts, note) {
   `;
 }
 
-function renderActionEmptyState({ title, body, action, label, iconName = "plus", buttonClass = "primary-button", attrs = "" }) {
+function renderKokkoMascot(type = "study", className = "kokko-mascot", loading = "lazy") {
+  const mascot = KOKKO_MASCOTS[type] || KOKKO_MASCOTS.study;
+  return `<img class="${className}" src="${mascot.src}" alt="${escapeHtml(mascot.label)}" loading="${loading}" />`;
+}
+
+function renderActionEmptyState({ title, body, action, label, iconName = "plus", buttonClass = "primary-button", attrs = "", mascot = "empty" }) {
   return `
     <div class="empty-state action-empty">
+      ${mascot ? renderKokkoMascot(mascot, "empty-state-mascot") : ""}
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(body)}</p>
       ${
@@ -1816,7 +1847,8 @@ function renderStatsFocusSection(summary) {
   const focusGroups = getStatsFocusGroups(summary.scope);
   if (!focusGroups.length) {
     return `
-      <section class="stats-healthy-note">
+      <section class="stats-healthy-note has-mascot">
+        ${renderKokkoMascot("stats", "stats-healthy-mascot")}
         <div>
           <span>오답 관리</span>
           <strong>누적 오답이 없습니다.</strong>
@@ -2049,6 +2081,13 @@ function renderAuth() {
   const accessCode = state.authValues.accessCode ?? DEFAULT_LOGIN.accessCode;
   views.auth.innerHTML = `
     <div class="panel stack auth-panel">
+      <section class="auth-mascot-card" aria-label="꼬꼬회독 시작">
+        ${renderKokkoMascot("welcome", "auth-mascot", "eager")}
+        <div>
+          <p class="eyebrow">꼬꼬회독</p>
+          <strong>오늘 볼 카드를 가볍게 열어둘게요.</strong>
+        </div>
+      </section>
       <div class="auth-heading">
         <p class="eyebrow">개인 학습 공간</p>
         <h2 id="auth-title">바로 시작하기</h2>
@@ -2627,6 +2666,7 @@ function renderTodayStudyPanel(recentGroup, weakCards = getWeakCards()) {
   const weakSummary = weakCards.length
     ? `${weakCards.length}개`
     : "없음";
+  const studiedToday = recentGroup && isToday(recentGroup.last_studied_at);
   return `
     <section class="today-study-panel">
       <div class="today-action-card primary today-primary-card">
@@ -2642,22 +2682,25 @@ function renderTodayStudyPanel(recentGroup, weakCards = getWeakCards()) {
         </button>
       </div>
       <div class="today-secondary-grid">
-        <article class="today-action-card primary">
+        <article class="today-action-card primary ${studiedToday ? "has-mascot" : ""}">
+          ${studiedToday ? renderKokkoMascot("flag", "today-card-mascot") : ""}
           <div>
             <span class="today-action-label">회독 상태</span>
             <strong>${recentGroup ? `${number(recentGroup.completed_rounds)}회독 완료` : `${number(state.groups.length)}개 소그룹`}</strong>
             <p>${escapeHtml(recentGroup ? `최근 학습 ${formatDate(recentGroup.last_studied_at)}` : "대그룹을 열고 첫 소그룹 회독을 시작하세요.")}</p>
           </div>
         </article>
-        <article class="today-action-card weak ${weakCards.length ? "has-weak" : "quiet"}">
+        <article class="today-action-card weak ${weakCards.length ? "has-weak" : "quiet has-mascot"}">
+          ${weakCards.length ? "" : renderKokkoMascot("shield", "today-card-mascot")}
           <div>
             <span class="today-action-label">약점 복습</span>
             <strong>${weakSummary}</strong>
             <p>${escapeHtml(weakMeta)}</p>
           </div>
-          ${
-            weakCards.length
-              ? `<div class="today-action-buttons">
+          <div class="today-card-actions">
+            ${
+              weakCards.length
+                ? `<div class="today-action-buttons">
                   <button class="secondary-button full" type="button" data-action="start-weak-study">${iconLabel(
                     "rotate-ccw",
                     "복습 시작",
@@ -2667,9 +2710,10 @@ function renderTodayStudyPanel(recentGroup, weakCards = getWeakCards()) {
                     state.weakPanelOpen ? "접기" : "목록 보기",
                   )}</button>
                 </div>`
-              : `<button class="ghost-button full" type="button" disabled>${iconLabel("rotate-ccw", "복습할 카드 없음")}</button>
+                : `<button class="ghost-button full" type="button" disabled>${iconLabel("rotate-ccw", "복습할 카드 없음")}</button>
                  ${renderDisabledReason("약점 기준에 걸린 카드가 생기면 복습을 시작할 수 있습니다.")}`
-          }
+            }
+          </div>
         </article>
       </div>
     </section>
@@ -5491,7 +5535,11 @@ document.addEventListener("click", async (event) => {
     }
     state.activeTab = nextTab;
     render();
-    focusAfterRender(`#view-${nextTab}.active h2`);
+    if (shouldMoveFocusAfterClick(event)) {
+      focusAfterRender(`#view-${nextTab}.active h2`);
+    } else if (tabButton instanceof HTMLElement) {
+      tabButton.blur();
+    }
     return;
   }
   const actionEl = event.target.closest("[data-action]");
