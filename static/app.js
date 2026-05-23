@@ -300,9 +300,9 @@ function getHeaderContext() {
     if (state.groupScreen === "group-form") return "소그룹 · 만들기";
     if (state.groupDetailCollectionId) {
       const collection = state.collections.find((item) => Number(item.id) === Number(state.groupDetailCollectionId));
-      return collection ? `묶음 · ${collection.name}` : "묶음 관리";
+      return collection ? `대그룹 · ${collection.name}` : "대그룹 관리";
     }
-    return "묶음 관리";
+    return "대그룹 관리";
   }
   if (state.activeTab === "settings") return "설정";
   return TAB_LABELS[state.activeTab] || "벼락치기";
@@ -618,6 +618,125 @@ function getCardFormSelection(groupId) {
 function getGroupLabel(group) {
   const groupName = group?.name || group?.group_name || "";
   return group?.collection_name ? `${group.collection_name} / ${groupName}` : groupName;
+}
+
+function getCardPath(card) {
+  return [card.collection_name || "대그룹 없음", card.group_name || "소그룹 없음"].filter(Boolean).join(" / ");
+}
+
+function getSelectedCardFilterCopy(filteredCount, visibleCount) {
+  if (!state.collections.length) {
+    return {
+      label: "대그룹 없음",
+      detail: "카드를 등록하려면 먼저 대그룹과 소그룹이 필요합니다.",
+    };
+  }
+  if (state.cardFilterCollectionId === "all") {
+    return {
+      label: "전체 카드",
+      detail: `대그룹 ${number(state.collections.length)}개 · 소그룹 ${number(state.groups.length)}개 · ${number(
+        visibleCount,
+      )}/${number(filteredCount)}개 표시`,
+    };
+  }
+  const collection = state.collections.find(
+    (item) => String(item.id) === String(state.cardFilterCollectionId),
+  );
+  if (!collection) {
+    return {
+      label: "대그룹 선택",
+      detail: "대그룹을 고르면 소그룹 필터와 카드 목록이 이어집니다.",
+    };
+  }
+  const group = getCardFilterGroups().find((item) => String(item.id) === String(state.cardFilterGroupId));
+  if (group) {
+    return {
+      label: group.name,
+      detail: `${collection.name} / ${group.name} · ${number(visibleCount)}/${number(filteredCount)}개 표시`,
+    };
+  }
+  return {
+    label: collection.name,
+    detail: `하위 소그룹 ${number(getGroupsForCollection(collection.id).length)}개 전체 · ${number(visibleCount)}/${number(
+      filteredCount,
+    )}개 표시`,
+  };
+}
+
+function renderCardFilterSummary(filteredCount, visibleCount) {
+  const copy = getSelectedCardFilterCopy(filteredCount, visibleCount);
+  return `
+    <section class="card-filter-summary">
+      <span>현재 범위</span>
+      <strong>${escapeHtml(copy.label)}</strong>
+      <p>${escapeHtml(copy.detail)}</p>
+    </section>
+  `;
+}
+
+function renderCardListEmptyState(filteredCards) {
+  if (!state.collections.length) {
+    return `
+      <div class="empty-state">카드를 만들기 전에 대그룹을 먼저 만들어주세요.</div>
+      <button class="primary-button full" type="button" data-action="go-groups">${iconLabel("plus", "대그룹 만들기")}</button>
+    `;
+  }
+  if (!state.groups.length) {
+    return `
+      <div class="empty-state">대그룹은 있지만 아직 소그룹이 없습니다. 카드는 소그룹에 저장됩니다.</div>
+      <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${state.selectedCollectionId || state.collections[0]?.id || ""}">${iconLabel(
+        "plus",
+        "소그룹 만들기",
+      )}</button>
+    `;
+  }
+  if (filteredCards.length && state.cardSearchQuery) {
+    return `<div class="empty-state">검색어와 맞는 카드가 없습니다. 앞면, 뜻, 메모, 예문을 함께 검색합니다.</div>`;
+  }
+  if (!state.cardFilterCollectionId) {
+    return `<div class="empty-state">대그룹을 선택하거나 전체 카드를 선택하면 목록이 나타납니다.</div>`;
+  }
+  if (state.cardFilterCollectionId !== "all" && !getCardFilterGroups().length) {
+    return `
+      <div class="empty-state">선택한 대그룹에 아직 소그룹이 없습니다.</div>
+      <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${state.cardFilterCollectionId}">${iconLabel(
+        "plus",
+        "소그룹 만들기",
+      )}</button>
+    `;
+  }
+  const target = state.cardFilterGroupId ? "소그룹" : state.cardFilterCollectionId === "all" ? "앱" : "대그룹";
+  return `
+    <div class="empty-state">이 ${target}에는 아직 카드가 없습니다.</div>
+    <button class="primary-button full" type="button" data-action="open-card-form">${iconLabel("plus", "카드 등록")}</button>
+  `;
+}
+
+function renderCardLocationPicker(selection, ids) {
+  const selectedCollection = state.collections.find((collection) => Number(collection.id) === Number(selection.collectionId));
+  const selectedGroup = selection.groups.find((group) => Number(group.id) === Number(selection.groupId));
+  const summary = selectedGroup
+    ? `${selectedCollection?.name || "대그룹 없음"} / ${selectedGroup.name}`
+    : selectedCollection
+      ? `${selectedCollection.name} / 소그룹 필요`
+      : "대그룹과 소그룹을 선택하세요.";
+  return `
+    <section class="card-location-panel">
+      <div>
+        <span>저장 위치</span>
+        <strong>${escapeHtml(summary)}</strong>
+        <p>대그룹을 바꾸면 선택 가능한 소그룹도 함께 바뀝니다.</p>
+      </div>
+      <div class="card-filter-grid">
+        <label class="field"><span>대그룹</span><select id="${ids.collection}" class="select" name="collection_id" required>${collectionOptions(
+          selection.collectionId,
+        )}</select></label>
+        <label class="field"><span>소그룹</span><select id="${ids.group}" class="select" name="group_id" required ${
+          selection.groups.length ? "" : "disabled"
+        }>${subgroupOptions(selection.groups, selection.groupId)}</select></label>
+      </div>
+    </section>
+  `;
 }
 
 function subgroupOptions(groups, selectedId) {
@@ -2681,7 +2800,7 @@ function renderCards() {
   );
   views.cards.innerHTML = showForm
     ? renderCardEditorPanel(editing, formGroupId)
-    : renderCardListPanel(visibleCards);
+    : renderCardListPanel(visibleCards, filteredCards);
 }
 
 function renderCardEditorPanel(editing, formGroupId) {
@@ -2724,7 +2843,7 @@ function renderCardEditorPanel(editing, formGroupId) {
   `;
 }
 
-function renderCardListPanel(visibleCards) {
+function renderCardListPanel(visibleCards, filteredCards = visibleCards) {
   const collectionGroups = getCardFilterGroups();
   return `
     <div class="panel stack">
@@ -2777,20 +2896,13 @@ function renderCardListPanel(visibleCards) {
             </div>`
           : ""
       }
+      ${renderCardFilterSummary(filteredCards.length, visibleCards.length)}
       ${renderSearchInput({ id: "card-search", value: state.cardSearchQuery, placeholder: "카드 검색" })}
       <div class="card-list">
       ${
         visibleCards.length
           ? visibleCards.map(renderCardListItem).join("")
-          : `<div class="empty-state">${
-              state.cardFilterGroupId
-                ? "검색된 카드가 없습니다."
-                : state.cardFilterCollectionId
-                  ? "검색된 카드가 없습니다."
-                  : state.collections.length
-                    ? "조건에 맞는 카드가 없습니다."
-                    : "등록된 카드가 없습니다."
-            }</div>`
+          : renderCardListEmptyState(filteredCards)
       }
       </div>
     </div>
@@ -2810,14 +2922,7 @@ function renderCardForm(card, groupId) {
     : "";
   return `
     <form id="card-form" class="stack">
-      <div class="card-filter-grid">
-        <label class="field"><span>대그룹</span><select id="card-form-collection" class="select" name="collection_id" required>${collectionOptions(
-          selection.collectionId,
-        )}</select></label>
-        <label class="field"><span>소그룹</span><select id="card-form-group" class="select" name="group_id" required ${
-          selection.groups.length ? "" : "disabled"
-        }>${subgroupOptions(selection.groups, selection.groupId)}</select></label>
-      </div>
+      ${renderCardLocationPicker(selection, { collection: "card-form-collection", group: "card-form-group" })}
       ${
         groupMissingPanel ||
         `
@@ -2861,14 +2966,7 @@ function renderBulkCardForm(groupId) {
     : "";
   return `
     <form id="bulk-card-form" class="stack">
-      <div class="card-filter-grid">
-        <label class="field"><span>대그룹</span><select id="bulk-card-collection" class="select" name="collection_id" required>${collectionOptions(
-          selection.collectionId,
-        )}</select></label>
-        <label class="field"><span>소그룹</span><select id="bulk-card-group" class="select" name="group_id" required ${
-          selection.groups.length ? "" : "disabled"
-        }>${subgroupOptions(selection.groups, selection.groupId)}</select></label>
-      </div>
+      ${renderCardLocationPicker(selection, { collection: "bulk-card-collection", group: "bulk-card-group" })}
       ${
         groupMissingPanel ||
         `
@@ -2878,7 +2976,14 @@ function renderBulkCardForm(groupId) {
           state.bulkDraftText,
         )}</textarea>
       </label>
-      <p class="form-hint">예문에서 강조할 부분은 [[이렇게]] 감싸면 학습 화면에서만 하이라이트됩니다.</p>
+      <details class="format-guide">
+        <summary>입력 형식 보기</summary>
+        <div>
+          <p>한 줄에 한 장씩 입력합니다. 구분자는 <code>|</code> 또는 탭을 사용할 수 있습니다.</p>
+          <p><code>앞면 | 뒷면 | 메모 | 예문 =&gt; 번역</code></p>
+          <p>예문에서 강조할 부분은 <code>[[이렇게]]</code> 감싸면 학습 화면에서만 하이라이트됩니다.</p>
+        </div>
+      </details>
       <button class="secondary-button full" type="submit">${iconLabel("eye", "미리보기")}</button>
       ${preview ? renderBulkPreview(preview) : ""}
         `
@@ -2889,11 +2994,19 @@ function renderBulkCardForm(groupId) {
 
 function renderBulkPreview(preview) {
   const canCreate = preview.items.length > 0 && !preview.errors.length && preview.warningCount === 0;
+  const statusText = preview.errors.length
+    ? "형식 오류가 있습니다."
+    : preview.warningCount
+      ? "중복을 확인하세요."
+      : "등록할 수 있습니다.";
   return `
     <section class="bulk-preview">
       <div class="completion-header">
-        <h3>등록 미리보기</h3>
-        <span class="pill">${preview.items.length}개</span>
+        <div>
+          <h3>등록 미리보기</h3>
+          <p class="meta">${escapeHtml(statusText)}</p>
+        </div>
+        <span class="pill ${canCreate ? "good" : preview.errors.length ? "bad" : ""}">${preview.items.length}개</span>
       </div>
       ${
         preview.errors.length
@@ -2920,7 +3033,7 @@ function renderBulkPreviewItem(item) {
     <article class="bulk-preview-item ${item.warnings.length ? "warn" : ""}">
       <div class="item-title">
         <strong>${item.front ? renderJapaneseText(item.front) : "앞면 없음"}</strong>
-        <span class="pill">${item.lineNo}줄</span>
+        <span class="pill ${item.warnings.length ? "bad" : ""}">${item.lineNo}줄</span>
       </div>
       <p class="meaning">${escapeHtml(item.back || "뒷면 없음")}</p>
       <p class="meta">메모 ${item.memo ? "있음" : "없음"} · 예문 ${item.examples.length}개</p>
@@ -2931,7 +3044,13 @@ function renderBulkPreviewItem(item) {
             )}</p>${item.examples[0].korean ? `<p class="example-ko">${renderMarkedText(item.examples[0].korean)}</p>` : ""}</div>`
           : ""
       }
-      ${item.warnings.map((warning) => `<p class="duplicate-warning inline">${escapeHtml(warning)}</p>`).join("")}
+      ${
+        item.warnings.length
+          ? `<div class="bulk-row-issues">${item.warnings
+              .map((warning) => `<p>${escapeHtml(warning)}</p>`)
+              .join("")}</div>`
+          : ""
+      }
     </article>
   `;
 }
@@ -2962,25 +3081,31 @@ function renderExampleEditorRow(example = {}, index = 0, collapsed = index > 0) 
 
 function renderCardListItem(card) {
   const total = number(card.correct_count) + number(card.wrong_count);
+  const exampleCount = card.examples?.length || 0;
+  const hasMemo = Boolean(card.memo);
   return `
     <article class="card-item">
-      <div class="item-title">
-        <strong>${renderJapaneseText(card.front)}</strong>
-        <span class="pill">${escapeHtml(getGroupLabel(card))}</span>
+      <div class="card-item-main">
+        <p class="card-path">${escapeHtml(getCardPath(card))}</p>
+        <strong class="card-front">${renderJapaneseText(card.front)}</strong>
+        <p class="card-back">${escapeHtml(card.back)}</p>
       </div>
-      <p class="meaning">${escapeHtml(card.back)}</p>
       ${
         card.examples?.[0]
-          ? `<div class="card-preview-example"><p class="example-jp">${renderMarkedJapaneseText(
+          ? `<div class="card-preview-example compact"><p class="example-jp">${renderMarkedJapaneseText(
               card.examples[0].japanese,
             )}</p>${card.examples[0].korean ? `<p class="example-ko">${renderMarkedText(card.examples[0].korean)}</p>` : ""}</div>`
           : ""
       }
-      <p class="meta">예문 ${card.examples?.length || 0}개 · 알맞음 ${number(card.correct_count)} · 틀림 ${number(
-        card.wrong_count,
-      )} · 총 ${total}</p>
-      <div class="card-actions">
-        <button class="secondary-button" type="button" data-action="edit-card" data-card-id="${card.id}">${iconLabel(
+      <div class="card-meta-strip">
+        <span>예문 ${exampleCount}개</span>
+        <span>메모 ${hasMemo ? "있음" : "없음"}</span>
+        <span>알맞음 ${number(card.correct_count)}</span>
+        <span>틀림 ${number(card.wrong_count)}</span>
+        <span>총 ${total}</span>
+      </div>
+      <div class="card-actions quiet-actions">
+        <button class="ghost-button" type="button" data-action="edit-card" data-card-id="${card.id}">${iconLabel(
           "pencil",
           "수정",
         )}</button>
@@ -3055,6 +3180,18 @@ function renderGroupEditorPanel(editing) {
   const selectedCollectionId =
     editing?.collection_id ?? state.groupDetailCollectionId ?? state.selectedCollectionId ?? state.collections[0]?.id;
   const selectedCollection = state.collections.find((collection) => Number(collection.id) === Number(selectedCollectionId));
+  const lockCollection = Boolean(state.groupDetailCollectionId && selectedCollection);
+  const collectionField = lockCollection
+    ? `
+        <section class="group-form-context">
+          <span>대그룹</span>
+          <strong>${escapeHtml(selectedCollection.name)}</strong>
+          <input type="hidden" name="collection_id" value="${selectedCollection.id}" />
+        </section>
+      `
+    : `<label class="field"><span>대그룹</span><select class="select" name="collection_id" required>${collectionOptions(
+        selectedCollectionId,
+      )}</select></label>`;
   return `
     <div class="panel stack">
       <div class="row">
@@ -3073,9 +3210,7 @@ function renderGroupEditorPanel(editing) {
       )}
       ${editing ? `<p class="meta">소그룹명과 설명만 바뀌고, 카드와 학습 기록은 유지됩니다.</p>` : ""}
       <form id="group-form" class="stack">
-        <label class="field"><span>대그룹</span><select class="select" name="collection_id" required>${collectionOptions(
-          selectedCollectionId,
-        )}</select></label>
+        ${collectionField}
         <label class="field"><span>소그룹명</span><input class="input" name="name" value="${escapeHtml(
           editing?.name || "",
         )}" placeholder="조사" required /></label>
@@ -3091,27 +3226,79 @@ function renderGroupEditorPanel(editing) {
   `;
 }
 
-function renderGroupListPanel(visibleCollections) {
-  return `
-    <div class="panel stack">
-      <div class="row">
-        <div>
-          <p class="eyebrow">묶음</p>
-          <h2 id="groups-title">대그룹 목록</h2>
-        </div>
-        <span class="pill">${visibleCollections.length}개</span>
+function renderCollectionEmptyState() {
+  if (state.collections.length) {
+    return `
+      <div class="empty-state action-empty">
+        <strong>검색된 대그룹이 없습니다.</strong>
+        <p>검색어를 줄이거나 새 대그룹을 만들어 주세요.</p>
+        <button class="secondary-button full" type="button" data-action="open-collection-form">${iconLabel(
+          "plus",
+          "대그룹 만들기",
+        )}</button>
       </div>
+    `;
+  }
+  return `
+    <div class="empty-state action-empty">
+      <strong>첫 대그룹을 만들어 주세요.</strong>
+      <p>대그룹을 만든 뒤 안에서 소그룹과 카드를 이어서 관리할 수 있습니다.</p>
       <button class="primary-button full" type="button" data-action="open-collection-form">${iconLabel(
         "plus",
         "대그룹 만들기",
       )}</button>
-      ${renderSearchInput({ id: "collection-search", value: state.collectionSearchQuery, placeholder: "대그룹 검색" })}
+    </div>
+  `;
+}
+
+function renderGroupEmptyState(collection) {
+  if (getGroupsForCollection(collection.id).length) {
+    return `
+      <div class="empty-state action-empty">
+        <strong>검색된 소그룹이 없습니다.</strong>
+        <p>검색어를 줄이면 이 대그룹의 다른 소그룹을 볼 수 있습니다.</p>
+      </div>
+    `;
+  }
+  return `
+    <div class="empty-state action-empty">
+      <strong>아직 소그룹이 없습니다.</strong>
+      <p>공식 회독과 통계는 소그룹 단위로 저장됩니다.</p>
+      <button class="primary-button full" type="button" data-action="open-group-form-for-collection" data-collection-id="${
+        collection.id
+      }">${iconLabel("plus", "소그룹 만들기")}</button>
+    </div>
+  `;
+}
+
+function renderGroupListPanel(visibleCollections) {
+  return `
+    <div class="panel stack">
+      <div class="groups-page-header">
+        <div>
+          <p class="eyebrow">묶음 탭</p>
+          <h2 id="groups-title">대그룹 관리</h2>
+          <p class="meta">대그룹을 열어 하위 소그룹을 관리합니다.</p>
+        </div>
+        <div class="groups-header-actions">
+          <span class="pill">대그룹 ${visibleCollections.length}개</span>
+          ${
+            state.collections.length
+              ? `<button class="primary-button small-button" type="button" data-action="open-collection-form">${iconLabel(
+                  "plus",
+                  "대그룹 만들기",
+                )}</button>`
+              : ""
+          }
+        </div>
+      </div>
+      ${
+        state.collections.length
+          ? renderSearchInput({ id: "collection-search", value: state.collectionSearchQuery, placeholder: "대그룹 검색" })
+          : ""
+      }
       <div class="group-list">
-        ${
-          visibleCollections.length
-            ? visibleCollections.map(renderCollectionListItem).join("")
-            : `<div class="empty-state">${state.collections.length ? "검색된 대그룹이 없습니다." : "등록된 대그룹이 없습니다."}</div>`
-        }
+        ${visibleCollections.length ? visibleCollections.map(renderCollectionListItem).join("") : renderCollectionEmptyState()}
       </div>
     </div>
   `;
@@ -3120,24 +3307,26 @@ function renderGroupListPanel(visibleCollections) {
 function renderCollectionDetailPanel(collection, visibleGroups) {
   return `
     <div class="panel stack">
-      <div class="row">
-        <div>
-          <p class="eyebrow">대그룹</p>
-          <h2 id="groups-title">${escapeHtml(collection.name)}</h2>
-        </div>
+      <div class="collection-detail-header">
         <button class="ghost-button small-button" type="button" data-action="back-to-collections">${iconLabel(
           "arrow-left",
-          "대그룹 보기",
+          "대그룹 목록",
         )}</button>
+        <div>
+          <p class="eyebrow">대그룹 상세</p>
+          <h2 id="groups-title">${escapeHtml(collection.name)}</h2>
+        </div>
       </div>
       ${renderOrientationNote(["묶음", "대그룹 목록", collection.name], "이 대그룹 안에서 소그룹을 만들고 관리합니다.")}
-      <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
-      <div class="stat-grid">
-        <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
-        <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
-        <div class="stat"><strong>${number(collection.completed_rounds)}</strong><span>하위 회독</span></div>
-      </div>
-      <p class="meta">공식 기록은 하위 소그룹 합산입니다. 묶음 연습은 공식 기록에 저장되지 않습니다.</p>
+      <section class="collection-detail-summary">
+        <p>${escapeHtml(collection.description || "설명 없음")}</p>
+        <div class="stat-grid">
+          <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
+          <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
+          <div class="stat"><strong>${number(collection.completed_rounds)}</strong><span>하위 회독</span></div>
+        </div>
+        <small>공식 기록은 하위 소그룹 합산입니다. 묶음 연습은 공식 기록에 저장되지 않습니다.</small>
+      </section>
       <div class="button-row">
         <button class="primary-button" type="button" data-action="open-group-form-for-collection" data-collection-id="${
           collection.id
@@ -3151,11 +3340,23 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
         ${
           visibleGroups.length
             ? visibleGroups.map(renderGroupListItem).join("")
-            : `<div class="empty-state">${
-                getGroupsForCollection(collection.id).length ? "검색된 소그룹이 없습니다." : "등록된 소그룹이 없습니다."
-              }</div>`
+            : renderGroupEmptyState(collection)
         }
       </div>
+      <section class="danger-zone">
+        <div>
+          <strong>대그룹 관리</strong>
+          <p>대그룹 삭제는 하위 소그룹과 카드까지 함께 삭제합니다.</p>
+        </div>
+        <div class="danger-zone-actions">
+          <button class="ghost-button" type="button" data-action="edit-collection" data-collection-id="${
+            collection.id
+          }">${iconLabel("pencil", "대그룹 수정")}</button>
+          <button class="danger-button" type="button" data-action="delete-collection" data-collection-id="${
+            collection.id
+          }">${iconLabel("trash", "대그룹 삭제")}</button>
+        </div>
+      </section>
     </div>
   `;
 }
@@ -3350,19 +3551,23 @@ function renderCollectionListItem(collection) {
   return `
     <article class="group-item collection-item ${collection.id === state.selectedCollectionId ? "active" : ""}">
       <button class="collection-list-main" type="button" data-action="open-collection-detail" data-collection-id="${collection.id}">
-        <div class="item-title">
-          <strong>${escapeHtml(collection.name)}</strong>
-          <span class="pill">${number(collection.card_count)}개</span>
+        <div class="collection-card-heading">
+          <div>
+            <span>대그룹</span>
+            <strong>${escapeHtml(collection.name)}</strong>
+          </div>
+          <span class="pill ${number(collection.group_count) ? "good" : ""}">${number(collection.group_count)}개 소그룹</span>
         </div>
-        <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
-        <div class="stat-grid">
-          <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
-          <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
+        <p class="collection-description">${escapeHtml(collection.description || "설명 없음")}</p>
+        <div class="collection-metric-strip">
+          <span><strong>${number(collection.card_count)}</strong>카드</span>
+          <span><strong>${number(collection.completed_rounds)}</strong>회독</span>
+          <span><strong>${number(collection.wrong_total)}</strong>오답</span>
         </div>
-        <p class="meta">소그룹 합산 · 묶음 연습은 공식 기록 제외</p>
+        <p class="collection-list-note">소그룹을 관리하려면 대그룹을 여세요. 묶음 연습은 공식 기록에서 제외됩니다.</p>
       </button>
-      <div class="card-actions">
-        <button class="secondary-button" type="button" data-action="edit-collection" data-collection-id="${
+      <div class="card-actions quiet-actions">
+        <button class="ghost-button" type="button" data-action="edit-collection" data-collection-id="${
           collection.id
         }">${iconLabel("pencil", "수정")}</button>
         <button class="danger-button" type="button" data-action="delete-collection" data-collection-id="${
@@ -3381,41 +3586,48 @@ function renderGroupListItem(group) {
   const lastStudyText = getGroupLastStudyLabel(group);
   return `
     <article class="group-item subgroup-management-item ${active ? "active" : ""} ${cardCount ? "" : "empty"}">
-      <div class="item-title">
-        <strong>${escapeHtml(group.name)}</strong>
+      <div class="subgroup-item-main">
+        <div class="item-title">
+          <strong>${escapeHtml(group.name)}</strong>
+          ${
+            cardCount
+              ? `<button class="pill group-card-count" type="button" data-action="preview-group-cards" data-group-id="${
+                  group.id
+                }" aria-label="${escapeHtml(`${group.name} 카드 ${cardCount}개 미리보기`)}">${cardCount}개</button>`
+              : `<span class="pill">카드 없음</span>`
+          }
+        </div>
+        <p class="meta">${escapeHtml(group.collection_name || "대그룹 없음")} · ${escapeHtml(group.description || "설명 없음")}</p>
+        ${renderGroupStatusPills(group)}
+        ${renderGroupMetricRow(group)}
+        <p class="meta">${escapeHtml(lastStudyText)} · 누적 알맞음 ${number(group.correct_total)} · 누적 틀림 ${number(group.wrong_total)}</p>
+      </div>
+      <div class="subgroup-primary-actions">
         ${
           cardCount
-            ? `<button class="pill group-card-count" type="button" data-action="preview-group-cards" data-group-id="${
-                group.id
-              }" aria-label="${escapeHtml(`${group.name} 카드 ${cardCount}개 미리보기`)}">${cardCount}개</button>`
-            : `<span class="pill">카드 없음</span>`
+            ? ""
+            : `<button class="secondary-button full add-card-button" type="button" data-action="add-card-to-study-group" data-group-id="${group.id}">${iconLabel(
+                "plus",
+                "카드 등록",
+              )}</button>`
         }
-      </div>
-      <p class="meta">${escapeHtml(group.collection_name || "대그룹 없음")} · ${escapeHtml(group.description || "설명 없음")}</p>
-      ${renderGroupStatusPills(group)}
-      ${renderGroupMetricRow(group)}
-      <p class="meta">${escapeHtml(lastStudyText)} · 누적 알맞음 ${number(group.correct_total)} · 누적 틀림 ${number(group.wrong_total)}</p>
-      ${
-        cardCount
-          ? ""
-          : `<button class="secondary-button full add-card-button" type="button" data-action="add-card-to-study-group" data-group-id="${group.id}">${iconLabel(
-              "plus",
-              "카드 등록",
-            )}</button>`
-      }
-      <button class="ghost-button full reset-history-button" type="button" data-action="reset-history" data-group-id="${group.id}" ${
-        hasHistory ? "" : "disabled"
-      }>${iconLabel("rotate-ccw", "기록 초기화")}</button>
-      <div class="card-actions">
-        <button class="secondary-button" type="button" data-action="edit-group" data-group-id="${group.id}">${iconLabel(
+        <button class="ghost-button" type="button" data-action="edit-group" data-group-id="${group.id}">${iconLabel(
           "pencil",
           "수정",
         )}</button>
-        <button class="danger-button" type="button" data-action="delete-group" data-group-id="${group.id}">${iconLabel(
-          "trash",
-          "삭제",
-        )}</button>
       </div>
+      <details class="danger-zone compact">
+        <summary>기록/삭제 관리</summary>
+        <div class="danger-zone-actions">
+          <button class="ghost-button" type="button" data-action="reset-history" data-group-id="${group.id}" ${
+            hasHistory ? "" : "disabled"
+          }>${iconLabel("rotate-ccw", "기록 초기화")}</button>
+          <button class="danger-button" type="button" data-action="delete-group" data-group-id="${group.id}">${iconLabel(
+            "trash",
+            "소그룹 삭제",
+          )}</button>
+        </div>
+      </details>
     </article>
   `;
 }

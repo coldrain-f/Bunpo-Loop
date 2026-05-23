@@ -73,12 +73,12 @@ Core direction:
 - [x] Phase 5. Completion Loop
   - [x] 5.1 Completion Summary Redesign
   - [x] 5.2 Next Action Design
-- [ ] Phase 6. Cards Tab
-  - [ ] 6.1 Card List Information Design
-  - [ ] 6.2 Single/Bulk Form UX
-- [ ] Phase 7. Groups Tab
-  - [ ] 7.1 Collection List Polish
-  - [ ] 7.2 Collection Detail & Group Form
+- [x] Phase 6. Cards Tab
+  - [x] 6.1 Card List Information Design
+  - [x] 6.2 Single/Bulk Form UX
+- [x] Phase 7. Groups Tab
+  - [x] 7.1 Collection List Polish
+  - [x] 7.2 Collection Detail & Group Form
 - [ ] Phase 8. Empty States & First-Use Flow
   - [ ] 8.1 First-Use Onboarding Without Landing
   - [ ] 8.2 Error & Disabled State Copy
@@ -352,10 +352,10 @@ Purpose:
 카드 관리 화면을 조밀하지만 읽기 좋은 도구로 만든다.
 
 Tasks:
-- [ ] 카드 item에서 front, back, memo, examples, group path의 위계를 정리한다.
-- [ ] 카드 리스트 action 버튼이 content보다 과하게 보이지 않게 한다.
-- [ ] all cards / collection / group filter 상태를 명확히 표현한다.
-- [ ] 검색 결과 없음, 대그룹 없음, 소그룹 없음 상태를 각각 다르게 안내한다.
+- [x] 카드 item에서 front, back, memo, examples, group path의 위계를 정리한다.
+- [x] 카드 리스트 action 버튼이 content보다 과하게 보이지 않게 한다.
+- [x] all cards / collection / group filter 상태를 명확히 표현한다.
+- [x] 검색 결과 없음, 대그룹 없음, 소그룹 없음 상태를 각각 다르게 안내한다.
 
 Files:
 - `static/app.js`
@@ -371,10 +371,10 @@ Purpose:
 카드 등록 피로도를 줄인다.
 
 Tasks:
-- [ ] 대그룹/소그룹 dependent select를 form 상단에서 더 명확히 묶는다.
-- [ ] 선택한 대그룹에 소그룹이 없을 때 CTA를 더 명확히 한다.
-- [ ] 대량 등록 미리보기에서 줄별 오류/중복을 더 잘 보이게 한다.
-- [ ] 형식 힌트는 짧게 유지하고, 필요하면 접힘/예시 형태로 둔다.
+- [x] 대그룹/소그룹 dependent select를 form 상단에서 더 명확히 묶는다.
+- [x] 선택한 대그룹에 소그룹이 없을 때 CTA를 더 명확히 한다.
+- [x] 대량 등록 미리보기에서 줄별 오류/중복을 더 잘 보이게 한다.
+- [x] 형식 힌트는 짧게 유지하고, 필요하면 접힘/예시 형태로 둔다.
 
 Files:
 - `static/app.js`
@@ -392,9 +392,9 @@ Purpose:
 묶음 관리가 구조적으로 이해되게 한다.
 
 Tasks:
-- [ ] 대그룹 list item의 title/stats/description/action 위계를 정리한다.
-- [ ] "묶음"이라는 탭명과 "대그룹"이라는 구조명을 혼동하지 않게 copy를 정리한다.
-- [ ] empty 대그룹 list에서 첫 대그룹 만들기 CTA를 명확히 한다.
+- [x] 대그룹 list item의 title/stats/description/action 위계를 정리한다.
+- [x] "묶음"이라는 탭명과 "대그룹"이라는 구조명을 혼동하지 않게 copy를 정리한다.
+- [x] empty 대그룹 list에서 첫 대그룹 만들기 CTA를 명확히 한다.
 
 Files:
 - `static/app.js`
@@ -410,9 +410,9 @@ Purpose:
 소그룹 추가/수정 흐름을 더 제품답게 만든다.
 
 Tasks:
-- [ ] 대그룹 상세 상단에 back action과 title hierarchy를 정리한다.
-- [ ] 소그룹 만들기 form에서 대그룹 select가 필요한 경우와 아닌 경우를 구분한다.
-- [ ] 삭제/초기화 action은 danger zone처럼 분리한다.
+- [x] 대그룹 상세 상단에 back action과 title hierarchy를 정리한다.
+- [x] 소그룹 만들기 form에서 대그룹 select가 필요한 경우와 아닌 경우를 구분한다.
+- [x] 삭제/초기화 action은 danger zone처럼 분리한다.
 
 Files:
 - `static/app.js`
