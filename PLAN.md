@@ -101,9 +101,9 @@ Core direction:
   - [x] 13.2 Destructive Actions & Restore Safety
   - [x] 13.3 Client State Edge Cases
   - [x] 13.4 Backup Schema & Migration Contract
-- [ ] Phase 14. Performance & Large Data UX
-  - [ ] 14.1 List Rendering & Search Responsiveness
-  - [ ] 14.2 Network/Request Feedback
+- [x] Phase 14. Performance & Large Data UX
+  - [x] 14.1 List Rendering & Search Responsiveness
+  - [x] 14.2 Network/Request Feedback
 - [ ] Phase 15. Product QA Pass
   - [ ] 15.1 Visual QA
   - [ ] 15.2 Functional QA
@@ -778,11 +778,11 @@ Purpose:
 카드/소그룹이 많아져도 관리 화면이 답답하지 않게 한다.
 
 Tasks:
-- [ ] 카드 100개, 500개, 1000개 test data에서 렌더링 감각을 확인한다.
-- [ ] 카드 검색 input 렌더링이 매 key 입력마다 과하게 무거워지지 않는지 확인한다.
-- [ ] 대량 등록 preview가 긴 입력에서도 화면을 잠그지 않게 한다.
-- [ ] 리스트 item markup과 CSS가 불필요하게 무거운 중첩을 만들지 않는지 정리한다.
-- [ ] 필요 시 pagination, collapse, lightweight virtualization 중 가장 작은 개선안을 정한다.
+- [x] 카드 100개, 500개, 1000개 test data에서 렌더링 감각을 확인한다.
+- [x] 카드 검색 input 렌더링이 매 key 입력마다 과하게 무거워지지 않는지 확인한다.
+- [x] 대량 등록 preview가 긴 입력에서도 화면을 잠그지 않게 한다.
+- [x] 리스트 item markup과 CSS가 불필요하게 무거운 중첩을 만들지 않는지 정리한다.
+- [x] 필요 시 pagination, collapse, lightweight virtualization 중 가장 작은 개선안을 정한다.
 
 Files:
 - `static/app.js`
@@ -800,10 +800,10 @@ Purpose:
 저장/삭제/학습 완료 요청이 느릴 때도 사용자가 현재 상태를 이해하게 한다.
 
 Tasks:
-- [ ] 저장/삭제/복원/학습 완료 요청 중 중복 submit을 막는다.
-- [ ] pending 중인 primary button label을 상황에 맞게 바꾼다.
-- [ ] 실패 시 입력값을 잃지 않고 다시 시도할 수 있게 한다.
-- [ ] `request()` 공통 error handling과 화면별 inline error의 역할을 분리한다.
+- [x] 저장/삭제/복원/학습 완료 요청 중 중복 submit을 막는다.
+- [x] pending 중인 primary button label을 상황에 맞게 바꾼다.
+- [x] 실패 시 입력값을 잃지 않고 다시 시도할 수 있게 한다.
+- [x] `request()` 공통 error handling과 화면별 inline error의 역할을 분리한다.
 
 Files:
 - `static/app.js`

@@ -37,6 +37,9 @@ const JLPT_LEVELS = ["N1", "N2", "N3", "N4", "N5"];
 const DEFAULT_WEAK_CARD_THRESHOLD = 16;
 const DEFAULT_WEAK_RECENT_ROUNDS = 3;
 const DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8;
+const CARD_LIST_PAGE_SIZE = 80;
+const BULK_PREVIEW_RENDER_LIMIT = 80;
+const SEARCH_RENDER_DELAY_MS = 90;
 
 const state = {
   activeTab: "study",
@@ -72,6 +75,7 @@ const state = {
   collectionSearchQuery: "",
   studyGroupSortMode: "recent",
   groupSearchQuery: "",
+  cardListLimit: CARD_LIST_PAGE_SIZE,
   scrollPositions: {},
   cardScreen: "list",
   groupScreen: "list",
@@ -115,6 +119,7 @@ let studyTimerId = null;
 let renderedDialogName = null;
 let dialogReturnFocusEl = null;
 let shouldFocusDialogOnRender = false;
+let deferredSearchRenderId = null;
 const ANSWER_FEEDBACK_MS = 230;
 const FOCUSABLE_SELECTOR = [
   "button:not([disabled])",
@@ -362,6 +367,7 @@ function resetDataScopedUiState() {
     cardScreen: "list",
     groupScreen: "list",
     groupDetailCollectionId: null,
+    cardListLimit: CARD_LIST_PAGE_SIZE,
     bulkDraftText: "",
     bulkDraftGroupId: null,
     bulkPreview: null,
@@ -698,6 +704,19 @@ function restoreScrollPosition(key) {
 
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function resetCardListLimit() {
+  state.cardListLimit = CARD_LIST_PAGE_SIZE;
+}
+
+function scheduleSearchRender(renderTask, inputId) {
+  window.clearTimeout(deferredSearchRenderId);
+  deferredSearchRenderId = window.setTimeout(() => {
+    deferredSearchRenderId = null;
+    renderTask();
+    refocusInput(inputId);
+  }, SEARCH_RENDER_DELAY_MS);
 }
 
 function renderOrientationNote(parts, note) {
@@ -1204,12 +1223,25 @@ function render() {
   document.body.classList.remove("auth-mode", "shell-mode");
   renderHeader();
   setTab(state.activeTab);
-  renderStudy();
-  renderCards();
-  renderGroups();
-  renderSettings();
+  renderActiveTab();
   renderDialog();
   syncStudyTimer();
+}
+
+function renderActiveTab() {
+  if (state.activeTab === "cards") {
+    renderCards();
+    return;
+  }
+  if (state.activeTab === "groups") {
+    renderGroups();
+    return;
+  }
+  if (state.activeTab === "settings") {
+    renderSettings();
+    return;
+  }
+  renderStudy();
 }
 
 function getAppErrorCopy(error = state.appError) {
@@ -2520,7 +2552,7 @@ function renderStudySession() {
         </div>
         <div class="study-session-controls">
           <button class="ghost-button small-button" type="button" data-action="quit-study" ${
-            session.isAnswering ? "disabled" : ""
+            session.isAnswering || session.saving ? "disabled" : ""
           }>${iconLabel("x", "포기")}</button>
           <span id="study-elapsed" class="timer-pill">${formatDuration(elapsedSeconds(session))}</span>
           <span class="pill">${session.passNo}차 ${session.index + 1}/${total}</span>
@@ -2550,7 +2582,9 @@ function renderStudySession() {
       </div>
       <div class="study-action-bar ${feedbackClass}">
         ${
-          session.showingBack
+          session.saving
+            ? `<button class="primary-button full" type="button" disabled>${iconLabel("save", "결과 저장 중")}</button>`
+            : session.showingBack
             ? `<div class="study-actions"><button class="answer-wrong" type="button" data-action="answer-card" data-result="wrong" ${
                 session.isAnswering ? "disabled" : ""
               }>${iconLabel("x", "틀림")}</button><button class="answer-correct" type="button" data-action="answer-card" data-result="correct" ${
@@ -3125,6 +3159,9 @@ function renderCardEditorPanel(editing, formGroupId) {
 
 function renderCardListPanel(visibleCards, filteredCards = visibleCards) {
   const collectionGroups = getCardFilterGroups();
+  const displayLimit = Math.max(CARD_LIST_PAGE_SIZE, number(state.cardListLimit));
+  const displayCards = visibleCards.slice(0, displayLimit);
+  const hiddenCount = Math.max(0, visibleCards.length - displayCards.length);
   return `
     <div class="panel stack">
       <div class="row">
@@ -3181,11 +3218,24 @@ function renderCardListPanel(visibleCards, filteredCards = visibleCards) {
       ${renderSearchInput({ id: "card-search", value: state.cardSearchQuery, placeholder: "카드 검색" })}
       <div class="card-list">
       ${
-        visibleCards.length
-          ? visibleCards.map(renderCardListItem).join("")
+        displayCards.length
+          ? displayCards.map(renderCardListItem).join("")
           : renderCardListEmptyState(filteredCards)
       }
       </div>
+      ${
+        hiddenCount
+          ? `<div class="list-footer">
+              <p>${number(displayCards.length)}/${number(visibleCards.length)}개 표시 중입니다.</p>
+              <button class="secondary-button full" type="button" data-action="show-more-cards">${iconLabel(
+                "chevron-down",
+                `${Math.min(CARD_LIST_PAGE_SIZE, hiddenCount)}개 더 보기`,
+              )}</button>
+            </div>`
+          : visibleCards.length > CARD_LIST_PAGE_SIZE
+            ? `<p class="list-performance-note">현재 범위의 카드 ${number(visibleCards.length)}개를 모두 표시했습니다.</p>`
+            : ""
+      }
     </div>
   `;
 }
@@ -3277,6 +3327,8 @@ function renderBulkCardForm(groupId) {
 
 function renderBulkPreview(preview) {
   const canCreate = preview.items.length > 0 && !preview.errors.length && preview.warningCount === 0;
+  const displayItems = preview.items.slice(0, BULK_PREVIEW_RENDER_LIMIT);
+  const hiddenCount = Math.max(0, preview.items.length - displayItems.length);
   const statusText = preview.errors.length
     ? "형식 오류가 있습니다."
     : preview.warningCount
@@ -3309,11 +3361,21 @@ function renderBulkPreview(preview) {
           : ""
       }
       <div class="bulk-preview-list">
-        ${preview.items.map(renderBulkPreviewItem).join("")}
+        ${displayItems.map(renderBulkPreviewItem).join("")}
       </div>
+      ${
+        hiddenCount
+          ? `<p class="bulk-preview-note">미리보기는 먼저 ${number(
+              displayItems.length,
+            )}개만 표시합니다. 등록하면 확인된 ${number(preview.items.length)}개가 모두 저장됩니다.</p>`
+          : ""
+      }
       <button class="primary-button full" type="button" data-action="confirm-bulk-cards" ${
-        canCreate ? "" : "disabled"
-      }>${iconLabel("check", "미리보기대로 등록")}</button>
+        canCreate && state.pendingRequest?.action !== "confirm-bulk-cards" ? "" : "disabled"
+      }>${iconLabel(
+        "check",
+        state.pendingRequest?.action === "confirm-bulk-cards" ? state.pendingRequest.label : "미리보기대로 등록",
+      )}</button>
       ${canCreate || !disabledReason ? "" : renderDisabledReason(disabledReason)}
     </section>
   `;
@@ -4142,6 +4204,7 @@ async function answerCard(result) {
     return;
   }
   session.saving = true;
+  render();
   try {
     const payload = {
       order_mode: session.orderMode,
@@ -4220,6 +4283,7 @@ async function saveCard(form) {
   if (targetGroup) state.selectedCollectionId = targetGroup.collection_id;
   if (targetGroup) state.cardFilterCollectionId = String(targetGroup.collection_id);
   state.cardFilterGroupId = String(payload.group_id);
+  resetCardListLimit();
   await loadData();
   render();
   showToast(isEditing ? "카드를 저장했습니다." : "카드를 등록했습니다.");
@@ -4239,27 +4303,38 @@ function previewBulkCards(form) {
 
 async function confirmBulkCards() {
   const preview = state.bulkPreview;
+  if (state.pendingRequest) return;
   if (!preview || preview.errors.length || preview.warningCount || !preview.items.length) {
     showToast("미리보기의 오류나 중복을 먼저 정리해주세요.");
     return;
   }
-  const data = await request("/api/cards/bulk", {
-    method: "POST",
-    body: JSON.stringify({ group_id: preview.groupId, text: preview.text }),
-  });
-  state.selectedGroupId = preview.groupId;
-  const targetGroup = state.groups.find((group) => Number(group.id) === Number(preview.groupId));
-  if (targetGroup) state.selectedCollectionId = targetGroup.collection_id;
-  if (targetGroup) state.cardFilterCollectionId = String(targetGroup.collection_id);
-  state.cardFilterGroupId = String(preview.groupId);
-  state.cardSearchQuery = "";
-  state.cardScreen = "list";
-  state.bulkDraftText = "";
-  state.bulkDraftGroupId = null;
-  state.bulkPreview = null;
-  await loadData();
-  render();
-  showToast(`카드 ${data.created_count}개를 등록했습니다.`);
+  state.pendingRequest = { action: "confirm-bulk-cards", label: "등록 중" };
+  renderCards();
+  try {
+    const data = await request("/api/cards/bulk", {
+      method: "POST",
+      body: JSON.stringify({ group_id: preview.groupId, text: preview.text }),
+    });
+    state.pendingRequest = null;
+    state.selectedGroupId = preview.groupId;
+    const targetGroup = state.groups.find((group) => Number(group.id) === Number(preview.groupId));
+    if (targetGroup) state.selectedCollectionId = targetGroup.collection_id;
+    if (targetGroup) state.cardFilterCollectionId = String(targetGroup.collection_id);
+    state.cardFilterGroupId = String(preview.groupId);
+    state.cardSearchQuery = "";
+    resetCardListLimit();
+    state.cardScreen = "list";
+    state.bulkDraftText = "";
+    state.bulkDraftGroupId = null;
+    state.bulkPreview = null;
+    await loadData();
+    render();
+    showToast(`카드 ${data.created_count}개를 등록했습니다.`);
+  } catch (error) {
+    state.pendingRequest = null;
+    renderCards();
+    throw error;
+  }
 }
 
 async function saveGroup(form) {
@@ -4440,6 +4515,7 @@ function logout() {
     collectionSearchQuery: "",
     studyGroupSortMode: "recent",
     groupSearchQuery: "",
+    cardListLimit: CARD_LIST_PAGE_SIZE,
     scrollPositions: {},
     cardScreen: "list",
     groupScreen: "list",
@@ -4981,6 +5057,7 @@ document.addEventListener("click", async (event) => {
       const target = actionEl.dataset.target;
       if (target === "card-search") {
         state.cardSearchQuery = "";
+        resetCardListLimit();
         renderCards();
       }
       if (target === "study-collection-search") {
@@ -5003,6 +5080,11 @@ document.addEventListener("click", async (event) => {
     if (action === "show-all-cards") {
       state.cardFilterCollectionId = "all";
       state.cardFilterGroupId = "";
+      resetCardListLimit();
+      renderCards();
+    }
+    if (action === "show-more-cards") {
+      state.cardListLimit = number(state.cardListLimit) + CARD_LIST_PAGE_SIZE;
       renderCards();
     }
     if (action === "add-example") {
@@ -5120,10 +5202,12 @@ document.addEventListener("change", async (event) => {
     if (event.target.id === "card-collection-filter") {
       state.cardFilterCollectionId = event.target.value;
       state.cardFilterGroupId = "";
+      resetCardListLimit();
       renderCards();
     }
     if (event.target.id === "card-group-filter") {
       state.cardFilterGroupId = event.target.value;
+      resetCardListLimit();
       renderCards();
     }
     if (event.target.id === "study-collection-select") {
@@ -5197,28 +5281,24 @@ function updateSearchInput(event) {
   }
   if (event.target.id === "card-search") {
     state.cardSearchQuery = event.target.value;
-    renderCards();
-    refocusInput("card-search");
+    resetCardListLimit();
+    scheduleSearchRender(renderCards, "card-search");
   }
   if (event.target.id === "study-collection-search") {
     state.studyCollectionSearchQuery = event.target.value;
-    renderStudy();
-    refocusInput("study-collection-search");
+    scheduleSearchRender(renderStudy, "study-collection-search");
   }
   if (event.target.id === "study-group-search") {
     state.studyGroupSearchQuery = event.target.value;
-    renderStudy();
-    refocusInput("study-group-search");
+    scheduleSearchRender(renderStudy, "study-group-search");
   }
   if (event.target.id === "collection-search") {
     state.collectionSearchQuery = event.target.value;
-    renderGroups();
-    refocusInput("collection-search");
+    scheduleSearchRender(renderGroups, "collection-search");
   }
   if (event.target.id === "group-search") {
     state.groupSearchQuery = event.target.value;
-    renderGroups();
-    refocusInput("group-search");
+    scheduleSearchRender(renderGroups, "group-search");
   }
 }
 
