@@ -608,12 +608,34 @@ h3 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loading-lines span {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 
+  .loading-lines span,
+  .study-card,
   button.is-pending .icon {
-    animation: none;
+    animation: none !important;
+  }
+
+  .primary-button:not(:disabled):hover,
+  .secondary-button:not(:disabled):hover,
+  .danger-button:not(:disabled):hover,
+  .ghost-button:not(:disabled):hover,
+  .segment:not(:disabled):hover,
+  .order-option:not(:disabled):hover,
+  button:active,
+  .today-action-card:active,
+  .study-start-panel:active,
+  .group-item:active,
+  .round-item-button:active {
+    transform: none;
   }
 }
 

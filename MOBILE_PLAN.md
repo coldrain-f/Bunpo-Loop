@@ -83,10 +83,10 @@ Core mobile rules:
 - [x] Phase 6. Mobile Performance
   - [x] 6.1 Large List Responsiveness
   - [x] 6.2 Loading & Network Feedback
-- [ ] Phase 7. Touch & Accessibility
+- [x] Phase 7. Touch & Accessibility
   - [x] 7.1 Touch Target Audit
-  - [ ] 7.2 Screen Reader & Focus Audit
-  - [ ] 7.3 Motion & Scroll Preferences
+  - [x] 7.2 Screen Reader & Focus Audit
+  - [x] 7.3 Motion & Scroll Preferences
 - [ ] Phase 8. PWA & Offline Readiness
   - [ ] 8.1 Install Surface
   - [ ] 8.2 Offline Behavior
@@ -431,7 +431,7 @@ Acceptance Criteria:
 Verification:
 - 모든 dialog panel에 `max-height: min(86vh, 760px)`와 내부 scroll/overscroll containment를 적용했다.
 - preview dialog는 header/action을 고정된 grid 영역에 두고 목록만 내부 scroll되도록 정리했다.
-- 삭제/초기화 confirm 문구가 대상 이름, 예문/회독 기록/정오답 누적 영향, 되돌릴 수 없음을 직접 말한다.
+- 삭제/초기화 confirm 문구가 대상 이름, 예문/회독 기록/정답/오답 누적 영향, 되돌릴 수 없음을 직접 말한다.
 - dismissible dialog는 backdrop tap과 Escape로 닫히고, confirm dialog는 backdrop/Escape에서 취소 버튼으로 focus를 돌린다.
 - `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200 확인을 통과했다. 인앱 브라우저 패널이 없어 실제 터치/시각 검증은 다음 브라우저 가능 시점에 다시 확인한다.
 
@@ -486,7 +486,7 @@ Acceptance Criteria:
 Verification:
 - 카드 검색은 카드별 검색 텍스트를 `WeakMap`으로 캐시해 예문 포함 검색의 반복 문자열 조합을 줄였다.
 - 카드 목록은 기존 80개 단위 pagination을 유지하고, 소그룹 상세 목록은 60개 단위 더 보기로 DOM 증가를 제한했다.
-- 통계 대그룹 목록은 40개 단위, 회독 상세의 틀린 카드/한 번에 맞은 카드는 60개 단위 더 보기로 나눠 큰 기록에서 렌더를 줄였다.
+- 통계 대그룹 목록은 40개 단위, 회독 상세의 오답 카드/첫 시도 정답 카드는 60개 단위 더 보기로 나눠 큰 기록에서 렌더를 줄였다.
 - 검색 debounce를 120ms로 조정해 모바일 키보드 입력 중 렌더 빈도를 조금 낮췄다.
 - 합성 100/500/1000장 카드 검색 벤치: cached 검색이 각각 0.047ms / 0.070ms / 0.105ms로 확인됐다.
 - `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200/title 확인을 통과했다. 인앱 브라우저 패널이 없어 실제 터치/시각 검증은 다음 브라우저 가능 시점에 다시 확인한다.
@@ -554,11 +554,11 @@ Purpose:
 모바일 접근성의 기본 신뢰도를 유지한다.
 
 Tasks:
-- [ ] form label과 input/select 연결을 확인한다.
-- [ ] icon-only button의 accessible name을 확인한다.
-- [ ] active tab, selected subgroup, disabled reason이 의미로 전달되는지 확인한다.
-- [ ] dialog title/description/focus trap이 안정적인지 확인한다.
-- [ ] keyboard만으로 로그인, 카드 추가, 학습 시작, dialog close를 수행한다.
+- [x] form label과 input/select 연결을 확인한다.
+- [x] icon-only button의 accessible name을 확인한다.
+- [x] active tab, selected subgroup, disabled reason이 의미로 전달되는지 확인한다.
+- [x] dialog title/description/focus trap이 안정적인지 확인한다.
+- [x] keyboard만으로 로그인, 카드 추가, 학습 시작, dialog close를 수행한다.
 
 Files:
 - `static/app.js`
@@ -570,16 +570,23 @@ Acceptance Criteria:
 - focus ring이 보이고, focus가 예기치 않게 사라지지 않는다.
 - 설명을 숨긴 help도 접근 가능한 이름과 상태를 가진다.
 
+Verification:
+- 하단 nav에 초기/동적 `aria-current`와 현재 탭 accessible name을 맞췄고, 소그룹 선택 버튼에는 `aria-pressed`를 추가했다.
+- 숨긴 help summary는 `aria-controls`와 `aria-expanded`를 가지며, details toggle 이벤트에서 열린 상태를 동기화한다.
+- 비활성 action 설명은 안정적인 id와 `role="note"`를 갖고, 주요 disabled control에서 `aria-describedby`로 연결한다.
+- 미리보기, 묶음 연습, 회독 상세 dialog의 title/description 연결을 보강했고 기존 focus trap/return focus 흐름을 유지했다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200/title, ARIA 연결 정적 검사를 통과했다. 인앱 브라우저 패널이 없고 headless Chrome 실행 승인이 사용량 제한으로 막혀 실제 키보드 실측은 다음 브라우저 가능 시점에 다시 확인한다.
+
 ### 7.3 Motion & Scroll Preferences
 
 Purpose:
 모바일에서 작은 animation과 scroll 보정이 편안하게 느껴지도록 한다.
 
 Tasks:
-- [ ] `prefers-reduced-motion` 환경에서 essential action이 animation에 의존하지 않는지 확인한다.
-- [ ] smooth scroll, focus scroll, dialog transition이 과하거나 어지럽지 않은지 확인한다.
-- [ ] active session에서 card flip이나 feedback transition이 버튼 위치를 흔들지 않는지 확인한다.
-- [ ] scroll restoration 또는 focus 이동이 사용자를 갑자기 화면 밖으로 보내지 않는지 확인한다.
+- [x] `prefers-reduced-motion` 환경에서 essential action이 animation에 의존하지 않는지 확인한다.
+- [x] smooth scroll, focus scroll, dialog transition이 과하거나 어지럽지 않은지 확인한다.
+- [x] active session에서 card flip이나 feedback transition이 버튼 위치를 흔들지 않는지 확인한다.
+- [x] scroll restoration 또는 focus 이동이 사용자를 갑자기 화면 밖으로 보내지 않는지 확인한다.
 
 Files:
 - `static/styles.css`
@@ -589,6 +596,13 @@ Acceptance Criteria:
 - 모션을 줄인 환경에서도 모든 정보를 이해할 수 있다.
 - 화면 전환이 가볍고 예측 가능하다.
 - scroll/focus 보정이 사용자의 현재 작업을 방해하지 않는다.
+
+Verification:
+- `prefers-reduced-motion: reduce`에서 loading skeleton, pending icon, study card 진입 animation을 제거하고 hover/active 이동 효과를 비활성화했다.
+- JS smooth scroll 호출을 `getMotionSafeScrollBehavior()`와 `scrollIntoViewSafely()`로 모아 reduced-motion 환경에서는 `auto` scroll을 쓰도록 정리했다.
+- active session의 카드 전환은 layout을 바꾸는 flip animation이 아니라 front/back render와 고정 answer bar 구조를 유지하며, reduced-motion에서는 card enter animation도 꺼지게 했다.
+- tab/detail scroll restoration은 저장된 scrollY를 현재 문서 높이에 맞춰 clamp해서 짧아진 화면에서 갑자기 화면 밖 위치로 이동하지 않게 했다.
+- `node --check static/app.js`, `git diff --check`, reduced-motion 관련 정적 검사를 통과했다. 로컬 HTTP 200/title과 360px/390px browser smoke에서 horizontal overflow 0건, console error 0건을 확인했다. 실제 기기 reduced-motion 실측은 Phase 9 real-device QA에서 다시 확인한다.
 
 ## Phase 8. PWA & Offline Readiness
 
@@ -678,3 +692,6 @@ Acceptance Criteria:
 - 모바일 개선 후에도 제품의 데이터 규칙이 유지된다.
 - 핵심 화면에 horizontal overflow, 가려진 CTA, 읽기 어려운 설명이 없다.
 - `MOBILE_PLAN.md`의 모든 체크가 실제 확인 결과와 맞다.
+
+Pre-QA Notes:
+- 정답률 copy는 `최근 첫 시도`와 `재풀이 포함`으로 구분한다. 최근/첫 시도 지표는 각 카드의 첫 풀이만 보고, 재풀이 포함 지표는 오답 반복 풀이까지 포함한 전체 시도 기준으로 표시한다.
