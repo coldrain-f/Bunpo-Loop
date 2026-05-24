@@ -1297,38 +1297,6 @@ h3 {
   line-height: 1.42;
 }
 
-.format-guide {
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-strong);
-}
-
-.format-guide summary {
-  cursor: pointer;
-  color: var(--ink);
-  font-size: 0.86rem;
-  font-weight: 850;
-}
-
-.format-guide div {
-  display: grid;
-  gap: 6px;
-  margin-top: 9px;
-}
-
-.format-guide p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.42;
-}
-
-.format-guide code {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-}
-
 .duplicate-warning {
   margin: -4px 0 0;
   padding: 9px 10px;
@@ -1381,6 +1349,28 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-strong);
+}
+
+.bulk-mode-note {
+  display: grid;
+  gap: 3px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.bulk-mode-note strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.bulk-mode-note span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 760;
+  line-height: 1.4;
 }
 
 .card-filter-summary span,
@@ -1471,6 +1461,10 @@ textarea[name="example_japanese"] {
 .backup-textarea {
   font-family: var(--font-mono);
   font-size: 0.86rem;
+}
+
+.bulk-textarea {
+  max-height: min(42vh, 360px);
 }
 
 .input:focus,
@@ -3049,7 +3043,7 @@ button:active,
 
 .bulk-preview-list {
   display: grid;
-  max-height: min(42vh, 420px);
+  max-height: min(34vh, 360px);
   gap: 8px;
   overflow-y: auto;
   padding-right: 3px;
@@ -3091,12 +3085,15 @@ button:active,
 
 .bulk-issues {
   display: grid;
+  max-height: min(28vh, 220px);
   gap: 4px;
+  overflow-y: auto;
   padding: 10px;
   border-radius: 8px;
   font-size: 0.84rem;
   font-weight: 800;
   line-height: 1.4;
+  overscroll-behavior: contain;
 }
 
 .bulk-issues p {
@@ -4169,7 +4166,8 @@ button:active,
 
 @media (max-width: 480px) {
   #settings-form .help-disclosure p,
-  .data-safety-panel .help-disclosure p {
+  .data-safety-panel .help-disclosure p,
+  #bulk-card-form .help-disclosure p {
     position: fixed;
     top: auto;
     right: 16px;
@@ -4183,6 +4181,24 @@ button:active,
 
   .card-location-grid {
     grid-template-columns: 1fr;
+  }
+
+  .bulk-textarea {
+    min-height: 124px;
+    max-height: min(30vh, 260px);
+  }
+
+  .bulk-preview {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .bulk-preview-list {
+    max-height: min(30vh, 260px);
+  }
+
+  .bulk-issues {
+    max-height: min(24vh, 180px);
   }
 }
 

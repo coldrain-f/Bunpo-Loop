@@ -4440,20 +4440,23 @@ function renderBulkCardForm(groupId) {
       ${
         groupMissingPanel ||
         `
-      <label class="field">
-        <span>카드</span>
-        <textarea class="textarea bulk-textarea" name="bulk_text" placeholder="〜あまり | ~한 나머지 | 메모 | 緊張の[[あまり]]、声が震えた。 => 긴장한 나머지 목소리가 떨렸다.&#10;〜に至っては | ~에 이르러서는">${escapeHtml(
+      <div class="bulk-mode-note">
+        <strong>여러 장 보조 등록</strong>
+        <span>미리보기로 오류와 중복을 확인한 뒤 한 번에 저장합니다.</span>
+      </div>
+      <div class="field">
+        <div class="field-label-row">
+          <label for="bulk-card-textarea">카드</label>
+          ${renderHelpDisclosure(
+            "대량 등록 형식 안내",
+            "한 줄에 한 장씩 입력합니다. 구분자는 | 또는 탭을 쓰고, 예문 번역은 => 뒤에 적습니다. 강조할 조각은 [[ ]]로 감쌉니다.",
+          )}
+        </div>
+        <textarea id="bulk-card-textarea" class="textarea bulk-textarea" name="bulk_text" aria-describedby="bulk-card-help" placeholder="〜あまり | ~한 나머지 | 메모 | 緊張の[[あまり]]、声が震えた。 => 긴장한 나머지 목소리가 떨렸다.&#10;〜に至っては | ~에 이르러서는">${escapeHtml(
           state.bulkDraftText,
         )}</textarea>
-      </label>
-      <details class="format-guide">
-        <summary>입력 형식 보기</summary>
-        <div>
-          <p>한 줄에 한 장씩 입력합니다. 구분자는 <code>|</code> 또는 탭을 사용할 수 있습니다.</p>
-          <p><code>앞면 | 뒷면 | 메모 | 예문 =&gt; 번역</code></p>
-          <p>예문에서 강조할 부분은 <code>[[이렇게]]</code> 감싸면 학습 화면에서만 하이라이트됩니다.</p>
-        </div>
-      </details>
+        <small id="bulk-card-help" class="form-hint">한 줄에 한 장씩 입력한 뒤 미리보기로 확인합니다.</small>
+      </div>
       <button class="secondary-button full" type="submit">${iconLabel("eye", "미리보기")}</button>
       ${preview ? renderBulkPreview(preview) : ""}
         `
@@ -4479,22 +4482,22 @@ function renderBulkPreview(preview) {
         ? ""
         : "등록할 카드가 없습니다.";
   return `
-    <section class="bulk-preview">
+    <section class="bulk-preview" aria-labelledby="bulk-preview-title">
       <div class="completion-header">
         <div>
-          <h3>등록 미리보기</h3>
+          <h3 id="bulk-preview-title">등록 미리보기</h3>
           <p class="meta">${escapeHtml(statusText)}</p>
         </div>
         <span class="pill ${canCreate ? "good" : preview.errors.length ? "bad" : ""}">${preview.items.length}개</span>
       </div>
       ${
         preview.errors.length
-          ? `<div class="bulk-issues bad">${preview.errors.map((error) => `<p>${escapeHtml(error)}</p>`).join("")}</div>`
+          ? `<div class="bulk-issues bad" role="alert">${preview.errors.map((error) => `<p>${escapeHtml(error)}</p>`).join("")}</div>`
           : ""
       }
       ${
         preview.warningCount
-          ? `<div class="bulk-issues warn"><p>중복 카드 ${preview.warningCount}건이 있습니다. 정리 후 다시 미리보기를 눌러주세요.</p></div>`
+          ? `<div class="bulk-issues warn" role="alert"><p>중복 카드 ${preview.warningCount}건이 있습니다. 정리 후 다시 미리보기를 눌러주세요.</p></div>`
           : ""
       }
       <div class="bulk-preview-list">
@@ -5414,6 +5417,7 @@ function previewBulkCards(form) {
   state.bulkDraftText = text;
   state.bulkPreview = buildBulkPreview(groupId, text);
   renderCards();
+  focusAfterRender(state.bulkPreview.errors.length ? ".bulk-issues.bad" : "#bulk-preview-title");
   if (!state.bulkPreview.errors.length && !state.bulkPreview.warningCount) {
     showToast(`카드 ${state.bulkPreview.items.length}개를 확인했습니다.`);
   }

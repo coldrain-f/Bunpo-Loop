@@ -73,10 +73,10 @@ Core mobile rules:
 - [x] Phase 3. Study Session Ergonomics
   - [x] 3.1 Card Reading & Flip Comfort
   - [x] 3.2 Answer Bar & Completion Flow
-- [ ] Phase 4. Mobile Forms & Keyboard
+- [x] Phase 4. Mobile Forms & Keyboard
   - [x] 4.1 Settings Form Pass
   - [x] 4.2 Card Creation Form Pass
-  - [ ] 4.3 Bulk Input Pass
+  - [x] 4.3 Bulk Input Pass
 - [ ] Phase 5. Dialogs & Bottom Sheets
   - [ ] 5.1 Core Dialog Pass
   - [ ] 5.2 Dense Picker Pass
@@ -383,10 +383,10 @@ Purpose:
 대량 등록이 모바일에서도 최소한 읽고 수정 가능한 보조 도구로 동작하게 한다.
 
 Tasks:
-- [ ] 대량 등록 형식 도움말을 inline help 또는 compact disclosure로 정리한다.
-- [ ] textarea 높이와 preview/error 영역이 작은 화면에서 균형을 잃지 않는지 확인한다.
-- [ ] 긴 오류 목록이 전체 화면을 밀어내지 않도록 max-height와 scroll을 점검한다.
-- [ ] 모바일에서는 대량 등록이 보조 기능임을 밀도와 CTA 위계로 드러낸다.
+- [x] 대량 등록 형식 도움말을 inline help 또는 compact disclosure로 정리한다.
+- [x] textarea 높이와 preview/error 영역이 작은 화면에서 균형을 잃지 않는지 확인한다.
+- [x] 긴 오류 목록이 전체 화면을 밀어내지 않도록 max-height와 scroll을 점검한다.
+- [x] 모바일에서는 대량 등록이 보조 기능임을 밀도와 CTA 위계로 드러낸다.
 
 Files:
 - `static/app.js`
@@ -396,6 +396,14 @@ Acceptance Criteria:
 - 대량 등록 화면이 문서처럼 길어 보이지 않는다.
 - 오류가 많아도 저장/취소 흐름이 가려지지 않는다.
 - 한 장 등록 흐름보다 더 중요해 보이지 않는다.
+
+Verification:
+- 기존 대량 등록 형식 설명 disclosure를 제거하고, 카드 label 옆 inline help로 옮겨 기본 화면의 설명 밀도를 낮췄다.
+- `여러 장 보조 등록` note와 secondary `미리보기` CTA를 유지해 한 장 등록보다 보조 기능처럼 보이게 했다.
+- 대량 등록 textarea, preview list, 오류/중복 영역에 max-height와 내부 scroll을 적용해 작은 화면에서 전체 form을 밀어내지 않게 했다.
+- preview 후 오류가 있으면 오류 영역, 오류가 없으면 preview 제목으로 focus를 옮겨 수정/확인 위치를 바로 잡게 했다.
+- 오류/중복 메시지는 `role="alert"`로 표시하고, 모바일 inline help는 설정 화면과 같은 fixed popover 규칙을 공유한다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200/UTF-8 title 확인을 통과했다. 인앱 브라우저 패널이 없어 실제 터치/키보드 검증은 다음 브라우저 가능 시점에 다시 확인한다.
 
 ## Phase 5. Dialogs & Bottom Sheets
 
