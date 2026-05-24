@@ -1413,6 +1413,13 @@ h3 {
   padding-left: 42px;
 }
 
+.search-field .input::-webkit-search-cancel-button,
+.search-field .input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 .search-icon {
   position: absolute;
   top: 50%;
