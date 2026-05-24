@@ -87,12 +87,12 @@ Core mobile rules:
   - [x] 7.1 Touch Target Audit
   - [x] 7.2 Screen Reader & Focus Audit
   - [x] 7.3 Motion & Scroll Preferences
-- [ ] Phase 8. PWA & Offline Readiness
-  - [ ] 8.1 Install Surface
-  - [ ] 8.2 Offline Behavior
+- [x] Phase 8. PWA & Offline Readiness
+  - [x] 8.1 Install Surface
+  - [x] 8.2 Offline Behavior
 - [ ] Phase 9. Mobile Release QA
   - [ ] 9.1 Real-Device Checklist
-  - [ ] 9.2 Final Regression Pass
+  - [x] 9.2 Final Regression Pass
 
 ## Phase 1. Mobile Viewport Baseline
 
@@ -612,10 +612,10 @@ Purpose:
 모바일에서 홈 화면에 추가했을 때 앱처럼 보이는 최소 기준을 맞춘다.
 
 Tasks:
-- [ ] manifest name, short_name, theme_color, background_color를 확인한다.
-- [ ] `logo-192.png`, apple touch icon, favicon이 현재 앱 이름과 맞는지 확인한다.
-- [ ] installed display mode에서 상단/하단 safe area가 어색하지 않은지 확인한다.
-- [ ] 설치를 강요하는 UI를 만들지 않고, 필요하면 설정이나 안내에 조용히 둔다.
+- [x] manifest name, short_name, theme_color, background_color를 확인한다.
+- [x] `logo-192.png`, apple touch icon, favicon이 현재 앱 이름과 맞는지 확인한다.
+- [x] installed display mode에서 상단/하단 safe area가 어색하지 않은지 확인한다.
+- [x] 설치를 강요하는 UI를 만들지 않고, 필요하면 설정이나 안내에 조용히 둔다.
 
 Files:
 - `static/manifest.webmanifest`
@@ -627,16 +627,25 @@ Acceptance Criteria:
 - 설치 후 첫 화면이 마케팅 랜딩이 아니라 학습 홈이다.
 - 브라우저와 설치형 실행 모두에서 layout이 깨지지 않는다.
 
+Verification:
+- `static/manifest.webmanifest`를 추가하고 `index.html`에서 manifest, application name, iOS 홈 화면 title/capable/status bar meta를 연결했다.
+- manifest는 `name`/`short_name`을 `꼬꼬회독`으로 두고, `theme_color`/`background_color`를 앱 canvas 색인 `#f6f7f5`로 맞췄다.
+- 기존 `logo-192.png`, `logo.png` 512px, `apple-touch-icon.png` 180px, `favicon-64.png` 크기를 확인했고 별도 asset 변경은 필요 없었다.
+- 설치를 유도하는 별도 UI는 추가하지 않았고, 첫 화면은 기존 학습 홈 흐름을 유지한다.
+- safe area는 기존 `viewport-fit=cover`와 app shell/bottom nav의 `env(safe-area-inset-*)` padding을 유지한다.
+- `node --check static/app.js`, manifest JSON parse, `git diff --check`, 로컬 manifest HTTP 200/content-type 확인을 통과했다.
+- 360px/390px browser smoke에서 manifest link, app name meta, apple title meta, title이 모두 `꼬꼬회독`으로 확인됐고 horizontal overflow 0건, console error 0건이었다.
+
 ### 8.2 Offline Behavior
 
 Purpose:
 오프라인 전체 지원 여부와 관계없이, 모바일 사용자가 실패 상태를 이해하게 한다.
 
 Tasks:
-- [ ] 현재 앱이 오프라인 학습을 지원하는지 제품적으로 판단한다.
-- [ ] 지원하지 않는다면 명확한 offline/error 안내와 재시도 경로를 둔다.
-- [ ] 지원한다면 service worker, cache, sync, 데이터 충돌 정책을 별도 phase로 확장한다.
-- [ ] 백업/복원과 오프라인 기대치가 충돌하지 않는지 확인한다.
+- [x] 현재 앱이 오프라인 학습을 지원하는지 제품적으로 판단한다.
+- [x] 지원하지 않는다면 명확한 offline/error 안내와 재시도 경로를 둔다.
+- [x] service worker, cache, sync, 데이터 충돌 정책을 별도 phase로 확장할지 판단한다.
+- [x] 백업/복원과 오프라인 기대치가 충돌하지 않는지 확인한다.
 
 Files:
 - `static/app.js`
@@ -648,6 +657,14 @@ Acceptance Criteria:
 - 네트워크가 끊겼을 때 앱이 조용히 실패하지 않는다.
 - 사용자가 데이터가 저장됐는지 아닌지 오해하지 않는다.
 - full offline 지원이 아니라면 그 한계를 제품 안에서 숨기지 않는다.
+
+Verification:
+- 현재 제품은 서버 API와 소그룹 공식 기록 저장을 기준으로 하므로 full offline 학습 저장은 지원하지 않는 것으로 정리했다.
+- service worker/cache/sync는 도입하지 않았다. 충돌 정책 없이 오프라인 저장처럼 보이는 상태를 만들지 않기 위해서다.
+- `navigator.onLine` 기반의 offline 상태 banner를 추가해 새 데이터 불러오기와 학습 기록 저장이 온라인에서만 가능함을 알린다.
+- request wrapper가 offline/write 실패를 `저장하지 못했습니다`로 안내하고, 기존 retry-load-data 버튼으로 초기 데이터 불러오기 실패를 다시 시도할 수 있게 유지했다.
+- 백업/복원은 서버 저장 작업이므로 오프라인에서는 저장 실패 toast로 명확히 막힌다.
+- 360px/390px browser smoke에서 온라인 상태의 offline banner 기본 hidden 상태와 console error 0건을 확인했다. 실제 기기 airplane mode 검증은 Phase 9 real-device QA에서 다시 확인한다.
 
 ## Phase 9. Mobile Release QA
 
@@ -677,11 +694,11 @@ Purpose:
 모바일 개선이 기존 제품 규칙을 깨지 않았는지 마지막으로 확인한다.
 
 Tasks:
-- [ ] 공식 소그룹 학습 기록이 정상 저장되는지 확인한다.
-- [ ] 묶음 연습과 약점 복습이 공식 통계에 섞이지 않는지 확인한다.
-- [ ] 백업/복원 후 모바일 화면 상태가 깨지지 않는지 확인한다.
-- [ ] 모든 주요 화면을 360px, 390px, 430px에서 다시 본다.
-- [ ] `node --check static/app.js`와 가능한 브라우저 smoke test를 통과한다.
+- [x] 공식 소그룹 학습 기록이 정상 저장되는지 확인한다.
+- [x] 묶음 연습과 약점 복습이 공식 통계에 섞이지 않는지 확인한다.
+- [x] 백업/복원 후 모바일 화면 상태가 깨지지 않는지 확인한다.
+- [x] 모든 주요 화면을 360px, 390px, 430px에서 다시 본다.
+- [x] `node --check static/app.js`와 가능한 브라우저 smoke test를 통과한다.
 
 Files:
 - `static/app.js`
@@ -695,3 +712,13 @@ Acceptance Criteria:
 
 Pre-QA Notes:
 - 정답률 copy는 `최근 첫 시도`와 `재풀이 포함`으로 구분한다. 최근/첫 시도 지표는 각 카드의 첫 풀이만 보고, 재풀이 포함 지표는 오답 반복 풀이까지 포함한 전체 시도 기준으로 표시한다.
+
+Verification:
+- 임시 DB 서버에서 공식 소그룹 회독 POST가 회독 기록을 1건 추가하고, 같은 카드의 오답 후 정답 반복 풀이가 카드별 정답/오답 누적에 반영되는 것을 확인했다.
+- 임시 DB 서버에서 묶음 연습용 `/api/study`는 카드를 불러오지만, `collection_id`가 포함된 `/api/rounds` 저장 요청은 400으로 거부되고 회독 수가 늘지 않는 것을 확인했다.
+- 임시 DB 서버에서 약점 복습 저장은 완료 응답만 만들고 공식 `study_rounds` 및 카드별 정답/오답 누적을 바꾸지 않는 것을 확인했다.
+- 백업/복원은 임시 대그룹을 만든 뒤 직전 백업으로 복원했을 때 임시 대그룹이 제거되는 것으로 확인했다.
+- 360px/390px/430px browser sweep에서 학습 홈, 묶음, 카드, 통계, 설정, 소그룹 준비, 학습 세션 앞면/뒷면, 포기 후 복귀까지 30개 상태를 확인했고 horizontal overflow 0건, console error 0건이었다.
+- 390px 통계 화면에서 grid panel의 intrinsic width 때문에 8px overflow가 잡혀 `.panel { min-width: 0; }`로 수정했다.
+- 홈의 빠른 학습 CTA는 실제로 준비 화면으로 이동하므로 `N회독 시작`에서 `N회독 준비`로 표기를 맞췄다.
+- `node --check static/app.js`, manifest JSON parse, `git diff --check`를 통과했다. 실제 iPhone Safari/Android Chrome 손검증은 9.1에 남겨둔다.

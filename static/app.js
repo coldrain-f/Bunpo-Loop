@@ -104,6 +104,7 @@ const SEARCH_INPUT_IDS = new Set([
 
 const state = {
   activeTab: "study",
+  isOffline: typeof navigator !== "undefined" && "onLine" in navigator ? !navigator.onLine : false,
   user: null,
   authError: "",
   authPending: false,
@@ -183,6 +184,7 @@ const dialogRoot = document.querySelector("#dialog-root");
 const headerUserEl = document.querySelector("#header-user");
 const headerGreetingEl = document.querySelector("#header-greeting");
 const headerContextEl = document.querySelector("#header-context");
+const connectionBannerEl = document.querySelector("#connection-banner");
 let studyTimerId = null;
 let renderedDialogName = null;
 let dialogReturnFocusEl = null;
@@ -269,15 +271,44 @@ function showToast(message, { duration = 2200 } = {}) {
   }, duration);
 }
 
+function isBrowserOffline() {
+  return typeof navigator !== "undefined" && "onLine" in navigator && !navigator.onLine;
+}
+
 function getRequestErrorMessage(error) {
-  if (error?.code === "network") return "연결 실패. 다시 눌러 재시도하세요.";
+  if (error?.code === "offline") {
+    return error?.message || "오프라인 상태입니다. 온라인으로 돌아온 뒤 다시 시도하세요.";
+  }
+  if (error?.code === "network") {
+    return error?.message || "연결 실패. 다시 눌러 재시도하세요.";
+  }
   return error?.message || "요청을 처리하지 못했습니다.";
 }
 
 function showRequestError(error, fallback = "") {
-  showToast(error?.code === "network" ? getRequestErrorMessage(error) : fallback || getRequestErrorMessage(error), {
-    duration: error?.code === "network" ? 3600 : 2400,
+  const isConnectionError = error?.code === "network" || error?.code === "offline";
+  showToast(isConnectionError ? getRequestErrorMessage(error) : fallback || getRequestErrorMessage(error), {
+    duration: isConnectionError ? 4200 : 2400,
   });
+}
+
+function renderConnectionBanner() {
+  if (!connectionBannerEl) return;
+  connectionBannerEl.hidden = !state.isOffline;
+  connectionBannerEl.textContent = state.isOffline
+    ? "오프라인 상태입니다. 새 데이터 불러오기와 학습 기록 저장은 온라인에서만 가능합니다."
+    : "";
+}
+
+function syncConnectionState({ notify = false } = {}) {
+  const wasOffline = state.isOffline;
+  state.isOffline = isBrowserOffline();
+  renderConnectionBanner();
+  if (!notify || wasOffline === state.isOffline) return;
+  showToast(
+    state.isOffline ? "오프라인 상태입니다. 저장은 온라인에서 다시 시도하세요." : "다시 연결됐습니다. 필요하면 다시 시도하세요.",
+    { duration: 3600 },
+  );
 }
 
 function getFocusableElements(container = document) {
@@ -437,6 +468,18 @@ function makeRequestError(message, details = {}) {
 }
 
 async function request(path, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const isWrite = !["GET", "HEAD"].includes(method);
+  if (isBrowserOffline()) {
+    state.isOffline = true;
+    renderConnectionBanner();
+    throw makeRequestError(
+      isWrite
+        ? "오프라인 상태라 서버에 저장하지 못했습니다. 연결 후 다시 시도하세요."
+        : "오프라인 상태입니다. 연결 후 다시 시도하세요.",
+      { code: "offline", method },
+    );
+  }
   const headers = { Accept: "application/json", ...(options.headers || {}) };
   if (state.user) {
     headers["X-Byeorakchigi-User-Id"] = String(state.user.id);
@@ -447,10 +490,16 @@ async function request(path, options = {}) {
   try {
     response = await fetch(path, { ...options, headers });
   } catch (error) {
-    throw makeRequestError("서버에 연결하지 못했습니다. 실행 중인지 확인한 뒤 다시 시도하세요.", {
-      code: "network",
-      cause: error,
-    });
+    throw makeRequestError(
+      isWrite
+        ? "서버에 연결하지 못해 저장하지 못했습니다. 연결을 확인한 뒤 다시 시도하세요."
+        : "서버에 연결하지 못했습니다. 실행 중인지 확인한 뒤 다시 시도하세요.",
+      {
+        code: "network",
+        method,
+        cause: error,
+      },
+    );
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -2333,6 +2382,8 @@ function updateStudyTimer() {
 }
 
 function render() {
+  state.isOffline = isBrowserOffline();
+  renderConnectionBanner();
   const inActiveStudy = Boolean(state.user && state.activeTab === "study" && state.session && !state.session.savedRound);
   document.body.classList.toggle("study-mode", inActiveStudy);
   if (!state.user) {
@@ -2385,6 +2436,13 @@ function renderActiveTab() {
 }
 
 function getAppErrorCopy(error = state.appError) {
+  if (error?.code === "offline") {
+    return {
+      eyebrow: "오프라인",
+      title: "온라인 연결이 필요합니다",
+      message: "꼬꼬회독은 서버에 학습 기록을 저장합니다. 연결 후 다시 시도하세요.",
+    };
+  }
   if (error?.code === "network") {
     return {
       eyebrow: "연결 실패",
@@ -3078,7 +3136,7 @@ function renderTodayStudyPanel(recentGroup, weakCards = getWeakCards()) {
         <button class="primary-button full" type="button" data-action="${
           recentGroup ? "choose-study-group" : "focus-study-collections"
         }" ${recentGroup ? `data-group-id="${recentGroup.id}"` : ""}>
-          ${iconLabel(recentGroup ? "play" : "folder", recentGroup ? `${nextRoundNo}회독 시작` : "대그룹 고르기")}
+          ${iconLabel(recentGroup ? "play" : "folder", recentGroup ? `${nextRoundNo}회독 준비` : "대그룹 고르기")}
         </button>
       </div>
       <div class="today-secondary-grid">
@@ -6865,6 +6923,8 @@ window.addEventListener("beforeunload", (event) => {
 window.addEventListener("popstate", handleHistoryPop);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 window.addEventListener("pageshow", handlePageShow);
+window.addEventListener("offline", () => syncConnectionState({ notify: true }));
+window.addEventListener("online", () => syncConnectionState({ notify: true }));
 
 async function init() {
   state.user = loadStoredUser();
