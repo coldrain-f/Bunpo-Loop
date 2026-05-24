@@ -10,7 +10,7 @@ cd Bunpo-Loop
 docker compose up -d --build
 ```
 
-기본 주소는 `http://서버IP:8000`입니다.
+기본 Docker 구성은 리버스 프록시 뒤에서 쓰기 좋게 앱 포트를 서버 내부에만 엽니다. 서버 내부 확인 주소는 `http://127.0.0.1:8000`입니다.
 
 SQLite 데이터는 Docker named volume인 `bunpo-loop-data`에 저장됩니다. 컨테이너를 다시 만들어도 학습 데이터는 유지됩니다.
 
@@ -23,10 +23,13 @@ cp .env.example .env
 `.env`:
 
 ```env
+BUNPO_LOOP_BIND=127.0.0.1
 BUNPO_LOOP_PORT=8000
 APP_USER=myname
 APP_PASSWORD=strong-password
 ```
+
+Caddy나 Nginx 뒤에서 HTTPS로 공개할 때는 `BUNPO_LOOP_BIND=127.0.0.1`을 유지하세요. 예를 들어 `BUNPO_LOOP_PORT=8002`를 쓰면 프록시 대상은 `http://127.0.0.1:8002`입니다. 서버 IP와 포트로 직접 접속해야 할 때만 `BUNPO_LOOP_BIND=0.0.0.0`으로 바꿉니다.
 
 변경 후 다시 올립니다.
 
@@ -151,4 +154,4 @@ BYEORAKCHIGI_DB=/var/lib/bunpo-loop/bunpo-loop.sqlite3 HOST=0.0.0.0 PORT=8000 py
 http://127.0.0.1:8000
 ```
 
-서버 방화벽을 직접 열어 접속할 경우에는 `BUNPO_LOOP_PORT`로 지정한 포트만 열면 됩니다. 다만 인터넷에 그대로 노출하기보다는 HTTPS 리버스 프록시와 기본 인증을 앞에 두는 구성을 권장합니다.
+포트는 `.env`의 `BUNPO_LOOP_PORT` 값에 맞춥니다. 예를 들어 `BUNPO_LOOP_PORT=8002`를 사용하면 Caddy 설정은 `reverse_proxy 127.0.0.1:8002`입니다. 서버 방화벽을 직접 열어 접속할 경우에는 `BUNPO_LOOP_BIND=0.0.0.0`으로 바꾸고 `BUNPO_LOOP_PORT`로 지정한 포트를 열면 됩니다. 다만 인터넷에 그대로 노출하기보다는 HTTPS 리버스 프록시와 기본 인증을 앞에 두는 구성을 권장합니다.

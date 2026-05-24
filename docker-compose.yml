@@ -6,7 +6,7 @@ services:
     container_name: bunpo-loop
     restart: unless-stopped
     ports:
-      - "${BUNPO_LOOP_PORT:-8000}:8000"
+      - "${BUNPO_LOOP_BIND:-127.0.0.1}:${BUNPO_LOOP_PORT:-8000}:8000"
     environment:
       HOST: 0.0.0.0
       PORT: 8000
