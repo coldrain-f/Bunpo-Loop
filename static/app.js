@@ -92,6 +92,13 @@ const ROUND_DETAIL_SECTION_PAGE_SIZE = 60;
 const BULK_PREVIEW_RENDER_LIMIT = 80;
 const SEARCH_RENDER_DELAY_MS = 120;
 const CARD_SEARCH_TEXT_CACHE = new WeakMap();
+const SEARCH_INPUT_IDS = new Set([
+  "card-search",
+  "study-collection-search",
+  "study-group-search",
+  "collection-search",
+  "group-search",
+]);
 
 const state = {
   activeTab: "study",
@@ -1111,13 +1118,22 @@ function resetStatsCollectionListLimit() {
   state.statsCollectionListLimit = STATS_COLLECTION_LIST_PAGE_SIZE;
 }
 
-function scheduleSearchRender(renderTask, inputId) {
+function cancelSearchRender() {
   window.clearTimeout(deferredSearchRenderId);
+  deferredSearchRenderId = null;
+}
+
+function scheduleSearchRender(renderTask, inputId) {
+  cancelSearchRender();
   deferredSearchRenderId = window.setTimeout(() => {
     deferredSearchRenderId = null;
     renderTask();
     refocusInput(inputId);
   }, SEARCH_RENDER_DELAY_MS);
+}
+
+function isSearchInputTarget(target) {
+  return target instanceof HTMLInputElement && SEARCH_INPUT_IDS.has(target.id);
 }
 
 function renderOrientationNote(parts, note, { exposeNote = false } = {}) {
@@ -6397,27 +6413,35 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "clear-search") {
       const target = actionEl.dataset.target;
+      const input = document.getElementById(target);
+      if (input instanceof HTMLInputElement) input.value = "";
+      cancelSearchRender();
       if (target === "card-search") {
         state.cardSearchQuery = "";
         resetCardListLimit();
         renderCards();
+        focusAfterRender("#card-search");
       }
       if (target === "study-collection-search") {
         state.studyCollectionSearchQuery = "";
         renderStudy();
+        focusAfterRender("#study-collection-search");
       }
       if (target === "study-group-search") {
         state.studyGroupSearchQuery = "";
         renderStudy();
+        focusAfterRender("#study-group-search");
       }
       if (target === "collection-search") {
         state.collectionSearchQuery = "";
         renderGroups();
+        focusAfterRender("#collection-search");
       }
       if (target === "group-search") {
         state.groupSearchQuery = "";
         resetGroupListLimit();
         renderGroups();
+        focusAfterRender("#group-search");
       }
     }
     if (action === "show-more-cards") {
@@ -6636,6 +6660,7 @@ document.addEventListener("change", async (event) => {
 });
 
 function updateSearchInput(event) {
+  if (isSearchInputTarget(event.target) && !event.target.isConnected) return;
   if (event.target.closest("#card-form") && event.target.name === "front") {
     updateSingleDuplicateWarning(event.target.closest("#card-form"));
   }
