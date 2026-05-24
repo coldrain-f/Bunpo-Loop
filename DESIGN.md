@@ -514,7 +514,7 @@ Goal: Configure learning target and weak-card rules.
 
 Rules:
 - Target name is generic: JLPT N1, HSK 5급, 토익 단어, etc.
-- JLPT level is optional compatibility, not the app identity.
+- Do not expose a separate JLPT level setting; write JLPT N1, HSK 5급, 토익 단어, etc. directly as the target name.
 - Weak-card settings are functional and compact.
 - Backup/restore is powerful and should feel serious.
 

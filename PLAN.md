@@ -469,7 +469,7 @@ Purpose:
 목표 설정과 약점 기준을 앱 정체성에 맞게 정리한다.
 
 Tasks:
-- [x] 목표 이름, 목표일, JLPT 급수 optional 관계를 명확히 한다.
+- [x] 목표 이름과 목표일만 남기고 별도 JLPT 급수 설정을 제거한다.
 - [x] 약점 카드 기준 설정을 compact but understandable하게 만든다.
 - [x] 설정 저장/초기화 CTA 우선순위를 정리한다.
 
@@ -657,8 +657,8 @@ Files:
 
 Acceptance Criteria:
 - 영어 단어, 중국어 표현, 자격증 암기 사용자가 앱을 열어도 어색하지 않다.
-- JLPT 급수는 선택 설정일 뿐 앱 정체성으로 보이지 않는다.
-- 기존 저장 사용자/백업을 깨지 않는 migration 방향이 문서화된다.
+- JLPT 급수는 별도 선택 설정으로 노출하지 않고 목표 이름에 직접 입력한다.
+- users 스키마에 JLPT 급수 컬럼이 남지 않는다.
 
 ### 12.2 Copy Inventory & Tone Pass
 

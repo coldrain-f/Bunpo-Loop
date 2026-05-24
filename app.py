@@ -33,7 +33,6 @@ CREATE TABLE IF NOT EXISTS users (
     access_code TEXT NOT NULL,
     target_name TEXT NOT NULL DEFAULT '',
     jlpt_exam_date TEXT NOT NULL DEFAULT '',
-    jlpt_level TEXT NOT NULL DEFAULT '',
     weak_card_threshold INTEGER NOT NULL DEFAULT 16,
     weak_recent_rounds INTEGER NOT NULL DEFAULT 3,
     weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 8,
@@ -164,8 +163,6 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN jlpt_exam_date TEXT NOT NULL DEFAULT ''")
     if "target_name" not in user_columns:
         conn.execute("ALTER TABLE users ADD COLUMN target_name TEXT NOT NULL DEFAULT ''")
-    if "jlpt_level" not in user_columns:
-        conn.execute("ALTER TABLE users ADD COLUMN jlpt_level TEXT NOT NULL DEFAULT ''")
     if "weak_card_threshold" not in user_columns:
         conn.execute(
             "ALTER TABLE users ADD COLUMN weak_card_threshold INTEGER NOT NULL DEFAULT 16"
@@ -434,15 +431,6 @@ def validate_exam_date(value: object) -> str:
         datetime.strptime(text, "%Y-%m-%d")
     except ValueError as exc:
         raise ValueError("목표일은 YYYY-MM-DD 형식이어야 합니다.") from exc
-    return text
-
-
-def validate_jlpt_level(value: object) -> str:
-    text = str(value or "").strip().upper()
-    if not text:
-        return ""
-    if text not in {"N1", "N2", "N3", "N4", "N5"}:
-        raise ValueError("JLPT 급수는 N1~N5 중에서 선택하세요.")
     return text
 
 
@@ -1620,7 +1608,6 @@ class AppHandler(BaseHTTPRequestHandler):
         return {
             "target_name": str(user["target_name"] or ""),
             "jlpt_exam_date": str(user["jlpt_exam_date"] or ""),
-            "jlpt_level": str(user["jlpt_level"] or ""),
             "weak_card_threshold": int(user["weak_card_threshold"] or DEFAULT_WEAK_CARD_THRESHOLD),
             "weak_recent_rounds": int(user["weak_recent_rounds"] or DEFAULT_WEAK_RECENT_ROUNDS),
             "weak_recent_wrong_threshold": int(
@@ -1639,11 +1626,6 @@ class AppHandler(BaseHTTPRequestHandler):
             validate_exam_date(body.get("jlpt_exam_date"))
             if "jlpt_exam_date" in body
             else str(user["jlpt_exam_date"] or "")
-        )
-        jlpt_level = (
-            validate_jlpt_level(body.get("jlpt_level"))
-            if "jlpt_level" in body
-            else str(user["jlpt_level"] or "")
         )
         weak_card_threshold = (
             validate_weak_card_threshold(body.get("weak_card_threshold"))
@@ -1665,7 +1647,6 @@ class AppHandler(BaseHTTPRequestHandler):
             UPDATE users
             SET target_name = ?,
                 jlpt_exam_date = ?,
-                jlpt_level = ?,
                 weak_card_threshold = ?,
                 weak_recent_rounds = ?,
                 weak_recent_wrong_threshold = ?
@@ -1674,7 +1655,6 @@ class AppHandler(BaseHTTPRequestHandler):
             (
                 target_name,
                 exam_date,
-                jlpt_level,
                 weak_card_threshold,
                 weak_recent_rounds,
                 weak_recent_wrong_threshold,

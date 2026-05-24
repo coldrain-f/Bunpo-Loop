@@ -3644,42 +3644,6 @@ button:active,
   grid-template-columns: minmax(0, 1fr) minmax(72px, 0.7fr) auto;
 }
 
-.level-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.level-option {
-  position: relative;
-  display: block;
-}
-
-.level-option input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.level-option span {
-  display: grid;
-  min-height: 44px;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--muted);
-  font-weight: 900;
-}
-
-.level-option input:checked + span {
-  border-color: var(--teal);
-  background: var(--teal-soft);
-  color: var(--teal);
-}
-
 .date-select-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr;
