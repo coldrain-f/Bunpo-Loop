@@ -4693,6 +4693,7 @@ function renderGroupEditorPanel(editing) {
       ${renderOrientationNote(
         ["묶음", selectedCollection?.name || "대그룹 선택", editing ? "소그룹 수정" : "소그룹 만들기"],
         "소그룹은 공식 회독과 통계가 저장되는 학습 단위입니다.",
+        { exposeNote: true },
       )}
       ${editing ? `<p class="meta">소그룹명과 설명만 바뀌고, 카드와 학습 기록은 유지됩니다.</p>` : ""}
       <form id="group-form" class="stack">
