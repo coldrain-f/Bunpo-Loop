@@ -14,7 +14,7 @@ const reducedMotionQuery =
 
 const ORDER_DESCRIPTIONS = {
   sequence: "등록한 순서 그대로 차분히 봅니다.",
-  random: "순서를 섞어서 기억 착각을 줄입니다.",
+  random: "순서를 섞어 순서 기억에 기대지 않게 합니다.",
   wrong: "누적 오답이 많은 카드부터 봅니다.",
 };
 
@@ -24,7 +24,7 @@ const EXAMPLE_DISPLAY_LABELS = {
 };
 
 const EXAMPLE_DISPLAY_DESCRIPTIONS = {
-  collapsed: "카드 뒷면에서 예문 1개만 먼저 보이고 나머지는 접어둡니다.",
+  collapsed: "카드 뒷면에서 예문 1개만 먼저 보여주고 나머지는 접어둡니다.",
   expanded: "카드 뒷면에서 예문을 처음부터 모두 보여줍니다.",
 };
 
@@ -1960,7 +1960,7 @@ function renderStatsTodayPanel(summary) {
     eyebrow: "추천",
     title: "첫 학습 단위를 준비하세요.",
     detail: "카드가 있는 소그룹이 생기면 오늘의 학습 상태를 더 정확히 보여줍니다.",
-    buttonLabel: "묶음으로 이동",
+    buttonLabel: "묶음 탭으로",
     icon: "folder",
     action: "go-groups",
     attrs: "",
@@ -1969,7 +1969,7 @@ function renderStatsTodayPanel(summary) {
     action = {
       tone: "danger",
       eyebrow: "추천",
-      title: `약점 카드 ${number(summary.weakCards.length)}개를 먼저 봐요.`,
+      title: `약점 카드 ${number(summary.weakCards.length)}개를 먼저 확인해요.`,
       detail: "설정한 오답 기준에 걸린 카드가 있어 복습 우선순위가 높습니다.",
       buttonLabel: "복습 시작",
       icon: "target",
@@ -2013,7 +2013,7 @@ function renderStatsTodayPanel(summary) {
     </section>
     <div class="stats-status-grid">
       ${renderStatsStatusItem("오늘 완료", `${number(todayCount)}/${number(readyCount)}`, "카드가 있는 소그룹", todayRate)}
-      ${renderStatsStatusItem("남은 소그룹", `${number(pendingCount)}개`, "오늘 아직 지나가지 않음", getRate(readyCount - pendingCount, readyCount))}
+      ${renderStatsStatusItem("남은 소그룹", `${number(pendingCount)}개`, "오늘 아직 회독 전", getRate(readyCount - pendingCount, readyCount))}
       ${renderStatsStatusItem("약점 카드", `${number(summary.weakCards.length)}개`, "오답 기준에 걸림", summary.weakCards.length ? 100 : 0, summary.weakCards.length ? "danger" : "good")}
     </div>
   `;
@@ -4732,7 +4732,7 @@ function renderBulkPreview(preview) {
       }
       ${
         preview.warningCount
-          ? `<div class="bulk-issues warn" role="alert"><p>중복 카드 ${preview.warningCount}건이 있습니다. 정리 후 다시 미리보기를 눌러주세요.</p></div>`
+          ? `<div class="bulk-issues warn" role="alert"><p>중복 카드 ${preview.warningCount}건이 있습니다. 중복을 정리한 뒤 미리보기를 다시 눌러 주세요.</p></div>`
           : ""
       }
       <div class="bulk-preview-list">
@@ -4742,7 +4742,7 @@ function renderBulkPreview(preview) {
         hiddenCount
           ? `<p class="bulk-preview-note">미리보기는 먼저 ${number(
               displayItems.length,
-            )}개만 표시합니다. 등록하면 확인된 ${number(preview.items.length)}개가 모두 저장됩니다.</p>`
+            )}개만 표시합니다. 등록하면 미리보기에서 확인한 ${number(preview.items.length)}개가 모두 저장됩니다.</p>`
           : ""
       }
       ${isPending ? `<p class="pending-note" role="status">등록 중입니다. 잠시만 기다려 주세요.</p>` : ""}
@@ -5252,7 +5252,7 @@ function renderWeakThresholdSetting() {
     <section class="settings-subsection">
       ${renderSectionHeading(
         "약점 카드 기준",
-        "최근 회독에서 자주 틀렸거나, 전체 회독에서 누적 오답이 많은 카드를 약점으로 모읍니다. 약점 복습에서 틀린 횟수는 이 기준 계산에 넣지 않습니다.",
+        "최근 회독에서 자주 틀렸거나, 전체 회독에서 누적 오답이 많은 카드를 약점으로 모읍니다. 약점 복습의 오답 횟수는 이 기준 계산에 넣지 않습니다.",
       )}
       <div class="weak-rule-preview">
         <span>최근 ${number(recentRounds)}회독 중 오답 ${number(recentThreshold)}회 이상</span>
@@ -5681,7 +5681,7 @@ async function confirmBulkCards() {
   const preview = state.bulkPreview;
   if (state.pendingRequest) return;
   if (!preview || preview.errors.length || preview.warningCount || !preview.items.length) {
-    showToast("미리보기의 오류나 중복을 먼저 정리해주세요.");
+    showToast("미리보기의 오류나 중복을 먼저 정리해 주세요.");
     return;
   }
   state.pendingRequest = { action: "confirm-bulk-cards", label: "등록 중" };
@@ -5790,7 +5790,7 @@ async function login(form) {
     state.appStatus = "ready";
     render();
     focusAfterRender(["#study-collection-search", '[data-action="choose-study-collection"]', "#study-title"]);
-    showToast(`${state.user.nickname}님, 들어왔습니다.`);
+    showToast(`${state.user.nickname}님, 들어왔어요.`);
   } catch (error) {
     state.authPending = false;
     if (state.user) {
