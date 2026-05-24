@@ -660,7 +660,8 @@ Acceptance Criteria:
 
 Verification:
 - 현재 제품은 서버 API와 소그룹 공식 기록 저장을 기준으로 하므로 full offline 학습 저장은 지원하지 않는 것으로 정리했다.
-- service worker/cache/sync는 도입하지 않았다. 충돌 정책 없이 오프라인 저장처럼 보이는 상태를 만들지 않기 위해서다.
+- service worker는 앱 shell 캐시 용도로만 도입했다. `index.html`, CSS, JS, manifest, 아이콘/마스코트 이미지를 캐시하되 `/api/*`와 저장 요청은 네트워크 전용으로 유지해 오프라인 저장처럼 보이지 않게 했다.
+- shell 업데이트는 안전하게 다음 실행/새로고침 때 적용되도록 두고, 새 버전이 준비되면 짧은 toast로만 안내한다.
 - `navigator.onLine` 기반의 offline 상태 banner를 추가해 새 데이터 불러오기와 학습 기록 저장이 온라인에서만 가능함을 알린다.
 - request wrapper가 offline/write 실패를 `저장하지 못했습니다`로 안내하고, 기존 retry-load-data 버튼으로 초기 데이터 불러오기 실패를 다시 시도할 수 있게 유지했다.
 - 백업/복원은 서버 저장 작업이므로 오프라인에서는 저장 실패 toast로 명확히 막힌다.

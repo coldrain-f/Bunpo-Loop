@@ -1238,7 +1238,10 @@ class AppHandler(BaseHTTPRequestHandler):
             )
 
     def handle_static(self, path: str) -> None:
-        if path in ("", "/"):
+        is_service_worker = path == "/sw.js"
+        if is_service_worker:
+            file_path = STATIC_DIR / "sw.js"
+        elif path in ("", "/"):
             file_path = STATIC_DIR / "index.html"
         else:
             safe_path = Path(path.lstrip("/"))
@@ -1254,6 +1257,9 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
+        if is_service_worker:
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Service-Worker-Allowed", "/")
         self.end_headers()
         self.wfile.write(data)
 

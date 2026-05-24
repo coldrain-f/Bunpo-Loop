@@ -6926,6 +6926,33 @@ window.addEventListener("pageshow", handlePageShow);
 window.addEventListener("offline", () => syncConnectionState({ notify: true }));
 window.addEventListener("online", () => syncConnectionState({ notify: true }));
 
+function notifyServiceWorkerUpdate() {
+  showToast("새 버전은 다음 실행 때 적용됩니다.", { duration: 4200 });
+}
+
+function watchServiceWorkerUpdate(registration) {
+  if (registration.waiting && navigator.serviceWorker.controller) notifyServiceWorkerUpdate();
+  registration.addEventListener("updatefound", () => {
+    const worker = registration.installing;
+    if (!worker) return;
+    worker.addEventListener("statechange", () => {
+      if (worker.state === "installed" && navigator.serviceWorker.controller) notifyServiceWorkerUpdate();
+    });
+  });
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      watchServiceWorkerUpdate(registration);
+    } catch (error) {
+      console.warn("Service worker registration failed", error);
+    }
+  });
+}
+
 async function init() {
   state.user = loadStoredUser();
   if (!state.user) {
@@ -6944,4 +6971,5 @@ async function init() {
   }
 }
 
+registerServiceWorker();
 init();
