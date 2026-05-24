@@ -62,12 +62,12 @@ Core mobile rules:
 
 ## Progress Tracker
 
-- [ ] Phase 1. Mobile Viewport Baseline
-  - [ ] 1.1 Viewport QA Matrix
+- [x] Phase 1. Mobile Viewport Baseline
+  - [x] 1.1 Viewport QA Matrix
   - [x] 1.2 Safe Area & Fixed Chrome
   - [x] 1.3 Mobile Browser Quirks
 - [ ] Phase 2. One-Hand Navigation
-  - [ ] 2.1 Back & Return Flow
+  - [x] 2.1 Back & Return Flow
   - [ ] 2.2 Tab State & Scroll Restoration
   - [ ] 2.3 Resume & Session Continuity
 - [ ] Phase 3. Study Session Ergonomics
@@ -104,7 +104,7 @@ Purpose:
 Tasks:
 - [x] 360px, 390px, 430px, 768px viewport를 기본 QA 폭으로 정한다.
 - [x] 학습, 묶음, 카드, 통계, 설정 화면을 각 폭에서 확인한다.
-- [ ] 로그인 화면을 사용 중인 세션을 해치지 않는 방식으로 각 폭에서 확인한다.
+- [x] 로그인 화면을 사용 중인 세션을 해치지 않는 방식으로 각 폭에서 확인한다.
 - [x] 360px에서 버튼 텍스트, badge, select, 하단 nav label이 넘치지 않는지 확인한다.
 - [x] 390px에서 실제 주력 모바일 화면처럼 전체 밀도와 tap flow를 확인한다.
 - [x] 768px에서는 앱이 데스크톱 사이트처럼 과하게 넓어지지 않는지 확인한다.
@@ -123,7 +123,8 @@ Verification:
 - 360/390/430/768px viewport 자동 검사에서 학습, 묶음, 카드, 통계, 설정 화면 모두 horizontal overflow 0건.
 - 360/390/430/768px viewport 자동 검사에서 버튼, 입력, select, badge overflow 0건.
 - 768px에서 app shell과 bottom nav가 560px 모바일 폭을 유지함.
-- 로그인 화면은 현재 세션을 로그아웃시키지 않기 위해 남겨둠.
+- 로그인 화면은 테스트 탭에서 로그아웃 후 같은 기본 로그인 값으로 재진입하는 방식으로 360/390/430/768px 검증 완료.
+- 로그인 화면에서도 horizontal overflow 0건, 16px 미만 입력 0건, 44px 미만 터치 타깃 0건.
 
 ### 1.2 Safe Area & Fixed Chrome
 
@@ -184,11 +185,11 @@ Purpose:
 모바일 브라우저의 뒤로가기와 앱 내부 돌아가기가 사용자의 기대와 맞게 동작하게 한다.
 
 Tasks:
-- [ ] 대그룹 detail에서 뒤로가면 묶음 탭 목록으로 돌아온다.
-- [ ] 통계에서 약점 복습을 시작한 뒤 포기하면 통계로 돌아온다.
-- [ ] 학습 홈에서 시작한 학습은 포기/완료 후 학습 홈 맥락으로 돌아온다.
-- [ ] 카드 preview/detail dialog를 닫으면 원래 목록 위치와 focus가 자연스럽다.
-- [ ] 브라우저 back button과 앱 내부 back action의 역할이 충돌하지 않는지 확인한다.
+- [x] 대그룹 detail에서 뒤로가면 묶음 탭 목록으로 돌아온다.
+- [x] 통계에서 약점 복습을 시작한 뒤 포기하면 통계로 돌아온다.
+- [x] 학습 홈에서 시작한 학습은 포기/완료 후 학습 홈 맥락으로 돌아온다.
+- [x] 카드 preview/detail dialog를 닫으면 원래 목록 위치와 focus가 자연스럽다.
+- [x] 브라우저 back button과 앱 내부 back action의 역할이 충돌하지 않는지 확인한다.
 
 Files:
 - `static/app.js`
@@ -198,6 +199,13 @@ Acceptance Criteria:
 - 사용자가 "어디서 시작했는지"를 앱이 기억하는 느낌이 든다.
 - 포기 action이 항상 이전 맥락으로 돌아가는 흐름을 가진다.
 - 모바일 뒤로가기에서 빈 화면이나 잘못된 탭 상태가 나오지 않는다.
+
+Verification:
+- 대그룹 상세 화면에서 브라우저 뒤로가기를 누르면 묶음 탭의 대그룹 목록으로 복귀함.
+- 통계에서 약점 복습 시작 후 브라우저 뒤로가기를 누르면 저장되지 않는다는 확인 dialog가 먼저 뜨고, 확인 시 통계로 복귀함.
+- 활성 학습 중 브라우저 뒤로가기는 즉시 이탈하지 않고 `학습을 종료하고 돌아갈까요?` 확인 dialog를 띄움.
+- 학습 홈에서 소그룹 회독 시작 후 포기하면 같은 소그룹 학습 설정 화면으로 복귀함.
+- 카드 preview dialog를 닫으면 원래 preview 버튼으로 focus가 돌아옴.
 
 ### 2.2 Tab State & Scroll Restoration
 

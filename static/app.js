@@ -149,6 +149,7 @@ const state = {
   roundDetail: null,
   pendingTab: null,
   pendingAction: null,
+  pendingHistoryRoute: null,
   editingCardId: null,
   editingGroupId: null,
   editingCollectionId: null,
@@ -172,6 +173,9 @@ let renderedDialogName = null;
 let dialogReturnFocusEl = null;
 let shouldFocusDialogOnRender = false;
 let deferredSearchRenderId = null;
+let historyInitialized = false;
+let lastHistoryRouteKey = "";
+let isApplyingHistoryRoute = false;
 const ANSWER_FEEDBACK_MS = 230;
 const FOCUSABLE_SELECTOR = [
   "button:not([disabled])",
@@ -865,6 +869,117 @@ function restoreScrollPosition(key) {
 
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function getAppRoute() {
+  if (!state.user) return { tab: "auth", view: "login" };
+  if (state.appStatus === "loading" || state.appStatus === "error") {
+    return { tab: "study", view: state.appStatus };
+  }
+  if (state.activeTab === "groups") {
+    if (state.groupScreen !== "list") return { tab: "groups", view: state.groupScreen };
+    if (state.groupDetailCollectionId) {
+      return { tab: "groups", view: "detail", collectionId: Number(state.groupDetailCollectionId) };
+    }
+    return { tab: "groups", view: "list" };
+  }
+  if (state.activeTab === "cards") {
+    return { tab: "cards", view: state.cardScreen === "form" ? "form" : "list" };
+  }
+  if (state.activeTab === "study") {
+    if (state.session?.savedRound) return { tab: "study", view: "completion", mode: state.session.studyMode };
+    if (state.session) return { tab: "study", view: "session", mode: state.session.studyMode };
+    return {
+      tab: "study",
+      view: state.studyStep || "select",
+      collectionId: state.selectedCollectionId ? Number(state.selectedCollectionId) : null,
+      groupId: state.selectedGroupId ? Number(state.selectedGroupId) : null,
+    };
+  }
+  return { tab: state.activeTab || "study", view: "main" };
+}
+
+function getAppRouteKey(route = getAppRoute()) {
+  return JSON.stringify(route || {});
+}
+
+function writeCurrentHistoryRoute(mode = "push") {
+  if (!window.history?.pushState || !window.history?.replaceState) return;
+  const route = getAppRoute();
+  const key = getAppRouteKey(route);
+  if (!historyInitialized || mode === "replace") {
+    window.history.replaceState({ appRoute: route }, "", window.location.href);
+    historyInitialized = true;
+    lastHistoryRouteKey = key;
+    return;
+  }
+  if (isApplyingHistoryRoute || key === lastHistoryRouteKey) return;
+  window.history.pushState({ appRoute: route }, "", window.location.href);
+  lastHistoryRouteKey = key;
+}
+
+function applyHistoryRoute(route) {
+  if (!route?.tab || route.tab === "auth") return;
+  closeHelpDisclosures();
+  state.activeDialog = null;
+  state.pendingTab = null;
+  state.pendingAction = null;
+  state.pendingHistoryRoute = null;
+  state.collectionStudyReturnContext = null;
+  state.roundDetail = null;
+  state.editingCardId = null;
+  state.editingGroupId = null;
+  state.editingCollectionId = null;
+  if (state.session?.savedRound && route.view !== "completion") {
+    state.session = null;
+    state.completionCorrectOpen = false;
+  }
+  if (route.tab === "groups") {
+    state.activeTab = "groups";
+    state.groupScreen = route.view === "collection-form" || route.view === "group-form" ? route.view : "list";
+    state.groupDetailCollectionId = route.view === "detail" ? Number(route.collectionId) || null : null;
+    return;
+  }
+  if (route.tab === "cards") {
+    state.activeTab = "cards";
+    state.cardScreen = route.view === "form" ? "form" : "list";
+    return;
+  }
+  if (route.tab === "settings" || route.tab === "stats") {
+    state.activeTab = route.tab;
+    return;
+  }
+  state.activeTab = "study";
+  if (!state.session || route.view !== "session") {
+    if (state.session?.savedRound && route.view === "completion") return;
+    state.session = null;
+    state.studyStep = ["select", "collection", "ready"].includes(route.view) ? route.view : "select";
+    state.selectedCollectionId = route.collectionId || null;
+    state.selectedGroupId = route.groupId || null;
+  }
+}
+
+function completeHistoryNavigation(route) {
+  isApplyingHistoryRoute = true;
+  applyHistoryRoute(route);
+  render();
+  isApplyingHistoryRoute = false;
+  writeCurrentHistoryRoute("replace");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function handleHistoryPop(event) {
+  const route = event.state?.appRoute;
+  if (!route) return;
+  if (state.session && !state.session.savedRound) {
+    state.pendingHistoryRoute = route;
+    state.activeDialog = "history-leave";
+    window.history.pushState({ appRoute: getAppRoute() }, "", window.location.href);
+    lastHistoryRouteKey = getAppRouteKey();
+    renderDialog();
+    return;
+  }
+  completeHistoryNavigation(route);
 }
 
 function resetCardListLimit() {
@@ -2012,6 +2127,7 @@ function render() {
     renderAuth();
     renderDialog();
     syncStudyTimer();
+    writeCurrentHistoryRoute();
     return;
   }
   if (state.appStatus === "loading" || state.appStatus === "error") {
@@ -2021,6 +2137,7 @@ function render() {
     renderAppShellState();
     renderDialog();
     syncStudyTimer();
+    writeCurrentHistoryRoute();
     return;
   }
   document.body.classList.remove("auth-mode", "shell-mode");
@@ -2029,6 +2146,7 @@ function render() {
   renderActiveTab();
   renderDialog();
   syncStudyTimer();
+  writeCurrentHistoryRoute();
 }
 
 function renderActiveTab() {
@@ -2327,6 +2445,16 @@ function renderDialog() {
     });
     return;
   }
+  if (state.activeDialog === "history-leave") {
+    renderConfirmDialog({
+      eyebrow: "뒤로가기",
+      title: "학습을 종료하고 돌아갈까요?",
+      message: "브라우저 뒤로가기로 이동하면 지금까지의 답변은 저장되지 않습니다.",
+      confirmLabel: "돌아가기",
+      confirmAction: "confirm-history-leave-study",
+    });
+    return;
+  }
   if (state.activeDialog === "delete-card") {
     const card = state.cards.find((item) => item.id === Number(state.pendingAction?.id));
     if (!card) return closeDialog();
@@ -2433,6 +2561,7 @@ function closeDialog() {
   state.roundDetail = null;
   state.pendingTab = null;
   state.pendingAction = null;
+  state.pendingHistoryRoute = null;
   state.collectionStudyReturnContext = null;
   renderDialog();
 }
@@ -5398,6 +5527,7 @@ function logout() {
     roundDetail: null,
     pendingTab: null,
     pendingAction: null,
+    pendingHistoryRoute: null,
     cardFilterCollectionId: "",
     cardFilterGroupId: "",
     cardSearchQuery: "",
@@ -5919,6 +6049,20 @@ document.addEventListener("click", async (event) => {
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
+    if (action === "confirm-history-leave-study") {
+      const route = state.pendingHistoryRoute || { tab: "study", view: "select" };
+      if (state.session) {
+        if (state.session.studyMode === "practice") restorePracticeReturnContext(state.session);
+        else if (state.session.studyMode !== "weak") {
+          state.selectedGroupId = state.session.group.id;
+          state.studyStep = "ready";
+        }
+        state.session = null;
+      }
+      state.activeDialog = null;
+      state.pendingHistoryRoute = null;
+      completeHistoryNavigation(route);
+    }
     if (action === "jump-wrong-review") {
       scrollToCompletionSection("wrong-review");
     }
@@ -6352,6 +6496,8 @@ window.addEventListener("beforeunload", (event) => {
   event.preventDefault();
   event.returnValue = "";
 });
+
+window.addEventListener("popstate", handleHistoryPop);
 
 async function init() {
   state.user = loadStoredUser();
