@@ -1244,6 +1244,7 @@ h3 {
 .field {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .field label,
@@ -1267,6 +1268,14 @@ h3 {
   align-items: center;
   justify-content: flex-start;
   gap: 4px;
+  min-width: 0;
+}
+
+.section-heading-with-help > span,
+.field-label-row > span,
+.safety-note-heading > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .field-label-row {
@@ -3798,6 +3807,25 @@ button:active,
   background: var(--surface-strong);
 }
 
+#settings-form .field,
+#settings-form .number-setting {
+  scroll-margin-top: 16px;
+  scroll-margin-bottom: calc(112px + env(safe-area-inset-bottom));
+}
+
+.settings-form-actions {
+  position: sticky;
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  z-index: 12;
+  margin-top: 2px;
+  padding: 6px;
+  border: 1px solid rgba(214, 224, 219, 0.92);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px);
+}
+
 .data-safety-panel h2 {
   margin-bottom: 0;
 }
@@ -3886,8 +3914,14 @@ button:active,
 
 .date-select-grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.91fr) minmax(0, 0.91fr);
   gap: 8px;
+}
+
+.date-select-grid .select {
+  min-width: 0;
+  padding-right: 8px;
+  padding-left: 10px;
 }
 
 .bottom-nav {
@@ -4129,6 +4163,21 @@ button:active,
   }
 }
 
+@media (max-width: 480px) {
+  #settings-form .help-disclosure p,
+  .data-safety-panel .help-disclosure p {
+    position: fixed;
+    top: auto;
+    right: 16px;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    left: 16px;
+    width: auto;
+    max-height: min(42vh, 220px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 @media (max-width: 380px) {
   .order-options.two {
     grid-template-columns: 1fr;
@@ -4157,6 +4206,20 @@ button:active,
 
   .study-card {
     padding: 18px;
+  }
+
+  .date-select-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr) minmax(0, 0.82fr);
+    gap: 6px;
+  }
+
+  .date-select-grid .select {
+    padding-right: 6px;
+    padding-left: 8px;
+  }
+
+  .settings-form-actions .primary-button {
+    order: -1;
   }
 
   .stats-recommend-card {

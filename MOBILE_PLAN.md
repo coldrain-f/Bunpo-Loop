@@ -74,7 +74,7 @@ Core mobile rules:
   - [x] 3.1 Card Reading & Flip Comfort
   - [x] 3.2 Answer Bar & Completion Flow
 - [ ] Phase 4. Mobile Forms & Keyboard
-  - [ ] 4.1 Settings Form Pass
+  - [x] 4.1 Settings Form Pass
   - [ ] 4.2 Card Creation Form Pass
   - [ ] 4.3 Bulk Input Pass
 - [ ] Phase 5. Dialogs & Bottom Sheets
@@ -328,10 +328,10 @@ Purpose:
 목표 이름, 목표일, 약점 기준, 데이터 관리가 모바일 입력 환경에서 부담 없이 동작하게 한다.
 
 Tasks:
-- [ ] 목표 이름 input focus 시 화면이 자연스럽게 스크롤되는지 확인한다.
-- [ ] 목표일 select 3개가 360px에서 보기 좋게 배치되는지 확인한다.
-- [ ] inline help가 작은 화면에서 label과 겹치지 않는지 확인한다.
-- [ ] 저장 버튼이 키보드에 가려지거나 너무 멀지 않은지 확인한다.
+- [x] 목표 이름 input focus 시 화면이 자연스럽게 스크롤되는지 확인한다.
+- [x] 목표일 select 3개가 360px에서 보기 좋게 배치되는지 확인한다.
+- [x] inline help가 작은 화면에서 label과 겹치지 않는지 확인한다.
+- [x] 저장 버튼이 키보드에 가려지거나 너무 멀지 않은지 확인한다.
 
 Files:
 - `static/app.js`
@@ -341,6 +341,13 @@ Acceptance Criteria:
 - 설정 변경은 모바일에서 확대 없이 끝낼 수 있다.
 - help icon은 눈에 거슬리지 않지만 눌렀을 때 충분히 읽힌다.
 - 부가 설명이 다시 화면을 무겁게 만들지 않는다.
+
+Verification:
+- 목표 이름 input에 `enterkeyhint="done"`과 명시 id를 추가하고, 설정 form 입력 항목에 scroll margin을 줘 모바일 focus 시 하단 action과 겹치지 않게 했다.
+- 목표일 select option에 `년/월/일` 단위를 표시하고, 380px 이하에서 select grid와 padding을 줄여 세 칸이 한 줄에 안정적으로 들어가게 했다.
+- 설정 form의 저장/초기화 action을 sticky bar로 처리해 약점 기준을 조정한 뒤 저장 버튼이 너무 멀리 떨어지지 않게 했다.
+- 설정/데이터 안전 inline help는 480px 이하에서 viewport 안 fixed popover로 열리게 해 label이나 화면 가장자리와 겹치지 않도록 했다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200/UTF-8 title 확인을 통과했다. 인앱 브라우저 패널이 없어 실제 터치/키보드 검증은 다음 브라우저 가능 시점에 다시 확인한다.
 
 ### 4.2 Card Creation Form Pass
 

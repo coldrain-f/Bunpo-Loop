@@ -4959,7 +4959,7 @@ function renderSettings() {
           ${renderExamDateSelects()}
         </section>
         ${renderWeakThresholdSetting()}
-        <div class="form-actions">
+        <div class="form-actions settings-form-actions">
           <button class="ghost-button" type="button" data-action="clear-exam-date" ${
             hasTargetSettings ? "" : "disabled"
           }>${iconLabel("rotate-ccw", "초기화")}</button>
@@ -4977,9 +4977,9 @@ function renderTargetNameField() {
   return `
     <div class="field">
       ${renderFieldLabel("목표 이름", "헤더와 학습 화면에 보일 이름입니다. 예: JLPT N1, HSK 5급, 토익 단어")}
-      <input class="input" name="target_name" value="${escapeHtml(
+      <input id="target-name-input" class="input" name="target_name" value="${escapeHtml(
         state.settings?.target_name || "",
-      )}" placeholder="예: 토익 단어" maxlength="80" aria-label="목표 이름" />
+      )}" placeholder="예: 토익 단어" maxlength="80" aria-label="목표 이름" autocomplete="off" enterkeyhint="done" />
     </div>
   `;
 }
@@ -5025,11 +5025,14 @@ function getExamDateParts() {
   return { year: match[1], month: String(Number(match[2])), day: String(Number(match[3])) };
 }
 
-function renderSelectOptions(values, selected, placeholder) {
+function renderSelectOptions(values, selected, placeholder, suffix = "") {
   return `
     <option value="">${placeholder}</option>
     ${values
-      .map((value) => `<option value="${value}" ${String(value) === String(selected) ? "selected" : ""}>${value}</option>`)
+      .map(
+        (value) =>
+          `<option value="${value}" ${String(value) === String(selected) ? "selected" : ""}>${value}${suffix}</option>`,
+      )
       .join("")}
   `;
 }
@@ -5045,13 +5048,13 @@ function renderExamDateSelects() {
       ${renderFieldLabel("목표일", "목표일도 선택 사항입니다. 세 칸을 모두 비우면 날짜 없이 사용합니다.")}
       <div class="date-select-grid">
         <select class="select" name="exam_year" aria-label="목표 연도">
-          ${renderSelectOptions(years, parts.year, "연도")}
+          ${renderSelectOptions(years, parts.year, "연도", "년")}
         </select>
         <select class="select" name="exam_month" aria-label="목표 월">
-          ${renderSelectOptions(months, parts.month, "월")}
+          ${renderSelectOptions(months, parts.month, "월", "월")}
         </select>
         <select class="select" name="exam_day" aria-label="목표 일">
-          ${renderSelectOptions(days, parts.day, "일")}
+          ${renderSelectOptions(days, parts.day, "일", "일")}
         </select>
       </div>
     </div>
