@@ -3703,7 +3703,9 @@ function renderStudySession() {
         <span>이번 차수 오답 ${currentWrongCount}개</span>
       </div>
       <div class="study-card ${session.showingBack ? "back" : "front"} ${feedbackClass}" ${
-        session.showingBack ? "" : `data-action="flip-card" role="button" tabindex="0"`
+        session.showingBack
+          ? ""
+          : `data-action="flip-card" role="button" tabindex="0" aria-label="카드 앞면. 탭해서 뜻 보기"`
       }>
         ${
           session.answerFeedback

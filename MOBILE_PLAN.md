@@ -71,7 +71,7 @@ Core mobile rules:
   - [x] 2.2 Tab State & Scroll Restoration
   - [x] 2.3 Resume & Session Continuity
 - [ ] Phase 3. Study Session Ergonomics
-  - [ ] 3.1 Card Reading & Flip Comfort
+  - [x] 3.1 Card Reading & Flip Comfort
   - [ ] 3.2 Answer Bar & Completion Flow
 - [ ] Phase 4. Mobile Forms & Keyboard
   - [ ] 4.1 Settings Form Pass
@@ -270,11 +270,11 @@ Purpose:
 학습 세션이 작은 화면에서도 읽기 쉽고, 한 손으로 넘기기 쉬운 경험이 되게 한다.
 
 Tasks:
-- [ ] 짧은 카드, 긴 카드, 긴 예문, 메모가 있는 카드를 각각 확인한다.
-- [ ] 카드 tap area가 flip action으로 충분히 예측 가능하게 동작하는지 확인한다.
-- [ ] 앞면/뒷면 전환 시 레이아웃이 크게 튀지 않는지 점검한다.
-- [ ] landscape 또는 낮은 높이 viewport에서 카드와 answer bar가 함께 보이는지 확인한다.
-- [ ] 일본어/한글 혼합 텍스트가 작은 화면에서 과하게 빽빽하지 않은지 확인한다.
+- [x] 짧은 카드, 긴 카드, 긴 예문, 메모가 있는 카드를 각각 확인한다.
+- [x] 카드 tap area가 flip action으로 충분히 예측 가능하게 동작하는지 확인한다.
+- [x] 앞면/뒷면 전환 시 레이아웃이 크게 튀지 않는지 점검한다.
+- [x] landscape 또는 낮은 높이 viewport에서 카드와 answer bar가 함께 보이는지 확인한다.
+- [x] 일본어/한글 혼합 텍스트가 작은 화면에서 과하게 빽빽하지 않은지 확인한다.
 
 Files:
 - `static/app.js`
@@ -284,6 +284,13 @@ Acceptance Criteria:
 - 360px 폭에서도 카드 본문과 예문을 편하게 읽을 수 있다.
 - 카드 flip과 정답/오답 action이 서로 오작동처럼 느껴지지 않는다.
 - 긴 내용이 있어도 answer bar가 밀려 사라지지 않는다.
+
+Verification:
+- active study mode를 viewport 높이 안의 grid layout으로 바꾸고, 카드 영역만 내부 스크롤되게 해 긴 뒷면/메모/예문이 answer bar를 밀어내지 않도록 했다.
+- 앞면 카드에는 명시적인 `aria-label`을 추가해 카드 전체 tap이 뜻 보기 동작임을 보조 기술에도 드러나게 했다.
+- 360px 이하에서도 정답/오답 버튼은 label이 짧아 2열을 유지하도록 했고, 낮은 높이 viewport에서는 카드 padding과 앞면 최소 높이를 줄인다.
+- 일본어/한글 혼합 카드의 줄간격은 유지하고, 낮은 높이에서만 앞면 글자 크기를 단계적으로 낮춰 답변 영역과 함께 보이게 했다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200 응답 확인을 통과했다. 이 환경의 헤드리스 Chrome/Edge가 권한 문제로 종료되어 실제 스크린샷 검증은 다음 브라우저 가능 시점에 다시 보는 항목으로 남긴다.
 
 ### 3.2 Answer Bar & Completion Flow
 
