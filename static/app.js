@@ -4980,7 +4980,11 @@ function startWeakStudy() {
   state.weakCardOpenId = null;
   state.weakPanelOpen = false;
   state.activeDialog = null;
+  state.activeTab = "study";
+  state.studyStep = "select";
   render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  focusAfterRender(['.study-card[data-action="flip-card"]', '.reveal-button[data-action="flip-card"]']);
 }
 
 function buildPracticeRound(session) {
