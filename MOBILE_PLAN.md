@@ -84,7 +84,7 @@ Core mobile rules:
   - [x] 6.1 Large List Responsiveness
   - [x] 6.2 Loading & Network Feedback
 - [ ] Phase 7. Touch & Accessibility
-  - [ ] 7.1 Touch Target Audit
+  - [x] 7.1 Touch Target Audit
   - [ ] 7.2 Screen Reader & Focus Audit
   - [ ] 7.3 Motion & Scroll Preferences
 - [ ] Phase 8. PWA & Offline Readiness
@@ -527,10 +527,10 @@ Purpose:
 작은 아이콘과 보조 action까지 모바일 손가락으로 안정적으로 누를 수 있게 한다.
 
 Tasks:
-- [ ] 하단 nav, 주요 CTA, ghost/secondary button, search clear action을 확인한다.
-- [ ] inline help icon의 시각 크기와 실제 tap target을 분리해 44px 기준을 만족시킨다.
-- [ ] checkbox row는 checkbox 자체보다 row 전체가 눌리는지 확인한다.
-- [ ] 위험 action은 다른 action과 충분히 떨어져 있는지 확인한다.
+- [x] 하단 nav, 주요 CTA, ghost/secondary button, search clear action을 확인한다.
+- [x] inline help icon의 시각 크기와 실제 tap target을 분리해 44px 기준을 만족시킨다.
+- [x] checkbox row는 checkbox 자체보다 row 전체가 눌리는지 확인한다.
+- [x] 위험 action은 다른 action과 충분히 떨어져 있는지 확인한다.
 
 Files:
 - `static/styles.css`
@@ -540,6 +540,13 @@ Acceptance Criteria:
 - 360px 화면에서 엄지로 주요 action을 놓치지 않는다.
 - 작은 icon button도 실제 tap target은 충분하다.
 - destructive action은 실수로 눌리기 어렵다.
+
+Verification:
+- 공통 button에 모바일 tap 지연을 줄이는 `touch-action: manipulation`과 텍스트 선택 방지를 적용했고, 기존 nav/CTA/ghost/secondary/search clear는 44px 이상 터치 타겟을 유지한다.
+- inline help summary는 시각 상태를 muted로 낮추고 실제 44px 터치 영역, focus/open 상태를 유지한다.
+- 학습 소그룹 checkbox row는 58px 높이의 label 전체가 눌리는 구조를 유지하고 터치/선택 방지 속성을 더했다.
+- 소그룹 위험 action에는 상단 구분선과 간격을 추가했고, 480px 이하에서는 초기화/삭제 action을 한 줄씩 분리한다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200/title 확인을 통과했다. 인앱 브라우저 패널이 없어 실제 터치/시각 검증은 다음 브라우저 가능 시점에 다시 확인한다.
 
 ### 7.2 Screen Reader & Focus Audit
 

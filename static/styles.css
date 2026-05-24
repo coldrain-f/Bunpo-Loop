@@ -119,6 +119,8 @@ button {
   border: 0;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 button:disabled {
@@ -439,9 +441,12 @@ h3 {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--stone);
-  cursor: help;
+  color: var(--muted);
+  cursor: pointer;
   list-style: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .help-disclosure summary::before {
@@ -1787,6 +1792,8 @@ button:active,
   border-radius: 8px;
   background: var(--surface);
   cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .study-subgroup-option.active {
@@ -2559,7 +2566,9 @@ button:active,
 }
 
 .subgroup-danger-actions {
-  margin-top: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 
 .group-choice-empty-action {
@@ -2662,7 +2671,7 @@ button:active,
 .card-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
   margin-top: 10px;
 }
 
@@ -2711,7 +2720,7 @@ button:active,
 .danger-zone-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
 }
 
 .danger-zone.compact .danger-zone-actions {
@@ -4301,6 +4310,11 @@ body.study-mode .toast {
 
   .bulk-issues {
     max-height: min(24vh, 180px);
+  }
+
+  .subgroup-danger-actions,
+  .danger-zone.compact .danger-zone-actions {
+    grid-template-columns: 1fr;
   }
 }
 
