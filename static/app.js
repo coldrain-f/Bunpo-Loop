@@ -1076,11 +1076,11 @@ function scheduleSearchRender(renderTask, inputId) {
   }, SEARCH_RENDER_DELAY_MS);
 }
 
-function renderOrientationNote(parts, note) {
+function renderOrientationNote(parts, note, { exposeNote = false } = {}) {
   return `
-    <div class="orientation-note">
+    <div class="orientation-note ${exposeNote ? "has-visible-note" : ""}">
       <span>${parts.map((part) => escapeHtml(part)).join(" / ")}</span>
-      ${note ? renderHelpDisclosure("화면 안내", note) : ""}
+      ${note ? (exposeNote ? `<p>${escapeHtml(note)}</p>` : renderHelpDisclosure("화면 안내", note)) : ""}
     </div>
   `;
 }
@@ -2828,7 +2828,9 @@ function renderStudySubgroupPicker(collection) {
           "대그룹 보기",
         )}</button>
       </div>
-      ${renderOrientationNote(["학습", collection.name], "공식 회독은 아래 소그룹 단위로 저장됩니다.")}
+      ${renderOrientationNote(["학습", collection.name], "공식 회독은 아래 소그룹 단위로 저장됩니다.", {
+        exposeNote: true,
+      })}
       <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
       <div class="stat-grid">
         <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>

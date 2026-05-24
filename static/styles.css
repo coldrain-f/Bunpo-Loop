@@ -512,10 +512,23 @@ h3 {
   line-height: 1.38;
 }
 
+.orientation-note.has-visible-note {
+  grid-template-columns: 1fr;
+  gap: 3px;
+}
+
 .orientation-note span {
   overflow-wrap: anywhere;
   color: var(--ink);
   font-weight: 850;
+}
+
+.orientation-note.has-visible-note > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.42;
 }
 
 .orientation-note .help-disclosure {
