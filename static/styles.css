@@ -1262,8 +1262,7 @@ h3 {
 }
 
 .section-heading-with-help,
-.field-label-row,
-.safety-note-heading {
+.field-label-row {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -1272,8 +1271,7 @@ h3 {
 }
 
 .section-heading-with-help > span,
-.field-label-row > span,
-.safety-note-heading > span {
+.field-label-row > span {
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -1285,8 +1283,7 @@ h3 {
 }
 
 .section-heading-with-help .help-disclosure,
-.field-label-row .help-disclosure,
-.safety-note-heading .help-disclosure {
+.field-label-row .help-disclosure {
   flex: 0 0 auto;
 }
 

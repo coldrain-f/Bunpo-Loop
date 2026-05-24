@@ -4845,10 +4845,8 @@ function backupSummary(backup) {
 function renderSafetyNote(title, body) {
   return `
     <article class="safety-note compact">
-      <div class="safety-note-heading">
-        <strong>${escapeHtml(title)}</strong>
-        ${renderHelpDisclosure(`${title} 안내`, body)}
-      </div>
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(body)}</p>
     </article>
   `;
 }
@@ -4982,7 +4980,7 @@ function renderSettings() {
 function renderTargetNameField() {
   return `
     <div class="field">
-      ${renderFieldLabel("목표 이름", "헤더와 학습 화면에 보일 이름입니다. 예: JLPT N1, HSK 5급, 토익 단어")}
+      ${renderFieldLabel("목표 이름")}
       <input id="target-name-input" class="input" name="target_name" value="${escapeHtml(
         state.settings?.target_name || "",
       )}" placeholder="예: 토익 단어" maxlength="80" aria-label="목표 이름" autocomplete="off" enterkeyhint="done" />
@@ -5051,7 +5049,7 @@ function renderExamDateSelects() {
   const days = Array.from({ length: 31 }, (_, index) => index + 1);
   return `
     <div class="field">
-      ${renderFieldLabel("목표일", "목표일도 선택 사항입니다. 세 칸을 모두 비우면 날짜 없이 사용합니다.")}
+      ${renderFieldLabel("목표일")}
       <div class="date-select-grid">
         <select class="select" name="exam_year" aria-label="목표 연도">
           ${renderSelectOptions(years, parts.year, "연도", "년")}
