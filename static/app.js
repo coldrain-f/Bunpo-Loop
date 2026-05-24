@@ -86,8 +86,12 @@ const DEFAULT_WEAK_CARD_THRESHOLD = 16;
 const DEFAULT_WEAK_RECENT_ROUNDS = 3;
 const DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8;
 const CARD_LIST_PAGE_SIZE = 80;
+const GROUP_LIST_PAGE_SIZE = 60;
+const STATS_COLLECTION_LIST_PAGE_SIZE = 40;
+const ROUND_DETAIL_SECTION_PAGE_SIZE = 60;
 const BULK_PREVIEW_RENDER_LIMIT = 80;
-const SEARCH_RENDER_DELAY_MS = 90;
+const SEARCH_RENDER_DELAY_MS = 120;
+const CARD_SEARCH_TEXT_CACHE = new WeakMap();
 
 const state = {
   activeTab: "study",
@@ -123,6 +127,7 @@ const state = {
   studyGroupSortMode: "recent",
   groupSearchQuery: "",
   cardListLimit: CARD_LIST_PAGE_SIZE,
+  groupListLimit: GROUP_LIST_PAGE_SIZE,
   scrollPositions: {},
   cardScreen: "list",
   groupScreen: "list",
@@ -136,6 +141,7 @@ const state = {
   statsRecentRoundsOpen: false,
   statsRangeMode: "all",
   statsCollectionId: "",
+  statsCollectionListLimit: STATS_COLLECTION_LIST_PAGE_SIZE,
   orderMode: "sequence",
   exampleDisplayMode: "collapsed",
   studyStep: "select",
@@ -538,12 +544,14 @@ function resetDataScopedUiState() {
     groupScreen: "list",
     groupDetailCollectionId: null,
     cardListLimit: CARD_LIST_PAGE_SIZE,
+    groupListLimit: GROUP_LIST_PAGE_SIZE,
     bulkDraftText: "",
     bulkDraftGroupId: null,
     bulkPreview: null,
     weakPanelOpen: false,
     weakCardOpenId: null,
     completionCorrectOpen: false,
+    statsCollectionListLimit: STATS_COLLECTION_LIST_PAGE_SIZE,
     scrollPositions: {},
   });
 }
@@ -709,10 +717,38 @@ function setTab(tab) {
   });
 }
 
-function matchesQuery(values, query) {
+function normalizeSearchQuery(query) {
   const needle = String(query || "").trim().toLocaleLowerCase();
+  return needle;
+}
+
+function matchesQuery(values, query) {
+  const needle = normalizeSearchQuery(query);
   if (!needle) return true;
   return values.some((value) => String(value || "").toLocaleLowerCase().includes(needle));
+}
+
+function getCardSearchText(card) {
+  if (!card || typeof card !== "object") return "";
+  const cached = CARD_SEARCH_TEXT_CACHE.get(card);
+  if (cached !== undefined) return cached;
+  const text = [
+    card.front,
+    card.back,
+    card.memo,
+    card.group_name,
+    card.collection_name,
+    ...(card.examples || []).flatMap((example) => [example.japanese, example.korean]),
+  ]
+    .map((value) => String(value || ""))
+    .join("\n")
+    .toLocaleLowerCase();
+  CARD_SEARCH_TEXT_CACHE.set(card, text);
+  return text;
+}
+
+function cardMatchesQuery(card, needle) {
+  return !needle || getCardSearchText(card).includes(needle);
 }
 
 function renderMarkedText(value) {
@@ -1065,6 +1101,14 @@ function handlePageShow(event) {
 
 function resetCardListLimit() {
   state.cardListLimit = CARD_LIST_PAGE_SIZE;
+}
+
+function resetGroupListLimit() {
+  state.groupListLimit = GROUP_LIST_PAGE_SIZE;
+}
+
+function resetStatsCollectionListLimit() {
+  state.statsCollectionListLimit = STATS_COLLECTION_LIST_PAGE_SIZE;
 }
 
 function scheduleSearchRender(renderTask, inputId) {
@@ -1985,15 +2029,35 @@ function getCollectionStats(collection, scope = getStatsScope()) {
 
 function renderStatsCollectionSection(scope = getStatsScope()) {
   const collections = scope.collections;
+  const displayLimit = Math.max(STATS_COLLECTION_LIST_PAGE_SIZE, number(state.statsCollectionListLimit));
+  const displayCollections = collections.slice(0, displayLimit);
+  const hiddenCount = Math.max(0, collections.length - displayCollections.length);
   return `
     <section class="panel stack">
       <div class="completion-header">
         <h3>${scope.collection ? "선택 대그룹 진행" : "대그룹별 진행"}</h3>
-        <span class="pill">${number(collections.length)}개</span>
+        <span class="pill">${hiddenCount ? `${number(displayCollections.length)}/${number(collections.length)}` : number(collections.length)}개</span>
       </div>
       ${
         collections.length
-          ? `<div class="stats-collection-list">${collections.map((collection) => renderStatsCollectionItem(collection, scope)).join("")}</div>`
+          ? `
+            <div class="stats-collection-list">${displayCollections
+              .map((collection) => renderStatsCollectionItem(collection, scope))
+              .join("")}</div>
+            ${
+              hiddenCount
+                ? `<div class="list-footer">
+                    <p>${number(displayCollections.length)}/${number(collections.length)}개 대그룹을 표시 중입니다.</p>
+                    <button class="secondary-button full" type="button" data-action="show-more-stats-collections">${iconLabel(
+                      "chevron-down",
+                      `${Math.min(STATS_COLLECTION_LIST_PAGE_SIZE, hiddenCount)}개 더 보기`,
+                    )}</button>
+                  </div>`
+                : collections.length > STATS_COLLECTION_LIST_PAGE_SIZE
+                  ? `<p class="list-performance-note">현재 조건의 대그룹 ${number(collections.length)}개를 모두 표시했습니다.</p>`
+                  : ""
+            }
+          `
           : renderActionEmptyState({
               title: "대그룹이 없습니다.",
               body: "대그룹을 만들면 소그룹별 학습 진행을 모아 볼 수 있습니다.",
@@ -3496,6 +3560,7 @@ function renderRoundDetailDialog() {
           <p class="eyebrow">회독 기록</p>
           <h2 id="study-dialog-title">자세히 불러오는 중</h2>
           <p class="meta">최근 회독의 풀이 기록을 정리하고 있습니다.</p>
+          <div class="loading-lines" aria-hidden="true"><span></span><span></span><span></span></div>
         </section>
       </div>
     `;
@@ -3534,6 +3599,9 @@ function renderRoundDetailDialog() {
 
 function renderRoundDetailSection(title, cards, tone) {
   const emptyText = tone === "bad" ? "이 회독에서는 다시 볼 오답 카드가 없었습니다." : "첫 시도에서 바로 맞은 카드가 없습니다.";
+  const visibleLimit = Math.max(ROUND_DETAIL_SECTION_PAGE_SIZE, number(state.roundDetail?.visibleLimits?.[tone]));
+  const displayCards = cards.slice(0, visibleLimit);
+  const hiddenCount = Math.max(0, cards.length - displayCards.length);
   return `
     <section class="round-detail-section">
       <div class="completion-header">
@@ -3542,7 +3610,22 @@ function renderRoundDetailSection(title, cards, tone) {
       </div>
       ${
         cards.length
-          ? `<div class="round-detail-list">${cards.map((card) => renderRoundDetailCard(card, tone)).join("")}</div>`
+          ? `
+            <div class="round-detail-list">${displayCards.map((card) => renderRoundDetailCard(card, tone)).join("")}</div>
+            ${
+              hiddenCount
+                ? `<div class="list-footer">
+                    <p>${number(displayCards.length)}/${number(cards.length)}개 표시 중입니다.</p>
+                    <button class="secondary-button full" type="button" data-action="show-more-round-detail" data-section="${tone}">${iconLabel(
+                      "chevron-down",
+                      `${Math.min(ROUND_DETAIL_SECTION_PAGE_SIZE, hiddenCount)}개 더 보기`,
+                    )}</button>
+                  </div>`
+                : cards.length > ROUND_DETAIL_SECTION_PAGE_SIZE
+                  ? `<p class="list-performance-note">이 회독의 ${escapeHtml(title)} ${number(cards.length)}개를 모두 표시했습니다.</p>`
+                  : ""
+            }
+          `
           : `<p class="meta">${emptyText}</p>`
       }
     </section>
@@ -4239,19 +4322,10 @@ function renderCards() {
     : hasCollectionFilter
       ? state.cards.filter((card) => String(card.collection_id) === String(state.cardFilterCollectionId))
       : [];
-  const visibleCards = filteredCards.filter((card) =>
-    matchesQuery(
-      [
-        card.front,
-        card.back,
-        card.memo,
-        card.group_name,
-        card.collection_name,
-        ...(card.examples || []).flatMap((example) => [example.japanese, example.korean]),
-      ],
-      state.cardSearchQuery,
-    ),
-  );
+  const cardSearchNeedle = normalizeSearchQuery(state.cardSearchQuery);
+  const visibleCards = cardSearchNeedle
+    ? filteredCards.filter((card) => cardMatchesQuery(card, cardSearchNeedle))
+    : filteredCards;
   views.cards.innerHTML = showForm
     ? renderCardEditorPanel(editing, formGroupId)
     : renderCardListPanel(visibleCards, filteredCards);
@@ -4796,6 +4870,9 @@ function renderGroupListPanel(visibleCollections) {
 }
 
 function renderCollectionDetailPanel(collection, visibleGroups) {
+  const displayLimit = Math.max(GROUP_LIST_PAGE_SIZE, number(state.groupListLimit));
+  const displayGroups = visibleGroups.slice(0, displayLimit);
+  const hiddenCount = Math.max(0, visibleGroups.length - displayGroups.length);
   return `
     <div class="panel stack">
       <div class="collection-detail-header">
@@ -4836,11 +4913,24 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
       ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "소그룹 검색" })}
       <div class="group-list">
         ${
-          visibleGroups.length
-            ? visibleGroups.map(renderGroupListItem).join("")
+          displayGroups.length
+            ? displayGroups.map(renderGroupListItem).join("")
             : renderGroupEmptyState(collection)
         }
       </div>
+      ${
+        hiddenCount
+          ? `<div class="list-footer">
+              <p>${number(displayGroups.length)}/${number(visibleGroups.length)}개 소그룹을 표시 중입니다.</p>
+              <button class="secondary-button full" type="button" data-action="show-more-groups">${iconLabel(
+                "chevron-down",
+                `${Math.min(GROUP_LIST_PAGE_SIZE, hiddenCount)}개 더 보기`,
+              )}</button>
+            </div>`
+          : visibleGroups.length > GROUP_LIST_PAGE_SIZE
+            ? `<p class="list-performance-note">현재 조건의 소그룹 ${number(visibleGroups.length)}개를 모두 표시했습니다.</p>`
+            : ""
+      }
     </div>
   `;
 }
@@ -5486,6 +5576,7 @@ async function saveGroup(form) {
   state.selectedGroupId = data.group.id;
   state.groupDetailCollectionId = payload.collection_id;
   state.groupSearchQuery = "";
+  resetGroupListLimit();
   state.groupScreen = "list";
   await loadData();
   render();
@@ -5504,6 +5595,7 @@ async function saveCollection(form) {
   state.groupDetailCollectionId = data.collection.id;
   state.collectionSearchQuery = "";
   state.groupSearchQuery = "";
+  resetGroupListLimit();
   state.groupScreen = "list";
   await loadData();
   render();
@@ -5648,6 +5740,8 @@ function logout() {
     studyGroupSortMode: "recent",
     groupSearchQuery: "",
     cardListLimit: CARD_LIST_PAGE_SIZE,
+    groupListLimit: GROUP_LIST_PAGE_SIZE,
+    statsCollectionListLimit: STATS_COLLECTION_LIST_PAGE_SIZE,
     scrollPositions: {},
     cardScreen: "list",
     groupScreen: "list",
@@ -5772,12 +5866,16 @@ async function deletePendingCollection() {
 
 async function openRoundDetail(roundId) {
   const cachedRound = state.rounds.find((round) => Number(round.id) === Number(roundId));
-  state.roundDetail = { loading: true, id: roundId, round: cachedRound || null, cards: [] };
+  const visibleLimits = {
+    bad: ROUND_DETAIL_SECTION_PAGE_SIZE,
+    good: ROUND_DETAIL_SECTION_PAGE_SIZE,
+  };
+  state.roundDetail = { loading: true, id: roundId, round: cachedRound || null, cards: [], visibleLimits };
   state.activeDialog = "round-detail";
   renderDialog();
   const data = await request(`/api/rounds/${roundId}`);
   if (state.activeDialog !== "round-detail" || Number(state.roundDetail?.id) !== Number(roundId)) return;
-  state.roundDetail = { ...data, loading: false, id: roundId };
+  state.roundDetail = { ...data, loading: false, id: roundId, visibleLimits };
   renderDialog();
 }
 
@@ -5839,6 +5937,7 @@ document.addEventListener("click", async (event) => {
       state.editingCollectionId = null;
       state.editingGroupId = null;
       state.groupSearchQuery = "";
+      resetGroupListLimit();
       render();
       focusAfterRender("#view-groups.active h2");
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -5862,6 +5961,7 @@ document.addEventListener("click", async (event) => {
       if (!STATS_RANGE_LABELS[nextRange]) return;
       state.statsRangeMode = nextRange;
       state.statsRecentRoundsOpen = false;
+      resetStatsCollectionListLimit();
       renderStats();
       focusAfterRender(`[data-action="set-stats-range"][data-range="${nextRange}"]`);
     }
@@ -6282,6 +6382,7 @@ document.addEventListener("click", async (event) => {
       state.editingGroupId = null;
       state.editingCollectionId = null;
       state.groupSearchQuery = "";
+      resetGroupListLimit();
       render();
       scrollToTop();
     }
@@ -6315,12 +6416,36 @@ document.addEventListener("click", async (event) => {
       }
       if (target === "group-search") {
         state.groupSearchQuery = "";
+        resetGroupListLimit();
         renderGroups();
       }
     }
     if (action === "show-more-cards") {
       state.cardListLimit = number(state.cardListLimit) + CARD_LIST_PAGE_SIZE;
       renderCards();
+    }
+    if (action === "show-more-groups") {
+      state.groupListLimit = number(state.groupListLimit) + GROUP_LIST_PAGE_SIZE;
+      renderGroups();
+    }
+    if (action === "show-more-round-detail") {
+      const section = actionEl.dataset.section;
+      if (!["bad", "good"].includes(section) || !state.roundDetail) return;
+      const body = dialogRoot.querySelector(".round-detail-body");
+      const scrollTop = body ? body.scrollTop : 0;
+      state.roundDetail.visibleLimits = {
+        ...(state.roundDetail.visibleLimits || {}),
+        [section]: number(state.roundDetail.visibleLimits?.[section]) + ROUND_DETAIL_SECTION_PAGE_SIZE,
+      };
+      renderDialog();
+      window.requestAnimationFrame(() => {
+        const nextBody = dialogRoot.querySelector(".round-detail-body");
+        if (nextBody) nextBody.scrollTop = scrollTop;
+      });
+    }
+    if (action === "show-more-stats-collections") {
+      state.statsCollectionListLimit = number(state.statsCollectionListLimit) + STATS_COLLECTION_LIST_PAGE_SIZE;
+      renderStats();
     }
     if (action === "add-example") {
       const list = document.querySelector("#example-editor-list");
@@ -6451,6 +6576,7 @@ document.addEventListener("change", async (event) => {
     if (event.target.id === "stats-collection-filter") {
       state.statsCollectionId = event.target.value;
       state.statsRecentRoundsOpen = false;
+      resetStatsCollectionListLimit();
       renderStats();
       focusAfterRender("#stats-collection-filter");
     }
@@ -6544,6 +6670,7 @@ function updateSearchInput(event) {
   }
   if (event.target.id === "group-search") {
     state.groupSearchQuery = event.target.value;
+    resetGroupListLimit();
     scheduleSearchRender(renderGroups, "group-search");
   }
 }

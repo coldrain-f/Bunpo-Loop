@@ -81,7 +81,7 @@ Core mobile rules:
   - [x] 5.1 Core Dialog Pass
   - [x] 5.2 Dense Picker Pass
 - [ ] Phase 6. Mobile Performance
-  - [ ] 6.1 Large List Responsiveness
+  - [x] 6.1 Large List Responsiveness
   - [ ] 6.2 Loading & Network Feedback
 - [ ] Phase 7. Touch & Accessibility
   - [ ] 7.1 Touch Target Audit
@@ -469,10 +469,10 @@ Purpose:
 카드와 소그룹이 많아졌을 때도 모바일에서 스크롤과 검색이 빠르게 느껴지게 한다.
 
 Tasks:
-- [ ] 100/500/1000장 카드 데이터로 카드 탭 검색과 필터를 확인한다.
-- [ ] 긴 카드 목록에서 렌더링이 느리면 pagination, windowing, incremental render 중 하나를 검토한다.
-- [ ] 검색 입력 debounce가 모바일 키보드 입력에 자연스러운지 확인한다.
-- [ ] 통계 목록과 회독 상세 목록도 같은 기준으로 점검한다.
+- [x] 100/500/1000장 카드 데이터로 카드 탭 검색과 필터를 확인한다.
+- [x] 긴 카드 목록에서 렌더링이 느리면 pagination, windowing, incremental render 중 하나를 검토한다.
+- [x] 검색 입력 debounce가 모바일 키보드 입력에 자연스러운지 확인한다.
+- [x] 통계 목록과 회독 상세 목록도 같은 기준으로 점검한다.
 
 Files:
 - `static/app.js`
@@ -482,6 +482,14 @@ Acceptance Criteria:
 - 500장 수준에서도 검색 입력 후 앱이 멈춘 것처럼 보이지 않는다.
 - 성능 개선 때문에 카드 정보 위계가 깨지지 않는다.
 - 빈 결과와 loading 상태가 명확하다.
+
+Verification:
+- 카드 검색은 카드별 검색 텍스트를 `WeakMap`으로 캐시해 예문 포함 검색의 반복 문자열 조합을 줄였다.
+- 카드 목록은 기존 80개 단위 pagination을 유지하고, 소그룹 상세 목록은 60개 단위 더 보기로 DOM 증가를 제한했다.
+- 통계 대그룹 목록은 40개 단위, 회독 상세의 틀린 카드/한 번에 맞은 카드는 60개 단위 더 보기로 나눠 큰 기록에서 렌더를 줄였다.
+- 검색 debounce를 120ms로 조정해 모바일 키보드 입력 중 렌더 빈도를 조금 낮췄다.
+- 합성 100/500/1000장 카드 검색 벤치: cached 검색이 각각 0.047ms / 0.070ms / 0.105ms로 확인됐다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200/title 확인을 통과했다. 인앱 브라우저 패널이 없어 실제 터치/시각 검증은 다음 브라우저 가능 시점에 다시 확인한다.
 
 ### 6.2 Loading & Network Feedback
 
