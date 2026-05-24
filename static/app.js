@@ -1,4 +1,5 @@
 const {
+  ALLOWED_LOGINS,
   DEFAULT_LOGIN,
   ORDER_LABELS,
   TAB_LABELS,
@@ -2500,8 +2501,11 @@ function renderAuth() {
   document.body.classList.remove("study-mode");
   document.querySelectorAll(".nav-button").forEach((button) => button.classList.remove("active"));
   Object.entries(views).forEach(([key, view]) => view.classList.toggle("active", key === "auth"));
-  const nickname = state.authValues.nickname ?? DEFAULT_LOGIN.nickname;
+  const nickname = ALLOWED_LOGINS.includes(state.authValues.nickname) ? state.authValues.nickname : DEFAULT_LOGIN.nickname;
   const accessCode = state.authValues.accessCode ?? DEFAULT_LOGIN.accessCode;
+  const accountOptions = ALLOWED_LOGINS.map(
+    (name) => `<option value="${escapeHtml(name)}" ${name === nickname ? "selected" : ""}>${escapeHtml(name)}</option>`,
+  ).join("");
   views.auth.innerHTML = `
     <div class="panel stack auth-panel">
       <section class="auth-mascot-card" aria-label="꼬꼬회독 시작">
@@ -2514,16 +2518,17 @@ function renderAuth() {
       <div class="auth-heading">
         <p class="eyebrow">개인 학습 공간</p>
         <h2 id="auth-title">바로 시작하기</h2>
-        <p id="auth-help" class="meta">닉네임과 6자리 코드는 같은 학습 데이터를 다시 여는 개인용 구분값입니다. 공개 서비스용 계정 보안은 아닙니다.</p>
+        <p id="auth-help" class="meta">등록된 계정 3개 중 하나를 선택하고 6자리 코드를 입력하세요.</p>
       </div>
       <form id="login-form" class="stack ${state.authPending ? "is-pending" : ""}" novalidate aria-busy="${state.authPending ? "true" : "false"}">
         <label class="field">
-          <span>닉네임</span>
-          <input class="input" name="nickname" autocomplete="username" value="${escapeHtml(
-            nickname,
-          )}" placeholder="예: haru" required maxlength="40" aria-describedby="auth-help auth-error" ${
+          <span>계정</span>
+          <select class="input" name="nickname" autocomplete="username" required aria-describedby="auth-help auth-error" ${
             state.authError ? 'aria-invalid="true"' : ""
-          } ${state.authPending ? "disabled" : ""} />
+          } ${state.authPending ? "disabled" : ""}>
+            <option value="">계정 선택</option>
+            ${accountOptions}
+          </select>
         </label>
         <label class="field">
           <span>6자리 코드</span>
@@ -2539,11 +2544,11 @@ function renderAuth() {
           state.authPending ? "확인 중" : "들어가기",
         )}</button>
       </form>
-      <p class="auth-note">처음 쓰는 닉네임이면 새 학습 공간을 만들고, 같은 닉네임이면 이 코드로 다시 들어갑니다.</p>
+      <p class="auth-note">허용된 계정만 접속할 수 있고, 계정별 학습 데이터는 서로 분리됩니다.</p>
     </div>
   `;
   if (!state.authPending) {
-    window.requestAnimationFrame(() => views.auth.querySelector('input[name="nickname"]')?.focus({ preventScroll: true }));
+    window.requestAnimationFrame(() => views.auth.querySelector('select[name="nickname"]')?.focus({ preventScroll: true }));
   }
 }
 

@@ -1,4 +1,4 @@
-const SHELL_CACHE = "kokko-shell-20260524-1";
+const SHELL_CACHE = "kokko-shell-20260524-3";
 
 const APP_SHELL = [
   "/",
@@ -9,8 +9,10 @@ const APP_SHELL = [
   "/static/app.js",
   "/static/manifest.webmanifest",
   "/static/assets/favicon-64.png",
-  "/static/assets/apple-touch-icon.png",
-  "/static/assets/logo-192.png",
+  "/static/assets/pwa-icon-180.png",
+  "/static/assets/pwa-icon-192.png",
+  "/static/assets/pwa-icon-512.png",
+  "/static/assets/pwa-icon-maskable-512.png",
   "/static/assets/logo.png",
   "/static/assets/kokko-empty.png",
   "/static/assets/kokko-welcome.png",

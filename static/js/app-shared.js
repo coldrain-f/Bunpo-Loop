@@ -18,6 +18,8 @@
     accessCode: "",
   };
 
+  const ALLOWED_LOGINS = ["상운", "GUEST1", "GUEST2"];
+
   const USER_STORAGE_KEY = "byeorakchigiUser";
   const LEGACY_USER_STORAGE_KEY = "jlptGrammarUser";
 
@@ -63,6 +65,7 @@
   }
 
   const shared = {
+    ALLOWED_LOGINS,
     DEFAULT_LOGIN,
     LEGACY_USER_STORAGE_KEY,
     ORDER_LABELS,

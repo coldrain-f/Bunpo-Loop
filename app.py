@@ -21,6 +21,12 @@ DB_ENV = os.environ.get("BYEORAKCHIGI_DB") or os.environ.get("BUNPO_LOOP_DB") or
 DB_PATH = Path(DB_ENV or DATA_DIR / "jlpt_cards.sqlite3")
 APP_USER = os.environ.get("APP_USER")
 APP_PASSWORD = os.environ.get("APP_PASSWORD")
+DEFAULT_USERS = (
+    ("상운", "960725"),
+    ("GUEST1", "000000"),
+    ("GUEST2", "000000"),
+)
+DEFAULT_USER_CODES = {nickname: access_code for nickname, access_code in DEFAULT_USERS}
 DEFAULT_WEAK_CARD_THRESHOLD = 16
 DEFAULT_WEAK_RECENT_ROUNDS = 3
 DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8
@@ -139,12 +145,15 @@ def init_db() -> None:
         if learning_schema_needs_reset(conn):
             reset_learning_schema(conn)
             migrate_db(conn)
+            ensure_default_users(conn)
         else:
             migrate_db(conn)
+            ensure_default_users(conn)
             if learning_schema_needs_user_scope(conn):
                 migrate_learning_schema_to_user_scope(conn)
             else:
                 conn.executescript(LEARNING_SCHEMA_SQL)
+        ensure_default_users(conn)
 
 
 def migrate_db(conn: sqlite3.Connection) -> None:
@@ -195,20 +204,31 @@ def migrate_db(conn: sqlite3.Connection) -> None:
             DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
         ),
     )
-    conn.execute(
-        """
-        UPDATE collections
-        SET name = ?
-        WHERE name IN (?, ?)
-          AND description = ?
-        """,
-        (
-            "영어 단어 꼬꼬회독",
-            "영어 단어 벼락회독",
-            "영어 단어 벼락치기",
-            "단어와 예문을 빠르게 반복합니다.",
-        ),
-    )
+
+
+def ensure_default_users(conn: sqlite3.Connection) -> None:
+    for nickname, access_code in DEFAULT_USERS:
+        conn.execute(
+            """
+            INSERT INTO users (
+                nickname,
+                access_code,
+                weak_card_threshold,
+                weak_recent_rounds,
+                weak_recent_wrong_threshold
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(nickname) DO UPDATE SET
+                access_code = excluded.access_code
+            """,
+            (
+                nickname,
+                access_code,
+                DEFAULT_WEAK_CARD_THRESHOLD,
+                DEFAULT_WEAK_RECENT_ROUNDS,
+                DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+            ),
+        )
 
 
 def table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
@@ -257,7 +277,12 @@ def reset_learning_schema(conn: sqlite3.Connection) -> None:
 
 
 def migrate_learning_schema_to_user_scope(conn: sqlite3.Connection) -> None:
-    owner = conn.execute("SELECT id FROM users ORDER BY id ASC LIMIT 1").fetchone()
+    owner = conn.execute(
+        "SELECT id FROM users WHERE nickname = ?",
+        (DEFAULT_USERS[0][0],),
+    ).fetchone()
+    if owner is None:
+        owner = conn.execute("SELECT id FROM users ORDER BY id ASC LIMIT 1").fetchone()
     owner_id = int(owner["id"]) if owner else None
     legacy = {
         "collections": table_payload(conn, "collections", "id ASC"),
@@ -403,89 +428,6 @@ def migrate_learning_schema_to_user_scope(conn: sqlite3.Connection) -> None:
             ),
         )
     delete_orphan_rounds(conn)
-
-
-def seed_data(conn: sqlite3.Connection, user_id: int) -> None:
-    collections = [
-        ("일본어 시험 표현", "문법과 표현을 소그룹으로 나누어 회독합니다."),
-        ("영어 단어 꼬꼬회독", "단어와 예문을 빠르게 반복합니다."),
-    ]
-    collection_ids: dict[str, int] = {}
-    for name, description in collections:
-        cur = conn.execute(
-            "INSERT INTO collections (user_id, name, description) VALUES (?, ?, ?)",
-            (user_id, name, description),
-        )
-        collection_ids[name] = int(cur.lastrowid)
-
-    groups = [
-        ("일본어 시험 표현", "문법 표현", "문장 끝과 연결 표현"),
-        ("일본어 시험 표현", "부사 표현", "문장 흐름을 잡는 표현"),
-        ("영어 단어 꼬꼬회독", "동사구", "시험과 회화에 자주 나오는 표현"),
-    ]
-    group_ids: dict[str, int] = {}
-    for collection_name, name, description in groups:
-        cur = conn.execute(
-            "INSERT INTO groups (collection_id, name, description) VALUES (?, ?, ?)",
-            (collection_ids[collection_name], name, description),
-        )
-        group_ids[name] = int(cur.lastrowid)
-
-    cards = [
-        (
-            "문법 표현",
-            "〜あまり",
-            "~한 나머지",
-            [
-                ("緊張のあまり、声が震えた。", "긴장한 나머지 목소리가 떨렸다."),
-                ("考えすぎたあまり、眠れなかった。", "너무 생각한 나머지 잠을 잘 수 없었다."),
-            ],
-        ),
-        (
-            "문법 표현",
-            "〜に至っては",
-            "~에 이르러서는",
-            [
-                ("弟に至っては、まだ準備もしていない。", "동생에 이르러서는 아직 준비도 하지 않았다."),
-                ("この問題に至っては、説明するのも難しい。", "이 문제에 이르러서는 설명하기도 어렵다."),
-            ],
-        ),
-        (
-            "문법 표현",
-            "〜をもって",
-            "~로써 / ~을 기해",
-            [
-                ("本日をもって受付を終了します。", "오늘을 기해 접수를 종료합니다."),
-                ("努力をもって困難を乗り越えた。", "노력으로써 어려움을 극복했다."),
-            ],
-        ),
-        (
-            "부사 표현",
-            "いかにも",
-            "정말로 / 참으로",
-            [
-                ("いかにも彼らしい答えだ。", "정말 그다운 대답이다."),
-                ("いかにも高そうな時計をしている。", "참으로 비싸 보이는 시계를 차고 있다."),
-            ],
-        ),
-        (
-            "동사구",
-            "carry out",
-            "수행하다 / 실행하다",
-            [
-                ("We need to carry out the plan by Friday.", "금요일까지 그 계획을 실행해야 한다."),
-                ("The team carried out a quick review.", "팀은 빠른 검토를 수행했다."),
-            ],
-        ),
-    ]
-
-    for group_name, front, back, examples in cards:
-        cur = conn.execute(
-            "INSERT INTO cards (group_id, front, back) VALUES (?, ?, ?)",
-            (group_ids[group_name], front, back),
-        )
-        card_id = int(cur.lastrowid)
-        insert_examples(conn, card_id, examples)
 
 
 def row_to_dict(row: sqlite3.Row) -> dict:
@@ -1954,6 +1896,10 @@ class AppHandler(BaseHTTPRequestHandler):
         body = parse_body(self)
         nickname = validate_nickname(body.get("nickname"))
         access_code = validate_access_code(body.get("access_code"))
+        expected_code = DEFAULT_USER_CODES.get(nickname)
+        if expected_code is None or not hmac.compare_digest(expected_code, access_code):
+            self.send_json({"error": "등록된 계정 정보와 일치하지 않습니다."}, HTTPStatus.UNAUTHORIZED)
+            return
         user = conn.execute(
             "SELECT * FROM users WHERE nickname = ?",
             (nickname,),
@@ -1972,7 +1918,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 """,
                 (
                     nickname,
-                    access_code,
+                    expected_code,
                     DEFAULT_WEAK_CARD_THRESHOLD,
                     DEFAULT_WEAK_RECENT_ROUNDS,
                     DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
@@ -1982,13 +1928,15 @@ class AppHandler(BaseHTTPRequestHandler):
                 "SELECT * FROM users WHERE id = ?",
                 (cur.lastrowid,),
             ).fetchone()
-        elif not hmac.compare_digest(str(user["access_code"]), access_code):
-            self.send_json({"error": "닉네임 또는 숫자 코드가 맞지 않습니다."}, HTTPStatus.UNAUTHORIZED)
-            return
         else:
             conn.execute(
-                f"UPDATE users SET last_login_at = {utc_now_sql()} WHERE id = ?",
-                (user["id"],),
+                f"""
+                UPDATE users
+                SET access_code = ?,
+                    last_login_at = {utc_now_sql()}
+                WHERE id = ?
+                """,
+                (expected_code, user["id"]),
             )
         self.send_json(
             {
@@ -2033,7 +1981,10 @@ class AppHandler(BaseHTTPRequestHandler):
             ).fetchone()
         if user is None:
             return None
-        if not hmac.compare_digest(str(user["access_code"]), access_code):
+        expected_code = DEFAULT_USER_CODES.get(str(user["nickname"]))
+        if expected_code is None:
+            return None
+        if not hmac.compare_digest(expected_code, access_code):
             return None
         return user
 
