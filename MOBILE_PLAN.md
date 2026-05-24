@@ -64,8 +64,8 @@ Core mobile rules:
 
 - [ ] Phase 1. Mobile Viewport Baseline
   - [ ] 1.1 Viewport QA Matrix
-  - [ ] 1.2 Safe Area & Fixed Chrome
-  - [ ] 1.3 Mobile Browser Quirks
+  - [x] 1.2 Safe Area & Fixed Chrome
+  - [x] 1.3 Mobile Browser Quirks
 - [ ] Phase 2. One-Hand Navigation
   - [ ] 2.1 Back & Return Flow
   - [ ] 2.2 Tab State & Scroll Restoration
@@ -102,11 +102,12 @@ Purpose:
 모바일 개선의 기준 화면 폭을 명시하고, 이후 변경이 같은 기준으로 검증되게 한다.
 
 Tasks:
-- [ ] 360px, 390px, 430px, 768px viewport를 기본 QA 폭으로 정한다.
-- [ ] 학습, 묶음, 카드, 통계, 설정, 로그인 화면을 각 폭에서 확인한다.
-- [ ] 360px에서 버튼 텍스트, badge, select, 하단 nav label이 넘치지 않는지 확인한다.
-- [ ] 390px에서 실제 주력 모바일 화면처럼 전체 밀도와 tap flow를 확인한다.
-- [ ] 768px에서는 앱이 데스크톱 사이트처럼 과하게 넓어지지 않는지 확인한다.
+- [x] 360px, 390px, 430px, 768px viewport를 기본 QA 폭으로 정한다.
+- [x] 학습, 묶음, 카드, 통계, 설정 화면을 각 폭에서 확인한다.
+- [ ] 로그인 화면을 사용 중인 세션을 해치지 않는 방식으로 각 폭에서 확인한다.
+- [x] 360px에서 버튼 텍스트, badge, select, 하단 nav label이 넘치지 않는지 확인한다.
+- [x] 390px에서 실제 주력 모바일 화면처럼 전체 밀도와 tap flow를 확인한다.
+- [x] 768px에서는 앱이 데스크톱 사이트처럼 과하게 넓어지지 않는지 확인한다.
 
 Files:
 - `static/styles.css`
@@ -118,16 +119,22 @@ Acceptance Criteria:
 - 하단 nav, sticky action, dialog가 viewport 폭 변화로 흔들리지 않는다.
 - 390px에서 첫 화면의 primary action이 한눈에 보인다.
 
+Verification:
+- 360/390/430/768px viewport 자동 검사에서 학습, 묶음, 카드, 통계, 설정 화면 모두 horizontal overflow 0건.
+- 360/390/430/768px viewport 자동 검사에서 버튼, 입력, select, badge overflow 0건.
+- 768px에서 app shell과 bottom nav가 560px 모바일 폭을 유지함.
+- 로그인 화면은 현재 세션을 로그아웃시키지 않기 위해 남겨둠.
+
 ### 1.2 Safe Area & Fixed Chrome
 
 Purpose:
 iOS/Android 브라우저의 safe area, 주소창 변화, 하단 nav 고정 상태에서도 주요 액션이 가려지지 않게 한다.
 
 Tasks:
-- [ ] `env(safe-area-inset-bottom)` 적용 위치를 app shell, bottom nav, toast, sticky action에서 점검한다.
-- [ ] active session의 answer bar가 하단 safe area 위에 안정적으로 놓이는지 확인한다.
-- [ ] toast가 하단 nav나 answer bar를 가리지 않는지 확인한다.
-- [ ] dialog bottom sheet가 safe area와 겹치지 않는지 확인한다.
+- [x] `env(safe-area-inset-bottom)` 적용 위치를 app shell, bottom nav, toast, sticky action에서 점검한다.
+- [x] active session의 answer bar가 하단 safe area 위에 안정적으로 놓이는지 확인한다.
+- [x] toast가 하단 nav나 answer bar를 가리지 않는지 확인한다.
+- [x] dialog bottom sheet가 safe area와 겹치지 않는지 확인한다.
 
 Files:
 - `static/styles.css`
@@ -137,17 +144,22 @@ Acceptance Criteria:
 - toast와 하단 nav가 서로 겹치지 않는다.
 - 학습 중 정답/오답 버튼이 항상 누르기 쉬운 위치에 있다.
 
+Verification:
+- 390px active session에서 header/nav가 숨겨지고 study action bar가 card 아래 안정적으로 배치됨.
+- 390px 포기 dialog가 bottom sheet 위치로 열리고 viewport 하단 safe padding 안에 유지됨.
+- 390px 설정 저장 toast가 bottom nav와 겹치지 않음.
+
 ### 1.3 Mobile Browser Quirks
 
 Purpose:
 iOS Safari와 Android Chrome의 모바일 웹 특성을 앱 품질 기준 안에 명시한다.
 
 Tasks:
-- [ ] viewport meta가 모바일 확대/축소, safe area, installed mode에 적절한지 확인한다.
-- [ ] input, select, textarea의 font-size가 iOS focus 확대를 유발하지 않는지 확인한다.
-- [ ] `100vh` 사용 여부를 점검하고, 필요한 곳은 `100dvh`/fallback 또는 layout-safe 방식으로 조정한다.
-- [ ] 주소창 show/hide 후 fixed bottom nav, dialog, active session 높이가 갑자기 튀지 않는지 확인한다.
-- [ ] pull-to-refresh, overscroll, momentum scroll이 dialog와 내부 scroll 영역에서 어색하지 않은지 확인한다.
+- [x] viewport meta가 모바일 확대/축소, safe area, installed mode에 적절한지 확인한다.
+- [x] input, select, textarea의 font-size가 iOS focus 확대를 유발하지 않는지 확인한다.
+- [x] `100vh` 사용 여부를 점검하고, 필요한 곳은 `100dvh`/fallback 또는 layout-safe 방식으로 조정한다.
+- [x] 주소창 show/hide 후 fixed bottom nav, dialog, active session 높이가 갑자기 튀지 않는지 확인한다.
+- [x] pull-to-refresh, overscroll, momentum scroll이 dialog와 내부 scroll 영역에서 어색하지 않은지 확인한다.
 
 Files:
 - `static/index.html`
@@ -157,6 +169,12 @@ Acceptance Criteria:
 - iOS Safari에서 입력 focus 시 의도치 않은 zoom이 발생하지 않는다.
 - 주소창 높이 변화에도 하단 nav와 answer bar가 주요 콘텐츠를 가리지 않는다.
 - dialog 내부 스크롤이 페이지 전체 스크롤과 헷갈리지 않는다.
+
+Verification:
+- viewport meta는 `viewport-fit=cover`를 유지함.
+- 360/390/430/768px 검사에서 input/select/textarea font-size 최소값 16px.
+- app shell과 study shell에 `100dvh` fallback을 추가함.
+- dialog/list 내부 scroll 영역은 `overscroll-behavior: contain`을 유지함.
 
 ## Phase 2. One-Hand Navigation
 

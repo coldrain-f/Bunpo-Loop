@@ -149,6 +149,7 @@ button:disabled {
 .app-shell {
   width: min(100%, 560px);
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0 auto;
   padding: calc(16px + env(safe-area-inset-top)) 16px calc(96px + env(safe-area-inset-bottom));
 }
@@ -407,9 +408,11 @@ h3 {
 }
 
 .help-disclosure summary {
+  position: relative;
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
+  margin: -8px;
   place-items: center;
   border: 0;
   border-radius: 999px;
@@ -419,13 +422,26 @@ h3 {
   list-style: none;
 }
 
+.help-disclosure summary::before {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  content: "";
+}
+
 .help-disclosure summary .icon {
+  position: relative;
   width: 16px;
   height: 16px;
+  z-index: 1;
+}
+
+.help-disclosure summary:hover::before {
+  background: var(--surface-strong);
 }
 
 .help-disclosure summary:hover {
-  background: var(--surface-strong);
   color: var(--muted);
 }
 
@@ -435,11 +451,17 @@ h3 {
 
 .help-disclosure summary:focus-visible {
   outline: none;
+}
+
+.help-disclosure summary:focus-visible::before {
   box-shadow: 0 0 0 3px rgba(23, 111, 102, 0.18);
 }
 
-.help-disclosure[open] summary {
+.help-disclosure[open] summary::before {
   background: var(--teal-soft);
+}
+
+.help-disclosure[open] summary {
   color: var(--teal);
 }
 
@@ -622,7 +644,7 @@ h3 {
 }
 
 .stats-range-options .segment {
-  min-height: 40px;
+  min-height: 44px;
   font-size: 0.8rem;
 }
 
@@ -3148,6 +3170,7 @@ button:active,
 
 .study-shell {
   min-height: calc(100vh - 112px);
+  min-height: calc(100dvh - 112px);
   padding-bottom: calc(78px + env(safe-area-inset-bottom));
 }
 
