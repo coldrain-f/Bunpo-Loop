@@ -867,6 +867,31 @@ function restoreScrollPosition(key) {
   window.requestAnimationFrame(() => window.scrollTo(0, position));
 }
 
+function getCurrentScrollKey() {
+  if (!state.user || state.session) return "";
+  if (state.activeTab === "groups") {
+    if (state.groupScreen !== "list") return `groups:${state.groupScreen}`;
+    return state.groupDetailCollectionId ? `groups:detail:${state.groupDetailCollectionId}` : "groups:collections";
+  }
+  if (state.activeTab === "cards") return state.cardScreen === "form" ? "cards:form" : "cards:list";
+  if (state.activeTab === "stats") return `stats:${state.statsCollectionId || "all"}:${state.statsRangeMode}`;
+  if (state.activeTab === "settings") return "settings";
+  if (state.activeTab === "study") {
+    if (state.studyStep === "collection") return `study:collection:${state.selectedCollectionId || "none"}`;
+    if (state.studyStep === "ready") return `study:ready:${state.selectedGroupId || "none"}`;
+    return "study:collections";
+  }
+  return state.activeTab || "";
+}
+
+function saveCurrentScrollPosition() {
+  saveScrollPosition(getCurrentScrollKey());
+}
+
+function restoreCurrentScrollPosition() {
+  restoreScrollPosition(getCurrentScrollKey());
+}
+
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -965,7 +990,7 @@ function completeHistoryNavigation(route) {
   render();
   isApplyingHistoryRoute = false;
   writeCurrentHistoryRoute("replace");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  restoreCurrentScrollPosition();
 }
 
 function handleHistoryPop(event) {
@@ -5688,8 +5713,10 @@ document.addEventListener("click", async (event) => {
       state.session = null;
       state.completionCorrectOpen = false;
     }
+    if (nextTab !== state.activeTab) saveCurrentScrollPosition();
     state.activeTab = nextTab;
     render();
+    if (nextTab !== "study" || !state.session) restoreCurrentScrollPosition();
     if (shouldMoveFocusAfterClick(event)) {
       focusAfterRender(`#view-${nextTab}.active h2`);
     } else if (tabButton instanceof HTMLElement) {

@@ -68,7 +68,7 @@ Core mobile rules:
   - [x] 1.3 Mobile Browser Quirks
 - [ ] Phase 2. One-Hand Navigation
   - [x] 2.1 Back & Return Flow
-  - [ ] 2.2 Tab State & Scroll Restoration
+  - [x] 2.2 Tab State & Scroll Restoration
   - [ ] 2.3 Resume & Session Continuity
 - [ ] Phase 3. Study Session Ergonomics
   - [ ] 3.1 Card Reading & Flip Comfort
@@ -213,10 +213,10 @@ Purpose:
 탭 이동과 detail 복귀 후 사용자가 보던 위치를 잃지 않게 한다.
 
 Tasks:
-- [ ] 각 탭의 주요 scroll position 보존 필요 여부를 정한다.
-- [ ] 묶음/카드/통계 탭에서 detail 또는 dialog를 닫은 뒤 목록 위치가 유지되는지 확인한다.
-- [ ] 검색어, 필터, select 상태가 탭 이동 후 기대한 만큼 유지되는지 확인한다.
-- [ ] 새 데이터를 저장한 뒤에는 필요한 경우만 목록을 재정렬하거나 top으로 이동한다.
+- [x] 각 탭의 주요 scroll position 보존 필요 여부를 정한다.
+- [x] 묶음/카드/통계 탭에서 detail 또는 dialog를 닫은 뒤 목록 위치가 유지되는지 확인한다.
+- [x] 검색어, 필터, select 상태가 탭 이동 후 기대한 만큼 유지되는지 확인한다.
+- [x] 새 데이터를 저장한 뒤에는 필요한 경우만 목록을 재정렬하거나 top으로 이동한다.
 
 Files:
 - `static/app.js`
@@ -225,6 +225,13 @@ Acceptance Criteria:
 - 목록에서 항목 하나를 보고 돌아왔을 때 처음부터 다시 찾지 않아도 된다.
 - 탭 이동이 reset처럼 느껴지지 않는다.
 - 저장 직후 변경된 항목이 어디에 반영됐는지 알 수 있다.
+
+Verification:
+- 하단 탭 전환 시 현재 탭의 scroll key를 저장하고, 복귀한 탭의 scroll position을 복원하도록 공통 처리함.
+- 390px에서 묶음 탭을 스크롤한 뒤 카드 탭을 거쳐 돌아왔을 때 묶음 탭 scrollY가 유지됨.
+- 390px에서 통계 기간 필터 `30일`과 통계 탭 scrollY가 탭 왕복 후 유지됨.
+- 390px에서 카드 검색어 `N1`과 카드 탭 scrollY가 탭 왕복 후 유지됨.
+- 대그룹/detail, 카드 form/list는 기존 저장/취소/복귀 흐름을 유지하고, 저장 후에는 변경 내용을 확인할 수 있는 목록/상세 맥락으로 돌아감.
 
 ### 2.3 Resume & Session Continuity
 
