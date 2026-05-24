@@ -688,6 +688,13 @@ Acceptance Criteria:
 - 핵심 학습 루프는 한 손으로 끝까지 진행된다.
 - 발견된 문제는 이 문서의 해당 phase로 되돌려 반영한다.
 
+Browser Preflight (2026-05-24):
+- 390px 인앱 브라우저에서 학습 홈, 공식 소그룹 회독 준비, 시작 확인 dialog, 학습 세션 앞면/뒷면, 정답/오답 answer bar 노출, 포기 복귀를 확인했다. 공식 기록 저장은 발생시키지 않았다.
+- 활성 학습 세션에서는 bottom nav가 숨겨지고 answer bar가 viewport 안에 유지되며 horizontal overflow 0건이었다.
+- 카드 탭에서 카드 등록 폼의 대그룹/소그룹 select, 앞면 input, 뒷면/메모 textarea, 예문 textarea, 예문 추가 버튼을 저장 없이 확인했다.
+- 학습 카드 미리보기 dialog의 열기/닫기와 console error 0건을 확인했다.
+- 이 preflight는 실제 iPhone Safari/Android Chrome 손검증을 대체하지 않는다. 주소창 show/hide, installed mode, 느린 네트워크/절전 모드 loading feedback은 실제 기기에서 확인해야 한다.
+
 ### 9.2 Final Regression Pass
 
 Purpose:
