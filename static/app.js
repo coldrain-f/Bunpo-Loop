@@ -191,6 +191,42 @@ function iconLabel(name, label) {
   return `<span class="button-content">${icon(name)}<span>${escapeHtml(label)}</span></span>`;
 }
 
+function renderHelpDisclosure(label, body, className = "") {
+  return `
+    <details class="help-disclosure ${className}">
+      <summary aria-label="${escapeHtml(label)}">
+        ${icon("info")}
+        <span class="sr-only">${escapeHtml(label)}</span>
+      </summary>
+      <p>${escapeHtml(body)}</p>
+    </details>
+  `;
+}
+
+function closeHelpDisclosures(except = null) {
+  document.querySelectorAll("details.help-disclosure[open]").forEach((item) => {
+    if (item !== except) item.open = false;
+  });
+}
+
+function renderSectionHeading(label, helpText = "") {
+  return `
+    <div class="section-heading-with-help">
+      <span class="field-label">${escapeHtml(label)}</span>
+      ${helpText ? renderHelpDisclosure(`${label} 안내`, helpText) : ""}
+    </div>
+  `;
+}
+
+function renderFieldLabel(label, helpText = "") {
+  return `
+    <div class="field-label-row">
+      <span>${escapeHtml(label)}</span>
+      ${helpText ? renderHelpDisclosure(`${label} 안내`, helpText) : ""}
+    </div>
+  `;
+}
+
 function showToast(message) {
   toastEl.textContent = message;
   toastEl.classList.add("show");
@@ -846,10 +882,10 @@ function scheduleSearchRender(renderTask, inputId) {
 
 function renderOrientationNote(parts, note) {
   return `
-    <p class="orientation-note">
+    <div class="orientation-note">
       <span>${parts.map((part) => escapeHtml(part)).join(" / ")}</span>
-      ${note ? `<small>${escapeHtml(note)}</small>` : ""}
-    </p>
+      ${note ? renderHelpDisclosure("화면 안내", note) : ""}
+    </div>
   `;
 }
 
@@ -4154,7 +4190,7 @@ function renderCardForm(card, groupId) {
         card?.memo || "",
       )}</textarea></label>
       <div class="field">
-        <span class="fieldset-label">예문</span>
+        ${renderFieldLabel("예문", "강조할 조각은 [[ ]]로 감싸면 학습 화면에서 하이라이트됩니다.")}
         <div id="example-editor-list" class="example-editor-list">${examples
           .map((example, index) => renderExampleEditorRow(example, index))
           .join("")}</div>
@@ -4311,7 +4347,6 @@ function renderExampleEditorRow(example = {}, index = 0, collapsed = index > 0) 
           example.korean || "",
         )}</textarea>
         <button class="ghost-button" type="button" data-action="remove-example">${iconLabel("trash", "예문 삭제")}</button>
-        <p class="form-hint">강조할 조각은 [[ ]]로 감싸세요.</p>
       </div>
     </div>
   `;
@@ -4588,6 +4623,17 @@ function backupSummary(backup) {
   };
 }
 
+function renderSafetyNote(title, body) {
+  return `
+    <article class="safety-note compact">
+      <div class="safety-note-heading">
+        <strong>${escapeHtml(title)}</strong>
+        ${renderHelpDisclosure(`${title} 안내`, body)}
+      </div>
+    </article>
+  `;
+}
+
 function renderPrivacyPanel() {
   return `
     <section class="panel stack data-safety-panel">
@@ -4596,18 +4642,18 @@ function renderPrivacyPanel() {
         <h2>저장 위치와 로그인</h2>
       </div>
       <div class="safety-note-grid">
-        <article class="safety-note">
-          <strong>앱 안 로그인</strong>
-          <p>닉네임과 6자리 코드는 같은 학습 데이터를 다시 여는 개인용 구분값입니다. 강력한 계정 보안으로 보기는 어렵습니다.</p>
-        </article>
-        <article class="safety-note">
-          <strong>서버 보호</strong>
-          <p>개인 서버에 올릴 때는 HTTPS와 서버 기본 인증 또는 리버스 프록시 보호를 함께 쓰는 구성을 권장합니다.</p>
-        </article>
-        <article class="safety-note">
-          <strong>학습 데이터</strong>
-          <p>카드, 예문, 회독 기록은 서버의 SQLite 데이터베이스와 백업 JSON 파일에 그대로 저장됩니다.</p>
-        </article>
+        ${renderSafetyNote(
+          "앱 안 로그인",
+          "닉네임과 6자리 코드는 같은 학습 데이터를 다시 여는 개인용 구분값입니다. 강력한 계정 보안으로 보기는 어렵습니다.",
+        )}
+        ${renderSafetyNote(
+          "서버 보호",
+          "개인 서버에 올릴 때는 HTTPS와 서버 기본 인증 또는 리버스 프록시 보호를 함께 쓰는 구성을 권장합니다.",
+        )}
+        ${renderSafetyNote(
+          "학습 데이터",
+          "카드, 예문, 회독 기록은 서버의 SQLite 데이터베이스와 백업 JSON 파일에 그대로 저장됩니다.",
+        )}
       </div>
     </section>
   `;
@@ -4692,10 +4738,10 @@ function renderSettings() {
       </div>
       <form id="settings-form" class="stack">
         <section class="settings-subsection">
-          <div>
-            <span class="field-label">목표 표시</span>
-            <p class="form-hint">목표 이름과 목표일은 선택 사항입니다. 일본어가 아니라도 시험명, 프로젝트명, 단어장 이름처럼 자유롭게 적을 수 있습니다.</p>
-          </div>
+          ${renderSectionHeading(
+            "목표 표시",
+            "목표 이름과 목표일은 선택 사항입니다. 일본어가 아니라도 시험명, 프로젝트명, 단어장 이름처럼 자유롭게 적을 수 있습니다.",
+          )}
           ${renderTargetNameField()}
           ${renderExamDateSelects()}
         </section>
@@ -4716,13 +4762,12 @@ function renderSettings() {
 
 function renderTargetNameField() {
   return `
-    <label class="field">
-      <span>목표 이름</span>
+    <div class="field">
+      ${renderFieldLabel("목표 이름", "헤더와 학습 화면에 보일 이름입니다. 예: JLPT N1, HSK 5급, 토익 단어")}
       <input class="input" name="target_name" value="${escapeHtml(
         state.settings?.target_name || "",
-      )}" placeholder="예: 토익 단어" maxlength="80" aria-describedby="target-name-hint" />
-      <small id="target-name-hint" class="form-hint">예: JLPT N1, HSK 5급, 토익 단어. 헤더와 학습 화면에 보일 이름입니다.</small>
-    </label>
+      )}" placeholder="예: 토익 단어" maxlength="80" aria-label="목표 이름" />
+    </div>
   `;
 }
 
@@ -4732,10 +4777,10 @@ function renderWeakThresholdSetting() {
   const recentThreshold = getWeakRecentWrongThreshold();
   return `
     <section class="settings-subsection">
-      <div>
-        <span class="field-label">약점 카드 기준</span>
-        <p class="form-hint">최근 회독에서 자주 틀렸거나, 전체 회독에서 누적 오답이 많은 카드를 약점으로 모읍니다.</p>
-      </div>
+      ${renderSectionHeading(
+        "약점 카드 기준",
+        "최근 회독에서 자주 틀렸거나, 전체 회독에서 누적 오답이 많은 카드를 약점으로 모읍니다. 약점 복습에서 틀린 횟수는 이 기준 계산에 넣지 않습니다.",
+      )}
       <div class="weak-rule-preview">
         <span>최근 ${number(recentRounds)}회독 중 오답 ${number(recentThreshold)}회 이상</span>
         <span>또는 전체 오답 ${number(totalThreshold)}회 이상</span>
@@ -4757,7 +4802,6 @@ function renderWeakThresholdSetting() {
           <span>회 이상</span>
         </label>
       </div>
-      <p class="form-hint">약점 복습에서 틀린 횟수는 이 기준 계산에 넣지 않습니다.</p>
     </section>
   `;
 }
@@ -4785,8 +4829,7 @@ function renderExamDateSelects() {
   const days = Array.from({ length: 31 }, (_, index) => index + 1);
   return `
     <div class="field">
-      <span>목표일</span>
-      <p class="form-hint">목표일도 선택 사항입니다. 세 칸을 모두 비우면 날짜 없이 사용합니다.</p>
+      ${renderFieldLabel("목표일", "목표일도 선택 사항입니다. 세 칸을 모두 비우면 날짜 없이 사용합니다.")}
       <div class="date-select-grid">
         <select class="select" name="exam_year" aria-label="목표 연도">
           ${renderSelectOptions(years, parts.year, "연도")}
@@ -5498,6 +5541,7 @@ async function openRoundDetail(roundId) {
 }
 
 document.addEventListener("click", async (event) => {
+  closeHelpDisclosures(event.target.closest?.("summary")?.closest("details.help-disclosure") || null);
   const tabButton = event.target.closest("[data-tab]");
   if (tabButton) {
     const nextTab = tabButton.dataset.tab;
@@ -6264,6 +6308,11 @@ document.addEventListener("submit", async (event) => {
 
 document.addEventListener("keydown", async (event) => {
   if (submitFormFromKeyboard(event)) return;
+  if (event.key === "Escape" && document.querySelector("details.help-disclosure[open]")) {
+    event.preventDefault();
+    closeHelpDisclosures();
+    return;
+  }
   if (state.activeDialog) {
     if (event.key === "Tab") {
       trapDialogFocus(event);

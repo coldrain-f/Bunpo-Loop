@@ -314,6 +314,15 @@ Use only for destructive actions.
 
 Select boxes should have clear labels. In card tab, 대그룹 select and 소그룹 select must visually read as a dependent pair.
 
+### Inline Help
+
+Use an `i` help button for optional rules and background explanation.
+
+- Keep task-critical copy visible: empty states, destructive confirmations, disabled reasons, and "기록 없음/공식 기록 제외" warnings.
+- Move secondary explanation behind inline help: target naming examples, weak-card rule details, data-location notes, and structural reminders.
+- Help buttons should read as quiet inline icons next to the relevant label, not as full buttons. Use muted color by default and a soft mint state only while open or focused.
+- Help text should be one compact paragraph, not a second documentation page.
+
 ### Segmented Controls
 
 Use for mode switching, not major navigation.
