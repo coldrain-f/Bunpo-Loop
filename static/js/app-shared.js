@@ -14,8 +14,8 @@
   };
 
   const DEFAULT_LOGIN = {
-    nickname: "상운",
-    accessCode: "960725",
+    nickname: "",
+    accessCode: "",
   };
 
   const USER_STORAGE_KEY = "byeorakchigiUser";

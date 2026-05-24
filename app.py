@@ -44,9 +44,11 @@ CREATE TABLE IF NOT EXISTS users (
 LEARNING_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS collections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS groups (
@@ -110,6 +112,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 CREATE INDEX IF NOT EXISTS idx_groups_collection_id ON groups(collection_id);
 CREATE INDEX IF NOT EXISTS idx_cards_group_id ON cards(group_id);
 CREATE INDEX IF NOT EXISTS idx_examples_card_id ON examples(card_id);
+CREATE INDEX IF NOT EXISTS idx_collections_user_id ON collections(user_id);
 CREATE INDEX IF NOT EXISTS idx_rounds_collection_id ON study_rounds(collection_id);
 CREATE INDEX IF NOT EXISTS idx_rounds_group_id ON study_rounds(group_id);
 CREATE INDEX IF NOT EXISTS idx_round_groups_group_id ON study_round_groups(group_id);
@@ -135,12 +138,13 @@ def init_db() -> None:
         conn.executescript(USER_SCHEMA_SQL)
         if learning_schema_needs_reset(conn):
             reset_learning_schema(conn)
+            migrate_db(conn)
         else:
-            conn.executescript(LEARNING_SCHEMA_SQL)
-        migrate_db(conn)
-        count = conn.execute("SELECT COUNT(*) FROM collections").fetchone()[0]
-        if count == 0:
-            seed_data(conn)
+            migrate_db(conn)
+            if learning_schema_needs_user_scope(conn):
+                migrate_learning_schema_to_user_scope(conn)
+            else:
+                conn.executescript(LEARNING_SCHEMA_SQL)
 
 
 def migrate_db(conn: sqlite3.Connection) -> None:
@@ -233,6 +237,10 @@ def learning_schema_needs_reset(conn: sqlite3.Connection) -> bool:
     return False
 
 
+def learning_schema_needs_user_scope(conn: sqlite3.Connection) -> bool:
+    return "user_id" not in table_columns(conn, "collections")
+
+
 def reset_learning_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
@@ -248,7 +256,156 @@ def reset_learning_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(LEARNING_SCHEMA_SQL)
 
 
-def seed_data(conn: sqlite3.Connection) -> None:
+def migrate_learning_schema_to_user_scope(conn: sqlite3.Connection) -> None:
+    owner = conn.execute("SELECT id FROM users ORDER BY id ASC LIMIT 1").fetchone()
+    owner_id = int(owner["id"]) if owner else None
+    legacy = {
+        "collections": table_payload(conn, "collections", "id ASC"),
+        "groups": table_payload(conn, "groups", "id ASC"),
+        "cards": table_payload(conn, "cards", "id ASC"),
+        "examples": table_payload(conn, "examples", "id ASC"),
+        "study_rounds": table_payload(conn, "study_rounds", "id ASC"),
+        "study_round_groups": table_payload(conn, "study_round_groups", "round_id ASC, group_id ASC"),
+        "reviews": table_payload(conn, "reviews", "id ASC"),
+    }
+
+    reset_learning_schema(conn)
+    if owner_id is None:
+        return
+
+    for collection in legacy["collections"]:
+        conn.execute(
+            """
+            INSERT INTO collections (id, user_id, name, description, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                int(collection["id"]),
+                owner_id,
+                str(collection["name"]),
+                str(collection["description"] or ""),
+                str(collection["created_at"]),
+            ),
+        )
+
+    for group in legacy["groups"]:
+        conn.execute(
+            """
+            INSERT INTO groups (id, collection_id, name, description, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                int(group["id"]),
+                int(group["collection_id"]),
+                str(group["name"]),
+                str(group["description"] or ""),
+                str(group["created_at"]),
+            ),
+        )
+
+    for card in legacy["cards"]:
+        conn.execute(
+            """
+            INSERT INTO cards (
+                id,
+                group_id,
+                front,
+                back,
+                memo,
+                correct_count,
+                wrong_count,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                int(card["id"]),
+                int(card["group_id"]),
+                str(card["front"]),
+                str(card["back"]),
+                str(card["memo"] or ""),
+                int(card["correct_count"] or 0),
+                int(card["wrong_count"] or 0),
+                str(card["created_at"]),
+                str(card["updated_at"]),
+            ),
+        )
+
+    for example in legacy["examples"]:
+        conn.execute(
+            """
+            INSERT INTO examples (id, card_id, japanese, korean, sort_order)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                int(example["id"]),
+                int(example["card_id"]),
+                str(example["japanese"]),
+                str(example["korean"] or ""),
+                int(example["sort_order"] or 0),
+            ),
+        )
+
+    for round_item in legacy["study_rounds"]:
+        conn.execute(
+            """
+            INSERT INTO study_rounds (
+                id,
+                collection_id,
+                group_id,
+                scope_type,
+                round_no,
+                order_mode,
+                total_cards,
+                correct_count,
+                wrong_count,
+                started_at,
+                duration_seconds,
+                completed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                int(round_item["id"]),
+                int(round_item["collection_id"]) if round_item["collection_id"] else None,
+                int(round_item["group_id"]) if round_item["group_id"] else None,
+                str(round_item["scope_type"] or "group"),
+                int(round_item["round_no"] or 1),
+                str(round_item["order_mode"] or "sequence"),
+                int(round_item["total_cards"] or 0),
+                int(round_item["correct_count"] or 0),
+                int(round_item["wrong_count"] or 0),
+                str(round_item["started_at"] or round_item["completed_at"]),
+                int(round_item["duration_seconds"] or 0),
+                str(round_item["completed_at"]),
+            ),
+        )
+
+    for item in legacy["study_round_groups"]:
+        conn.execute(
+            "INSERT OR IGNORE INTO study_round_groups (round_id, group_id) VALUES (?, ?)",
+            (int(item["round_id"]), int(item["group_id"])),
+        )
+
+    for review in legacy["reviews"]:
+        conn.execute(
+            """
+            INSERT INTO reviews (id, round_id, card_id, result, reviewed_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                int(review["id"]),
+                int(review["round_id"]),
+                int(review["card_id"]),
+                str(review["result"]),
+                str(review["reviewed_at"]),
+            ),
+        )
+    delete_orphan_rounds(conn)
+
+
+def seed_data(conn: sqlite3.Connection, user_id: int) -> None:
     collections = [
         ("일본어 시험 표현", "문법과 표현을 소그룹으로 나누어 회독합니다."),
         ("영어 단어 꼬꼬회독", "단어와 예문을 빠르게 반복합니다."),
@@ -256,8 +413,8 @@ def seed_data(conn: sqlite3.Connection) -> None:
     collection_ids: dict[str, int] = {}
     for name, description in collections:
         cur = conn.execute(
-            "INSERT INTO collections (name, description) VALUES (?, ?)",
-            (name, description),
+            "INSERT INTO collections (user_id, name, description) VALUES (?, ?, ?)",
+            (user_id, name, description),
         )
         collection_ids[name] = int(cur.lastrowid)
 
@@ -501,33 +658,64 @@ def normalize_round_limit(value: object, default: int = 200) -> int:
     return min(500, max(1, limit))
 
 
-def get_collection(conn: sqlite3.Connection, collection_id: int) -> sqlite3.Row | None:
-    return conn.execute("SELECT * FROM collections WHERE id = ?", (collection_id,)).fetchone()
+def get_collection(conn: sqlite3.Connection, user_id: int, collection_id: int) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM collections WHERE id = ? AND user_id = ?",
+        (collection_id, user_id),
+    ).fetchone()
 
 
-def get_group(conn: sqlite3.Connection, group_id: int) -> sqlite3.Row | None:
-    return conn.execute("SELECT * FROM groups WHERE id = ?", (group_id,)).fetchone()
+def get_group(conn: sqlite3.Connection, user_id: int, group_id: int) -> sqlite3.Row | None:
+    return conn.execute(
+        """
+        SELECT g.*
+        FROM groups g
+        JOIN collections c ON c.id = g.collection_id
+        WHERE g.id = ?
+          AND c.user_id = ?
+        """,
+        (group_id, user_id),
+    ).fetchone()
 
 
-def get_card(conn: sqlite3.Connection, card_id: int) -> sqlite3.Row | None:
-    return conn.execute("SELECT * FROM cards WHERE id = ?", (card_id,)).fetchone()
+def get_card(conn: sqlite3.Connection, user_id: int, card_id: int) -> sqlite3.Row | None:
+    return conn.execute(
+        """
+        SELECT cards.*
+        FROM cards
+        JOIN groups g ON g.id = cards.group_id
+        JOIN collections c ON c.id = g.collection_id
+        WHERE cards.id = ?
+          AND c.user_id = ?
+        """,
+        (card_id, user_id),
+    ).fetchone()
 
 
 def duplicate_card_exists(
     conn: sqlite3.Connection,
+    user_id: int,
     group_id: int,
     front: str,
     exclude_card_id: int | None = None,
 ) -> bool:
-    params: list[object] = [group_id, front.strip()]
-    sql = "SELECT 1 FROM cards WHERE group_id = ? AND front = ?"
+    params: list[object] = [group_id, front.strip(), user_id]
+    sql = """
+        SELECT 1
+        FROM cards c
+        JOIN groups g ON g.id = c.group_id
+        JOIN collections col ON col.id = g.collection_id
+        WHERE c.group_id = ?
+          AND c.front = ?
+          AND col.user_id = ?
+    """
     if exclude_card_id is not None:
-        sql += " AND id <> ?"
+        sql += " AND c.id <> ?"
         params.append(exclude_card_id)
     return conn.execute(sql, params).fetchone() is not None
 
 
-def collections_payload(conn: sqlite3.Connection) -> list[dict]:
+def collections_payload(conn: sqlite3.Connection, user_id: int) -> list[dict]:
     rows = conn.execute(
         """
         WITH group_stats AS (
@@ -613,13 +801,15 @@ def collections_payload(conn: sqlite3.Connection) -> list[dict]:
         LEFT JOIN round_stats rs ON rs.collection_id = c.id
         LEFT JOIN latest_rounds lr ON lr.stat_collection_id = c.id
         LEFT JOIN first_attempts fa ON fa.round_id = lr.id
+        WHERE c.user_id = ?
         ORDER BY c.created_at ASC, c.id ASC
-        """
+        """,
+        (user_id,),
     ).fetchall()
     return [row_to_dict(row) for row in rows]
 
 
-def groups_payload(conn: sqlite3.Connection) -> list[dict]:
+def groups_payload(conn: sqlite3.Connection, user_id: int) -> list[dict]:
     rows = conn.execute(
         """
         WITH card_stats AS (
@@ -690,22 +880,25 @@ def groups_payload(conn: sqlite3.Connection) -> list[dict]:
         LEFT JOIN round_stats rs ON rs.group_id = g.id
         LEFT JOIN latest_rounds lr ON lr.stat_group_id = g.id
         LEFT JOIN first_attempts fa ON fa.round_id = lr.id
+        WHERE c.user_id = ?
         ORDER BY c.created_at ASC, c.id ASC, g.created_at ASC, g.id ASC
-        """
+        """,
+        (user_id,),
     ).fetchall()
     return [row_to_dict(row) for row in rows]
 
 
 def cards_payload(
     conn: sqlite3.Connection,
+    user_id: int,
     group_id: int | None = None,
     group_ids: list[int] | None = None,
     query: str | None = None,
     order_mode: str = "created",
     recent_round_window: int = DEFAULT_WEAK_RECENT_ROUNDS,
 ) -> list[dict]:
-    clauses: list[str] = []
-    params: list[object] = []
+    clauses: list[str] = ["col.user_id = ?"]
+    params: list[object] = [user_id]
     if group_ids:
         placeholders = ",".join("?" for _ in group_ids)
         clauses.append(f"c.group_id IN ({placeholders})")
@@ -793,17 +986,112 @@ def table_payload(conn: sqlite3.Connection, table: str, order_by: str) -> list[d
     return [row_to_dict(row) for row in rows]
 
 
-def backup_payload(conn: sqlite3.Connection) -> dict:
+def backup_payload(conn: sqlite3.Connection, user_id: int) -> dict:
     return {
         "version": BACKUP_VERSION,
         "exported_at": datetime.now(timezone.utc).isoformat(),
-        "collections": table_payload(conn, "collections", "id ASC"),
-        "groups": table_payload(conn, "groups", "id ASC"),
-        "cards": table_payload(conn, "cards", "id ASC"),
-        "examples": table_payload(conn, "examples", "card_id ASC, sort_order ASC, id ASC"),
-        "study_rounds": table_payload(conn, "study_rounds", "id ASC"),
-        "study_round_groups": table_payload(conn, "study_round_groups", "round_id ASC, group_id ASC"),
-        "reviews": table_payload(conn, "reviews", "id ASC"),
+        "collections": [
+            row_to_dict(row)
+            for row in conn.execute(
+                """
+                SELECT id, name, description, created_at
+                FROM collections
+                WHERE user_id = ?
+                ORDER BY id ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        ],
+        "groups": [
+            row_to_dict(row)
+            for row in conn.execute(
+                """
+                SELECT g.*
+                FROM groups g
+                JOIN collections c ON c.id = g.collection_id
+                WHERE c.user_id = ?
+                ORDER BY g.id ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        ],
+        "cards": [
+            row_to_dict(row)
+            for row in conn.execute(
+                """
+                SELECT cards.*
+                FROM cards
+                JOIN groups g ON g.id = cards.group_id
+                JOIN collections c ON c.id = g.collection_id
+                WHERE c.user_id = ?
+                ORDER BY cards.id ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        ],
+        "examples": [
+            row_to_dict(row)
+            for row in conn.execute(
+                """
+                SELECT ex.*
+                FROM examples ex
+                JOIN cards card ON card.id = ex.card_id
+                JOIN groups g ON g.id = card.group_id
+                JOIN collections c ON c.id = g.collection_id
+                WHERE c.user_id = ?
+                ORDER BY ex.card_id ASC, ex.sort_order ASC, ex.id ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        ],
+        "study_rounds": [
+            row_to_dict(row)
+            for row in conn.execute(
+                """
+                SELECT sr.*
+                FROM study_rounds sr
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM study_round_groups rg
+                    JOIN groups g ON g.id = rg.group_id
+                    JOIN collections c ON c.id = g.collection_id
+                    WHERE rg.round_id = sr.id
+                      AND c.user_id = ?
+                )
+                ORDER BY sr.id ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        ],
+        "study_round_groups": [
+            row_to_dict(row)
+            for row in conn.execute(
+                """
+                SELECT rg.*
+                FROM study_round_groups rg
+                JOIN groups g ON g.id = rg.group_id
+                JOIN collections c ON c.id = g.collection_id
+                WHERE c.user_id = ?
+                ORDER BY rg.round_id ASC, rg.group_id ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        ],
+        "reviews": [
+            row_to_dict(row)
+            for row in conn.execute(
+                """
+                SELECT rv.*
+                FROM reviews rv
+                JOIN cards card ON card.id = rv.card_id
+                JOIN groups g ON g.id = card.group_id
+                JOIN collections c ON c.id = g.collection_id
+                WHERE c.user_id = ?
+                ORDER BY rv.id ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        ],
     }
 
 
@@ -835,7 +1123,111 @@ def table_count(conn: sqlite3.Connection, table: str) -> int:
     return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] or 0)
 
 
-def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
+def user_learning_counts(conn: sqlite3.Connection, user_id: int) -> dict:
+    collection_count = int(
+        conn.execute("SELECT COUNT(*) FROM collections WHERE user_id = ?", (user_id,)).fetchone()[0] or 0
+    )
+    group_count = int(
+        conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM groups g
+            JOIN collections c ON c.id = g.collection_id
+            WHERE c.user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()[0]
+        or 0
+    )
+    card_count = int(
+        conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM cards card
+            JOIN groups g ON g.id = card.group_id
+            JOIN collections c ON c.id = g.collection_id
+            WHERE c.user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()[0]
+        or 0
+    )
+    example_count = int(
+        conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM examples ex
+            JOIN cards card ON card.id = ex.card_id
+            JOIN groups g ON g.id = card.group_id
+            JOIN collections c ON c.id = g.collection_id
+            WHERE c.user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()[0]
+        or 0
+    )
+    round_count = int(
+        conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM study_rounds sr
+            WHERE EXISTS (
+                SELECT 1
+                FROM study_round_groups rg
+                JOIN groups g ON g.id = rg.group_id
+                JOIN collections c ON c.id = g.collection_id
+                WHERE rg.round_id = sr.id
+                  AND c.user_id = ?
+            )
+            """,
+            (user_id,),
+        ).fetchone()[0]
+        or 0
+    )
+    review_count = int(
+        conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM reviews rv
+            JOIN cards card ON card.id = rv.card_id
+            JOIN groups g ON g.id = card.group_id
+            JOIN collections c ON c.id = g.collection_id
+            WHERE c.user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()[0]
+        or 0
+    )
+    return {
+        "collections": collection_count,
+        "groups": group_count,
+        "cards": card_count,
+        "examples": example_count,
+        "rounds": round_count,
+        "reviews": review_count,
+    }
+
+
+def delete_user_learning_data(conn: sqlite3.Connection, user_id: int) -> None:
+    conn.execute(
+        """
+        DELETE FROM study_rounds
+        WHERE EXISTS (
+            SELECT 1
+            FROM study_round_groups rg
+            JOIN groups g ON g.id = rg.group_id
+            JOIN collections c ON c.id = g.collection_id
+            WHERE rg.round_id = study_rounds.id
+              AND c.user_id = ?
+        )
+        """,
+        (user_id,),
+    )
+    conn.execute("DELETE FROM collections WHERE user_id = ?", (user_id,))
+    delete_orphan_rounds(conn)
+
+
+def restore_backup(conn: sqlite3.Connection, user_id: int, payload: dict) -> dict:
     backup, _version = normalize_backup_payload(payload)
     collections = ensure_list(backup.get("collections", []), "대그룹 백업")
     groups = ensure_list(backup.get("groups", []), "소그룹 백업")
@@ -846,13 +1238,7 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
     reviews = ensure_list(backup.get("reviews", []), "복습 백업")
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
-    conn.execute("DELETE FROM reviews")
-    conn.execute("DELETE FROM study_round_groups")
-    conn.execute("DELETE FROM study_rounds")
-    conn.execute("DELETE FROM examples")
-    conn.execute("DELETE FROM cards")
-    conn.execute("DELETE FROM groups")
-    conn.execute("DELETE FROM collections")
+    delete_user_learning_data(conn, user_id)
 
     if not collections and groups:
         collections = [
@@ -864,45 +1250,60 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
             }
         ]
 
+    collection_id_map: dict[int, int] = {}
     for collection in collections:
-        conn.execute(
+        old_id = int(collection.get("id") or 0)
+        cur = conn.execute(
             """
-            INSERT INTO collections (id, name, description, created_at)
+            INSERT INTO collections (user_id, name, description, created_at)
             VALUES (?, ?, ?, ?)
             """,
             (
-                int(collection.get("id") or 0),
+                user_id,
                 validate_text(collection.get("name"), "대그룹명", 100),
                 str(collection.get("description") or "").strip(),
                 str(collection.get("created_at") or now),
             ),
         )
+        if old_id:
+            collection_id_map[old_id] = int(cur.lastrowid)
 
     group_collection_ids: dict[int, int] = {}
-    default_collection_id = int(collections[0].get("id") or 1) if collections else 0
+    group_id_map: dict[int, int] = {}
+    default_old_collection_id = int(collections[0].get("id") or 0) if collections else 0
+    default_collection_id = collection_id_map.get(default_old_collection_id, next(iter(collection_id_map.values()), 0))
     for group in groups:
-        group_id = int(group.get("id") or 0)
-        collection_id = int(group.get("collection_id") or default_collection_id)
-        group_collection_ids[group_id] = collection_id
-        conn.execute(
+        old_group_id = int(group.get("id") or 0)
+        old_collection_id = int(group.get("collection_id") or default_old_collection_id)
+        collection_id = collection_id_map.get(old_collection_id, default_collection_id)
+        if not collection_id:
+            continue
+        cur = conn.execute(
             """
-            INSERT INTO groups (id, collection_id, name, description, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO groups (collection_id, name, description, created_at)
+            VALUES (?, ?, ?, ?)
             """,
             (
-                group_id,
                 collection_id,
                 validate_text(group.get("name"), "소그룹명", 100),
                 str(group.get("description") or "").strip(),
                 str(group.get("created_at") or now),
             ),
         )
+        new_group_id = int(cur.lastrowid)
+        if old_group_id:
+            group_id_map[old_group_id] = new_group_id
+            group_collection_ids[old_group_id] = collection_id
 
+    card_id_map: dict[int, int] = {}
     for card in cards:
-        conn.execute(
+        old_card_id = int(card.get("id") or 0)
+        group_id = group_id_map.get(int(card.get("group_id") or 0))
+        if not group_id:
+            continue
+        cur = conn.execute(
             """
             INSERT INTO cards (
-                id,
                 group_id,
                 front,
                 back,
@@ -912,11 +1313,10 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                int(card.get("id") or 0),
-                int(card.get("group_id") or 0),
+                group_id,
                 validate_text(card.get("front"), "앞면", 200),
                 validate_text(card.get("back"), "뒷면", 500),
                 str(card.get("memo") or "").strip(),
@@ -926,40 +1326,47 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
                 str(card.get("updated_at") or now),
             ),
         )
+        if old_card_id:
+            card_id_map[old_card_id] = int(cur.lastrowid)
 
     for example in examples:
         japanese = str(example.get("japanese") or "").strip()
-        if not japanese:
+        card_id = card_id_map.get(int(example.get("card_id") or 0))
+        if not japanese or not card_id:
             continue
         conn.execute(
             """
-            INSERT INTO examples (id, card_id, japanese, korean, sort_order)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO examples (card_id, japanese, korean, sort_order)
+            VALUES (?, ?, ?, ?)
             """,
             (
-                int(example.get("id") or 0),
-                int(example.get("card_id") or 0),
+                card_id,
                 japanese,
                 str(example.get("korean") or "").strip(),
                 int(example.get("sort_order") or 0),
             ),
         )
 
+    round_id_map: dict[int, int] = {}
     for round_item in rounds:
+        old_round_id = int(round_item.get("id") or 0)
         order_mode = str(round_item.get("order_mode") or "sequence")
         if order_mode not in ("sequence", "random", "wrong"):
             order_mode = "sequence"
-        group_id = int(round_item.get("group_id") or 0) or None
-        collection_id = int(round_item.get("collection_id") or 0) or (
-            group_collection_ids.get(group_id) if group_id else None
+        old_group_id = int(round_item.get("group_id") or 0)
+        group_id = group_id_map.get(old_group_id) if old_group_id else None
+        old_collection_id = int(round_item.get("collection_id") or 0) or (
+            group_collection_ids.get(old_group_id) if old_group_id else 0
         )
+        collection_id = collection_id_map.get(old_collection_id) if old_collection_id else None
         scope_type = str(round_item.get("scope_type") or ("group" if group_id else "collection"))
         if scope_type not in ("group", "collection"):
             scope_type = "group" if group_id else "collection"
-        conn.execute(
+        if old_group_id and not group_id:
+            continue
+        cur = conn.execute(
             """
             INSERT INTO study_rounds (
-                id,
                 collection_id,
                 group_id,
                 scope_type,
@@ -972,10 +1379,9 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
                 duration_seconds,
                 completed_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                int(round_item.get("id") or 0),
                 collection_id,
                 group_id,
                 scope_type,
@@ -989,11 +1395,13 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
                 str(round_item.get("completed_at") or now),
             ),
         )
+        if old_round_id:
+            round_id_map[old_round_id] = int(cur.lastrowid)
 
     if round_groups:
         for item in round_groups:
-            round_id = int(item.get("round_id") or 0)
-            group_id = int(item.get("group_id") or 0)
+            round_id = round_id_map.get(int(item.get("round_id") or 0))
+            group_id = group_id_map.get(int(item.get("group_id") or 0))
             if round_id and group_id:
                 conn.execute(
                     "INSERT OR IGNORE INTO study_round_groups (round_id, group_id) VALUES (?, ?)",
@@ -1001,8 +1409,8 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
                 )
     else:
         for round_item in rounds:
-            round_id = int(round_item.get("id") or 0)
-            group_id = int(round_item.get("group_id") or 0)
+            round_id = round_id_map.get(int(round_item.get("id") or 0))
+            group_id = group_id_map.get(int(round_item.get("group_id") or 0))
             if round_id and group_id:
                 conn.execute(
                     "INSERT OR IGNORE INTO study_round_groups (round_id, group_id) VALUES (?, ?)",
@@ -1013,29 +1421,25 @@ def restore_backup(conn: sqlite3.Connection, payload: dict) -> dict:
         result = str(review.get("result") or "")
         if result not in ("correct", "wrong"):
             continue
+        round_id = round_id_map.get(int(review.get("round_id") or 0))
+        card_id = card_id_map.get(int(review.get("card_id") or 0))
+        if not round_id or not card_id:
+            continue
         conn.execute(
             """
-            INSERT INTO reviews (id, round_id, card_id, result, reviewed_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO reviews (round_id, card_id, result, reviewed_at)
+            VALUES (?, ?, ?, ?)
             """,
             (
-                int(review.get("id") or 0),
-                int(review.get("round_id") or 0),
-                int(review.get("card_id") or 0),
+                round_id,
+                card_id,
                 result,
                 str(review.get("reviewed_at") or now),
             ),
         )
 
     delete_orphan_rounds(conn)
-    return {
-        "collections": table_count(conn, "collections"),
-        "groups": table_count(conn, "groups"),
-        "cards": table_count(conn, "cards"),
-        "examples": table_count(conn, "examples"),
-        "rounds": table_count(conn, "study_rounds"),
-        "reviews": table_count(conn, "reviews"),
-    }
+    return user_learning_counts(conn, user_id)
 
 
 def parse_example_text(value: str) -> list[tuple[str, str]]:
@@ -1111,21 +1515,23 @@ def parse_id_list(value: object) -> list[int]:
 
 def groups_for_collection(
     conn: sqlite3.Connection,
+    user_id: int,
     collection_id: int,
     group_ids: list[int] | None = None,
 ) -> list[sqlite3.Row]:
-    params: list[object] = [collection_id]
-    where = "WHERE collection_id = ?"
+    params: list[object] = [collection_id, user_id]
+    where = "WHERE g.collection_id = ? AND c.user_id = ?"
     if group_ids:
         placeholders = ",".join("?" for _ in group_ids)
-        where += f" AND id IN ({placeholders})"
+        where += f" AND g.id IN ({placeholders})"
         params.extend(group_ids)
     rows = conn.execute(
         f"""
-        SELECT *
-        FROM groups
+        SELECT g.*
+        FROM groups g
+        JOIN collections c ON c.id = g.collection_id
         {where}
-        ORDER BY created_at ASC, id ASC
+        ORDER BY g.created_at ASC, g.id ASC
         """,
         params,
     ).fetchall()
@@ -1134,53 +1540,72 @@ def groups_for_collection(
     return rows
 
 
-def group_round_no(conn: sqlite3.Connection, group_id: int) -> int:
+def group_round_no(conn: sqlite3.Connection, user_id: int, group_id: int) -> int:
     return (
         conn.execute(
             """
             SELECT COUNT(DISTINCT round_id) + 1
-            FROM study_round_groups
-            WHERE group_id = ?
+            FROM study_round_groups rg
+            JOIN groups g ON g.id = rg.group_id
+            JOIN collections c ON c.id = g.collection_id
+            WHERE rg.group_id = ?
+              AND c.user_id = ?
             """,
-            (group_id,),
+            (group_id, user_id),
         ).fetchone()[0]
         or 1
     )
 
 
-def delete_rounds_for_group(conn: sqlite3.Connection, group_id: int) -> int:
+def delete_rounds_for_group(conn: sqlite3.Connection, user_id: int, group_id: int) -> int:
     return conn.execute(
         """
         DELETE FROM study_rounds
-        WHERE group_id = ?
-           OR id IN (
-               SELECT round_id
-               FROM study_round_groups
-               WHERE group_id = ?
-           )
+        WHERE (
+            group_id = ?
+            OR id IN (
+                SELECT round_id
+                FROM study_round_groups
+                WHERE group_id = ?
+            )
+        )
+          AND EXISTS (
+              SELECT 1
+              FROM study_round_groups rg
+              JOIN groups g ON g.id = rg.group_id
+              JOIN collections c ON c.id = g.collection_id
+              WHERE rg.round_id = study_rounds.id
+                AND c.user_id = ?
+          )
         """,
-        (group_id, group_id),
+        (group_id, group_id, user_id),
     ).rowcount
 
 
-def delete_rounds_for_collection(conn: sqlite3.Connection, collection_id: int) -> int:
+def delete_rounds_for_collection(conn: sqlite3.Connection, user_id: int, collection_id: int) -> int:
     return conn.execute(
         """
         DELETE FROM study_rounds
-        WHERE collection_id = ?
-           OR group_id IN (
-               SELECT id
-               FROM groups
-               WHERE collection_id = ?
-           )
-           OR id IN (
-               SELECT rg.round_id
-               FROM study_round_groups rg
-               JOIN groups g ON g.id = rg.group_id
-               WHERE g.collection_id = ?
-           )
+        WHERE (
+            collection_id = ?
+            OR group_id IN (
+                SELECT g.id
+                FROM groups g
+                JOIN collections c ON c.id = g.collection_id
+                WHERE g.collection_id = ?
+                  AND c.user_id = ?
+            )
+            OR id IN (
+                SELECT rg.round_id
+                FROM study_round_groups rg
+                JOIN groups g ON g.id = rg.group_id
+                JOIN collections c ON c.id = g.collection_id
+                WHERE g.collection_id = ?
+                  AND c.user_id = ?
+            )
+        )
         """,
-        (collection_id, collection_id, collection_id),
+        (collection_id, collection_id, user_id, collection_id, user_id),
     ).rowcount
 
 
@@ -1277,6 +1702,7 @@ class AppHandler(BaseHTTPRequestHandler):
             if user is None:
                 self.send_json({"error": "로그인이 필요합니다."}, HTTPStatus.UNAUTHORIZED)
                 return
+            user_id = int(user["id"])
 
             if parts == ["api", "settings"]:
                 if method == "GET":
@@ -1288,17 +1714,17 @@ class AppHandler(BaseHTTPRequestHandler):
 
             if parts == ["api", "collections"]:
                 if method == "GET":
-                    self.send_json({"collections": collections_payload(conn)})
+                    self.send_json({"collections": collections_payload(conn, user_id)})
                     return
                 if method == "POST":
                     body = parse_body(self)
                     name = validate_text(body.get("name"), "대그룹명", 100)
                     description = str(body.get("description") or "").strip()
                     cur = conn.execute(
-                        "INSERT INTO collections (name, description) VALUES (?, ?)",
-                        (name, description),
+                        "INSERT INTO collections (user_id, name, description) VALUES (?, ?, ?)",
+                        (user_id, name, description),
                     )
-                    collection = get_collection(conn, int(cur.lastrowid))
+                    collection = get_collection(conn, user_id, int(cur.lastrowid))
                     self.send_json({"collection": row_to_dict(collection)}, HTTPStatus.CREATED)
                     return
 
@@ -1309,16 +1735,16 @@ class AppHandler(BaseHTTPRequestHandler):
                 and method == "POST"
             ):
                 collection_id = int(parts[2])
-                collection = get_collection(conn, collection_id)
+                collection = get_collection(conn, user_id, collection_id)
                 if collection is None:
                     self.send_json({"error": "대그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                     return
-                self.reset_collection_history(conn, collection_id)
+                self.reset_collection_history(conn, user_id, collection_id)
                 return
 
             if len(parts) == 3 and parts[:2] == ["api", "collections"]:
                 collection_id = int(parts[2])
-                collection = get_collection(conn, collection_id)
+                collection = get_collection(conn, user_id, collection_id)
                 if collection is None:
                     self.send_json({"error": "대그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                     return
@@ -1330,11 +1756,11 @@ class AppHandler(BaseHTTPRequestHandler):
                         "UPDATE collections SET name = ?, description = ? WHERE id = ?",
                         (name, description, collection_id),
                     )
-                    updated = get_collection(conn, collection_id)
+                    updated = get_collection(conn, user_id, collection_id)
                     self.send_json({"collection": row_to_dict(updated)})
                     return
                 if method == "DELETE":
-                    delete_rounds_for_collection(conn, collection_id)
+                    delete_rounds_for_collection(conn, user_id, collection_id)
                     conn.execute("DELETE FROM collections WHERE id = ?", (collection_id,))
                     delete_orphan_rounds(conn)
                     self.send_json({"ok": True})
@@ -1342,12 +1768,12 @@ class AppHandler(BaseHTTPRequestHandler):
 
             if parts == ["api", "groups"]:
                 if method == "GET":
-                    self.send_json({"groups": groups_payload(conn)})
+                    self.send_json({"groups": groups_payload(conn, user_id)})
                     return
                 if method == "POST":
                     body = parse_body(self)
                     collection_id = int(body.get("collection_id") or 0)
-                    if get_collection(conn, collection_id) is None:
+                    if get_collection(conn, user_id, collection_id) is None:
                         raise ValueError("소그룹을 넣을 대그룹을 선택하세요.")
                     name = validate_text(body.get("name"), "소그룹명", 100)
                     description = str(body.get("description") or "").strip()
@@ -1369,23 +1795,23 @@ class AppHandler(BaseHTTPRequestHandler):
                 and method == "POST"
             ):
                 group_id = int(parts[2])
-                group = get_group(conn, group_id)
+                group = get_group(conn, user_id, group_id)
                 if group is None:
                     self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                     return
-                self.reset_group_history(conn, group_id)
+                self.reset_group_history(conn, user_id, group_id)
                 return
 
             if len(parts) == 3 and parts[:2] == ["api", "groups"]:
                 group_id = int(parts[2])
-                group = get_group(conn, group_id)
+                group = get_group(conn, user_id, group_id)
                 if group is None:
                     self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                     return
                 if method == "PATCH":
                     body = parse_body(self)
                     collection_id = int(body.get("collection_id", group["collection_id"]) or group["collection_id"])
-                    if get_collection(conn, collection_id) is None:
+                    if get_collection(conn, user_id, collection_id) is None:
                         raise ValueError("소그룹을 넣을 대그룹을 선택하세요.")
                     name = validate_text(body.get("name", group["name"]), "소그룹명", 100)
                     description = str(body.get("description", group["description"]) or "").strip()
@@ -1393,11 +1819,11 @@ class AppHandler(BaseHTTPRequestHandler):
                         "UPDATE groups SET collection_id = ?, name = ?, description = ? WHERE id = ?",
                         (collection_id, name, description, group_id),
                     )
-                    updated = get_group(conn, group_id)
+                    updated = get_group(conn, user_id, group_id)
                     self.send_json({"group": row_to_dict(updated)})
                     return
                 if method == "DELETE":
-                    delete_rounds_for_group(conn, group_id)
+                    delete_rounds_for_group(conn, user_id, group_id)
                     conn.execute("DELETE FROM groups WHERE id = ?", (group_id,))
                     delete_orphan_rounds(conn)
                     self.send_json({"ok": True})
@@ -1412,6 +1838,7 @@ class AppHandler(BaseHTTPRequestHandler):
                         {
                             "cards": cards_payload(
                                 conn,
+                                user_id,
                                 group_id=group_id,
                                 group_ids=group_ids,
                                 query=q,
@@ -1421,20 +1848,20 @@ class AppHandler(BaseHTTPRequestHandler):
                     )
                     return
                 if method == "POST":
-                    self.create_card(conn)
+                    self.create_card(conn, user_id)
                     return
 
             if parts == ["api", "cards", "bulk"] and method == "POST":
-                self.create_bulk_cards(conn)
+                self.create_bulk_cards(conn, user_id)
                 return
 
             if len(parts) == 3 and parts[:2] == ["api", "cards"]:
                 card_id = int(parts[2])
                 if method == "PATCH":
-                    self.update_card(conn, card_id)
+                    self.update_card(conn, user_id, card_id)
                     return
                 if method == "DELETE":
-                    card = get_card(conn, card_id)
+                    card = get_card(conn, user_id, card_id)
                     if card is None:
                         self.send_json({"error": "카드를 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                         return
@@ -1448,41 +1875,41 @@ class AppHandler(BaseHTTPRequestHandler):
                     raise ValueError("지원하지 않는 학습 순서입니다.")
                 collection_id = int(query.get("collection_id", ["0"])[0])
                 if collection_id:
-                    collection = get_collection(conn, collection_id)
+                    collection = get_collection(conn, user_id, collection_id)
                     if collection is None:
                         self.send_json({"error": "대그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                         return
                     group_ids = parse_id_list(query.get("group_ids", [""])[0])
                     if not group_ids:
                         raise ValueError("학습할 소그룹을 하나 이상 선택하세요.")
-                    selected_groups = groups_for_collection(conn, collection_id, group_ids)
+                    selected_groups = groups_for_collection(conn, user_id, collection_id, group_ids)
                     selected_group_ids = [int(group["id"]) for group in selected_groups]
-                    cards = cards_payload(conn, group_ids=selected_group_ids, order_mode=order_mode)
+                    cards = cards_payload(conn, user_id, group_ids=selected_group_ids, order_mode=order_mode)
                     self.send_json(
                         {
                             "scope_type": "practice",
                             "collection": row_to_dict(collection),
                             "groups": [row_to_dict(group) for group in selected_groups],
-                            "round_no": group_round_no(conn, selected_group_ids[0]),
+                            "round_no": group_round_no(conn, user_id, selected_group_ids[0]),
                             "order_mode": order_mode,
                             "cards": cards,
                         }
                     )
                     return
                 group_id = int(query.get("group_id", ["0"])[0])
-                group = get_group(conn, group_id)
+                group = get_group(conn, user_id, group_id)
                 if group is None:
                     self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                     return
-                collection = get_collection(conn, int(group["collection_id"]))
-                cards = cards_payload(conn, group_id=group_id, order_mode=order_mode)
+                collection = get_collection(conn, user_id, int(group["collection_id"]))
+                cards = cards_payload(conn, user_id, group_id=group_id, order_mode=order_mode)
                 self.send_json(
                     {
                         "scope_type": "group",
                         "collection": row_to_dict(collection) if collection else None,
                         "group": row_to_dict(group),
                         "groups": [row_to_dict(group)],
-                        "round_no": group_round_no(conn, group_id),
+                        "round_no": group_round_no(conn, user_id, group_id),
                         "order_mode": order_mode,
                         "cards": cards,
                     }
@@ -1494,15 +1921,15 @@ class AppHandler(BaseHTTPRequestHandler):
                     group_id = int(query["group_id"][0]) if query.get("group_id") else None
                     collection_id = int(query["collection_id"][0]) if query.get("collection_id") else None
                     limit = normalize_round_limit(query.get("limit", ["200"])[0])
-                    self.send_json({"rounds": self.rounds_payload(conn, group_id, collection_id, limit)})
+                    self.send_json({"rounds": self.rounds_payload(conn, user_id, group_id, collection_id, limit)})
                     return
                 if method == "POST":
-                    self.complete_round(conn)
+                    self.complete_round(conn, user_id)
                     return
 
             if len(parts) == 3 and parts[:2] == ["api", "rounds"] and method == "GET":
                 round_id = int(parts[2])
-                detail = self.round_detail_payload(conn, round_id)
+                detail = self.round_detail_payload(conn, user_id, round_id)
                 if detail is None:
                     self.send_json({"error": "회독 기록을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                     return
@@ -1510,15 +1937,15 @@ class AppHandler(BaseHTTPRequestHandler):
                 return
 
             if parts == ["api", "weak-rounds"] and method == "POST":
-                self.complete_weak_round(conn)
+                self.complete_weak_round(conn, user_id)
                 return
 
             if parts == ["api", "backup"]:
                 if method == "GET":
-                    self.send_json({"backup": backup_payload(conn)})
+                    self.send_json({"backup": backup_payload(conn, user_id)})
                     return
                 if method == "POST":
-                    self.import_backup(conn)
+                    self.import_backup(conn, user_id)
                     return
 
         self.send_json({"error": "요청 경로를 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
@@ -1670,10 +2097,10 @@ class AppHandler(BaseHTTPRequestHandler):
         updated = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
         self.send_json({"settings": self.settings_payload(updated)})
 
-    def create_card(self, conn: sqlite3.Connection) -> None:
+    def create_card(self, conn: sqlite3.Connection, user_id: int) -> None:
         body = parse_body(self)
         group_id = int(body.get("group_id") or 0)
-        if get_group(conn, group_id) is None:
+        if get_group(conn, user_id, group_id) is None:
             raise ValueError("카드를 저장할 소그룹을 선택하세요.")
         front = validate_text(body.get("front"), "앞면", 200)
         back = validate_text(body.get("back"), "뒷면", 500)
@@ -1681,7 +2108,7 @@ class AppHandler(BaseHTTPRequestHandler):
         examples = body.get("examples") or []
         if not isinstance(examples, list):
             raise ValueError("예문은 배열이어야 합니다.")
-        if duplicate_card_exists(conn, group_id, front):
+        if duplicate_card_exists(conn, user_id, group_id, front):
             raise ValueError("같은 소그룹에 이미 같은 앞면 카드가 있습니다.")
         cur = conn.execute(
             """
@@ -1692,18 +2119,18 @@ class AppHandler(BaseHTTPRequestHandler):
         )
         card_id = int(cur.lastrowid)
         insert_examples(conn, card_id, examples)
-        card = cards_payload(conn, query=None)
+        card = cards_payload(conn, user_id, query=None)
         created = next(item for item in card if int(item["id"]) == card_id)
         self.send_json({"card": created}, HTTPStatus.CREATED)
 
-    def update_card(self, conn: sqlite3.Connection, card_id: int) -> None:
-        card = get_card(conn, card_id)
+    def update_card(self, conn: sqlite3.Connection, user_id: int, card_id: int) -> None:
+        card = get_card(conn, user_id, card_id)
         if card is None:
             self.send_json({"error": "카드를 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
             return
         body = parse_body(self)
         group_id = int(body.get("group_id", card["group_id"]) or card["group_id"])
-        if get_group(conn, group_id) is None:
+        if get_group(conn, user_id, group_id) is None:
             raise ValueError("카드를 저장할 소그룹을 선택하세요.")
         front = validate_text(body.get("front", card["front"]), "앞면", 200)
         back = validate_text(body.get("back", card["back"]), "뒷면", 500)
@@ -1711,7 +2138,7 @@ class AppHandler(BaseHTTPRequestHandler):
         examples = body.get("examples")
         if examples is not None and not isinstance(examples, list):
             raise ValueError("예문은 배열이어야 합니다.")
-        if duplicate_card_exists(conn, group_id, front, card_id):
+        if duplicate_card_exists(conn, user_id, group_id, front, card_id):
             raise ValueError("같은 소그룹에 이미 같은 앞면 카드가 있습니다.")
         conn.execute(
             f"""
@@ -1728,13 +2155,13 @@ class AppHandler(BaseHTTPRequestHandler):
         if examples is not None:
             conn.execute("DELETE FROM examples WHERE card_id = ?", (card_id,))
             insert_examples(conn, card_id, examples)
-        updated = next(item for item in cards_payload(conn) if int(item["id"]) == card_id)
+        updated = next(item for item in cards_payload(conn, user_id) if int(item["id"]) == card_id)
         self.send_json({"card": updated})
 
-    def create_bulk_cards(self, conn: sqlite3.Connection) -> None:
+    def create_bulk_cards(self, conn: sqlite3.Connection, user_id: int) -> None:
         body = parse_body(self)
         group_id = int(body.get("group_id") or 0)
-        if get_group(conn, group_id) is None:
+        if get_group(conn, user_id, group_id) is None:
             raise ValueError("카드를 저장할 소그룹을 선택하세요.")
         items = parse_bulk_cards(body.get("text"))
         seen_fronts = set()
@@ -1743,7 +2170,7 @@ class AppHandler(BaseHTTPRequestHandler):
             if front in seen_fronts:
                 raise ValueError(f"대량 등록 안에 같은 앞면이 두 번 들어 있습니다: {front}")
             seen_fronts.add(front)
-            if duplicate_card_exists(conn, group_id, front):
+            if duplicate_card_exists(conn, user_id, group_id, front):
                 raise ValueError(f"같은 소그룹에 이미 같은 앞면 카드가 있습니다: {front}")
         created_ids = []
         for item in items:
@@ -1766,13 +2193,13 @@ class AppHandler(BaseHTTPRequestHandler):
             HTTPStatus.CREATED,
         )
 
-    def import_backup(self, conn: sqlite3.Connection) -> None:
+    def import_backup(self, conn: sqlite3.Connection, user_id: int) -> None:
         body = parse_body(self)
-        result = restore_backup(conn, body)
+        result = restore_backup(conn, user_id, body)
         self.send_json({"ok": True, "restored": result})
 
-    def reset_group_history(self, conn: sqlite3.Connection, group_id: int) -> None:
-        rounds_deleted = delete_rounds_for_group(conn, group_id)
+    def reset_group_history(self, conn: sqlite3.Connection, user_id: int, group_id: int) -> None:
+        rounds_deleted = delete_rounds_for_group(conn, user_id, group_id)
         cards_reset = conn.execute(
             f"""
             UPDATE cards
@@ -1791,8 +2218,8 @@ class AppHandler(BaseHTTPRequestHandler):
             }
         )
 
-    def reset_collection_history(self, conn: sqlite3.Connection, collection_id: int) -> None:
-        rounds_deleted = delete_rounds_for_collection(conn, collection_id)
+    def reset_collection_history(self, conn: sqlite3.Connection, user_id: int, collection_id: int) -> None:
+        rounds_deleted = delete_rounds_for_collection(conn, user_id, collection_id)
         cards_reset = conn.execute(
             f"""
             UPDATE cards
@@ -1800,12 +2227,14 @@ class AppHandler(BaseHTTPRequestHandler):
                 wrong_count = 0,
                 updated_at = {utc_now_sql()}
             WHERE group_id IN (
-                SELECT id
-                FROM groups
-                WHERE collection_id = ?
+                SELECT g.id
+                FROM groups g
+                JOIN collections c ON c.id = g.collection_id
+                WHERE g.collection_id = ?
+                  AND c.user_id = ?
             )
             """,
-            (collection_id,),
+            (collection_id, user_id),
         ).rowcount
         self.send_json(
             {
@@ -1815,7 +2244,7 @@ class AppHandler(BaseHTTPRequestHandler):
             }
         )
 
-    def complete_round(self, conn: sqlite3.Connection) -> None:
+    def complete_round(self, conn: sqlite3.Connection, user_id: int) -> None:
         body = parse_body(self)
         collection_id = int(body.get("collection_id") or 0)
         group_id = int(body.get("group_id") or 0)
@@ -1835,43 +2264,49 @@ class AppHandler(BaseHTTPRequestHandler):
         selected_group_ids: list[int]
         round_collection_id: int | None = None
         if collection_id:
-            if get_collection(conn, collection_id) is None:
+            if get_collection(conn, user_id, collection_id) is None:
                 raise ValueError("대그룹을 찾을 수 없습니다.")
             selected_group_ids = parse_id_list(body.get("group_ids"))
             if not selected_group_ids:
                 raise ValueError("학습한 소그룹 정보가 없습니다.")
-            selected_groups = groups_for_collection(conn, collection_id, selected_group_ids)
+            selected_groups = groups_for_collection(conn, user_id, collection_id, selected_group_ids)
             selected_group_ids = [int(group["id"]) for group in selected_groups]
             primary_group_id = selected_group_ids[0] if len(selected_group_ids) == 1 else None
-            round_no = group_round_no(conn, selected_group_ids[0])
+            round_no = group_round_no(conn, user_id, selected_group_ids[0])
             previous_round = conn.execute(
                 """
                 SELECT sr.*
                 FROM study_rounds sr
                 JOIN study_round_groups rg ON rg.round_id = sr.id
+                JOIN groups g ON g.id = rg.group_id
+                JOIN collections c ON c.id = g.collection_id
                 WHERE rg.group_id = ?
+                  AND c.user_id = ?
                 ORDER BY completed_at DESC, id DESC
                 LIMIT 1
                 """,
-                (selected_group_ids[0],),
+                (selected_group_ids[0], user_id),
             ).fetchone()
         else:
-            group = get_group(conn, group_id)
+            group = get_group(conn, user_id, group_id)
             if group is None:
                 raise ValueError("소그룹을 찾을 수 없습니다.")
             primary_group_id = group_id
             selected_group_ids = [group_id]
-            round_no = group_round_no(conn, group_id)
+            round_no = group_round_no(conn, user_id, group_id)
             previous_round = conn.execute(
                 """
                 SELECT sr.*
                 FROM study_rounds sr
                 JOIN study_round_groups rg ON rg.round_id = sr.id
+                JOIN groups g ON g.id = rg.group_id
+                JOIN collections c ON c.id = g.collection_id
                 WHERE rg.group_id = ?
+                  AND c.user_id = ?
                 ORDER BY sr.completed_at DESC, sr.id DESC
                 LIMIT 1
                 """,
-                (group_id,),
+                (group_id, user_id),
             ).fetchone()
 
         card_ids = []
@@ -1891,11 +2326,15 @@ class AppHandler(BaseHTTPRequestHandler):
         card_placeholders = ",".join("?" for _ in unique_card_ids)
         rows = conn.execute(
             f"""
-            SELECT id, group_id FROM cards
-            WHERE group_id IN ({group_placeholders})
-              AND id IN ({card_placeholders})
+            SELECT card.id, card.group_id
+            FROM cards card
+            JOIN groups g ON g.id = card.group_id
+            JOIN collections c ON c.id = g.collection_id
+            WHERE card.group_id IN ({group_placeholders})
+              AND card.id IN ({card_placeholders})
+              AND c.user_id = ?
             """,
-            [*selected_group_ids, *unique_card_ids],
+            [*selected_group_ids, *unique_card_ids, user_id],
         ).fetchall()
         valid_ids = {int(row["id"]) for row in rows}
         if len(valid_ids) != len(unique_card_ids):
@@ -1964,7 +2403,7 @@ class AppHandler(BaseHTTPRequestHandler):
             HTTPStatus.CREATED,
         )
 
-    def complete_weak_round(self, conn: sqlite3.Connection) -> None:
+    def complete_weak_round(self, conn: sqlite3.Connection, user_id: int) -> None:
         body = parse_body(self)
         started_at = normalize_timestamp(body.get("started_at"))
         duration_seconds = normalize_duration(body.get("duration_seconds"))
@@ -1987,8 +2426,15 @@ class AppHandler(BaseHTTPRequestHandler):
         unique_card_ids = sorted(set(card_ids))
         placeholders = ",".join("?" for _ in unique_card_ids)
         rows = conn.execute(
-            f"SELECT id FROM cards WHERE id IN ({placeholders})",
-            unique_card_ids,
+            f"""
+            SELECT card.id
+            FROM cards card
+            JOIN groups g ON g.id = card.group_id
+            JOIN collections c ON c.id = g.collection_id
+            WHERE card.id IN ({placeholders})
+              AND c.user_id = ?
+            """,
+            [*unique_card_ids, user_id],
         ).fetchall()
         valid_ids = {int(row["id"]) for row in rows}
         if len(valid_ids) != len(unique_card_ids):
@@ -2015,7 +2461,7 @@ class AppHandler(BaseHTTPRequestHandler):
             HTTPStatus.CREATED,
         )
 
-    def round_detail_payload(self, conn: sqlite3.Connection, round_id: int) -> dict | None:
+    def round_detail_payload(self, conn: sqlite3.Connection, user_id: int, round_id: int) -> dict | None:
         round_row = conn.execute(
             """
             SELECT
@@ -2037,8 +2483,16 @@ class AppHandler(BaseHTTPRequestHandler):
             LEFT JOIN groups g ON g.id = sr.group_id
             LEFT JOIN collections c ON c.id = sr.collection_id
             WHERE sr.id = ?
+              AND EXISTS (
+                  SELECT 1
+                  FROM study_round_groups rg_filter
+                  JOIN groups g_filter ON g_filter.id = rg_filter.group_id
+                  JOIN collections c_filter ON c_filter.id = g_filter.collection_id
+                  WHERE rg_filter.round_id = sr.id
+                    AND c_filter.user_id = ?
+              )
             """,
-            (round_id,),
+            (round_id, user_id),
         ).fetchone()
         if round_row is None:
             return None
@@ -2055,10 +2509,13 @@ class AppHandler(BaseHTTPRequestHandler):
                 c.memo
             FROM reviews rv
             JOIN cards c ON c.id = rv.card_id
+            JOIN groups g ON g.id = c.group_id
+            JOIN collections col ON col.id = g.collection_id
             WHERE rv.round_id = ?
+              AND col.user_id = ?
             ORDER BY rv.id ASC
             """,
-            (round_id,),
+            (round_id, user_id),
         ).fetchall()
         cards_by_id: dict[int, dict] = {}
         for row in review_rows:
@@ -2104,24 +2561,39 @@ class AppHandler(BaseHTTPRequestHandler):
     def rounds_payload(
         self,
         conn: sqlite3.Connection,
+        user_id: int,
         group_id: int | None,
         collection_id: int | None = None,
         limit: int = 200,
     ) -> list[dict]:
-        clauses = []
-        params = []
+        clauses = [
+            """
+            EXISTS (
+                SELECT 1
+                FROM study_round_groups rg_owner
+                JOIN groups g_owner ON g_owner.id = rg_owner.group_id
+                JOIN collections c_owner ON c_owner.id = g_owner.collection_id
+                WHERE rg_owner.round_id = sr.id
+                  AND c_owner.user_id = ?
+            )
+            """
+        ]
+        params = [user_id]
         if group_id:
             clauses.append(
                 """
                 EXISTS (
                     SELECT 1
                     FROM study_round_groups rg_filter
+                    JOIN groups g_filter ON g_filter.id = rg_filter.group_id
+                    JOIN collections c_filter ON c_filter.id = g_filter.collection_id
                     WHERE rg_filter.round_id = sr.id
                       AND rg_filter.group_id = ?
+                      AND c_filter.user_id = ?
                 )
                 """
             )
-            params.append(group_id)
+            params.extend([group_id, user_id])
         if collection_id:
             clauses.append(
                 """
@@ -2131,13 +2603,15 @@ class AppHandler(BaseHTTPRequestHandler):
                         SELECT 1
                         FROM study_round_groups rg_filter
                         JOIN groups g_filter ON g_filter.id = rg_filter.group_id
+                        JOIN collections c_filter ON c_filter.id = g_filter.collection_id
                         WHERE rg_filter.round_id = sr.id
                           AND g_filter.collection_id = ?
+                          AND c_filter.user_id = ?
                     )
                 )
                 """
             )
-            params.extend([collection_id, collection_id])
+            params.extend([collection_id, collection_id, user_id])
         where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = conn.execute(
             f"""
