@@ -4799,7 +4799,9 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
           <h2 id="groups-title">${escapeHtml(collection.name)}</h2>
         </div>
       </div>
-      ${renderOrientationNote(["묶음", "대그룹 목록", collection.name], "이 대그룹 안에서 소그룹을 만들고 관리합니다.")}
+      ${renderOrientationNote(["묶음", "대그룹 목록", collection.name], "이 대그룹 안에서 소그룹을 만들고 관리합니다.", {
+        exposeNote: true,
+      })}
       <section class="collection-detail-summary">
         <p>${escapeHtml(collection.description || "설명 없음")}</p>
         <div class="stat-grid">
