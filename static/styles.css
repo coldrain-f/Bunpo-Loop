@@ -126,6 +126,14 @@ button:disabled {
   opacity: 0.5;
 }
 
+button.is-pending:disabled {
+  opacity: 0.72;
+}
+
+button.is-pending .icon {
+  animation: pending-pulse 900ms ease-in-out infinite;
+}
+
 .icon-sprite {
   position: absolute;
   width: 0;
@@ -583,8 +591,23 @@ h3 {
   }
 }
 
+@keyframes pending-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .loading-lines span {
+    animation: none;
+  }
+
+  button.is-pending .icon {
     animation: none;
   }
 }
@@ -1321,6 +1344,18 @@ h3 {
 
 .duplicate-warning.inline {
   margin-top: 8px;
+}
+
+.pending-note {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(15, 117, 108, 0.2);
+  border-radius: 8px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: 0.82rem;
+  font-weight: 820;
+  line-height: 1.4;
 }
 
 .input,
@@ -4024,6 +4059,10 @@ button:active,
 
 .toast.show {
   display: block;
+}
+
+body.study-mode .toast {
+  bottom: calc(112px + env(safe-area-inset-bottom));
 }
 
 .dialog-backdrop {

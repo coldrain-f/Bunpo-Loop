@@ -80,9 +80,9 @@ Core mobile rules:
 - [x] Phase 5. Dialogs & Bottom Sheets
   - [x] 5.1 Core Dialog Pass
   - [x] 5.2 Dense Picker Pass
-- [ ] Phase 6. Mobile Performance
+- [x] Phase 6. Mobile Performance
   - [x] 6.1 Large List Responsiveness
-  - [ ] 6.2 Loading & Network Feedback
+  - [x] 6.2 Loading & Network Feedback
 - [ ] Phase 7. Touch & Accessibility
   - [ ] 7.1 Touch Target Audit
   - [ ] 7.2 Screen Reader & Focus Audit
@@ -497,10 +497,10 @@ Purpose:
 모바일 네트워크가 느리거나 불안정할 때도 사용자가 앱 상태를 이해하게 한다.
 
 Tasks:
-- [ ] 초기 로딩, 저장 중, 삭제 중, 복원 중 상태가 모바일에서 분명한지 확인한다.
-- [ ] 버튼 pending state가 중복 submit을 막는지 확인한다.
-- [ ] 네트워크 실패 toast가 하단 nav 또는 answer bar와 겹치지 않는지 확인한다.
-- [ ] offline-like 상황에서 사용자가 재시도할 수 있는 경로를 확인한다.
+- [x] 초기 로딩, 저장 중, 삭제 중, 복원 중 상태가 모바일에서 분명한지 확인한다.
+- [x] 버튼 pending state가 중복 submit을 막는지 확인한다.
+- [x] 네트워크 실패 toast가 하단 nav 또는 answer bar와 겹치지 않는지 확인한다.
+- [x] offline-like 상황에서 사용자가 재시도할 수 있는 경로를 확인한다.
 
 Files:
 - `static/app.js`
@@ -510,6 +510,14 @@ Acceptance Criteria:
 - 느린 작업에서 같은 버튼을 여러 번 누르고 싶지 않게 된다.
 - 실패 메시지가 짧고 행동 가능하다.
 - toast가 주요 action을 가리지 않는다.
+
+Verification:
+- form submit pending에 `aria-busy`, `is-pending` 버튼 상태, 중복 submit 방지 복구 흐름을 적용했다.
+- 삭제/초기화/복원 confirm dialog와 대량 등록 확정에 pending note를 추가해 처리 중임을 본문에서도 보이게 했다.
+- 네트워크 실패 toast를 `연결 실패. 다시 눌러 재시도하세요.`로 짧고 행동 가능하게 정리하고 표시 시간을 조금 늘렸다.
+- study mode toast bottom offset을 answer bar 위로 올려 학습 중 주요 action과 겹칠 가능성을 줄였다.
+- 초기 로딩/error 화면은 기존 loading skeleton과 `다시 시도` 경로를 유지한다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200/title 확인을 통과했다. 인앱 브라우저 패널이 없어 실제 터치/시각 검증은 다음 브라우저 가능 시점에 다시 확인한다.
 
 ## Phase 7. Touch & Accessibility
 

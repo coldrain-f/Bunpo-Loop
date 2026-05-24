@@ -247,11 +247,25 @@ function renderFieldLabel(label, helpText = "") {
   `;
 }
 
-function showToast(message) {
+function showToast(message, { duration = 2200 } = {}) {
   toastEl.textContent = message;
   toastEl.classList.add("show");
   window.clearTimeout(showToast.timer);
-  showToast.timer = window.setTimeout(() => toastEl.classList.remove("show"), 2200);
+  showToast.timer = window.setTimeout(() => {
+    toastEl.classList.remove("show");
+    toastEl.textContent = "";
+  }, duration);
+}
+
+function getRequestErrorMessage(error) {
+  if (error?.code === "network") return "연결 실패. 다시 눌러 재시도하세요.";
+  return error?.message || "요청을 처리하지 못했습니다.";
+}
+
+function showRequestError(error, fallback = "") {
+  showToast(error?.code === "network" ? getRequestErrorMessage(error) : fallback || getRequestErrorMessage(error), {
+    duration: error?.code === "network" ? 3600 : 2400,
+  });
 }
 
 function getFocusableElements(container = document) {
@@ -1084,7 +1098,7 @@ async function refreshDataOnResume({ force = false } = {}) {
     if (error?.status === 401 || error?.code === "auth") {
       handleLoadDataError(error);
     } else {
-      showToast("최신 데이터를 확인하지 못했습니다. 연결 상태를 확인해 주세요.");
+      showRequestError(error, "최신 데이터를 확인하지 못했습니다. 다시 시도해 주세요.");
     }
   } finally {
     resumeRefreshPending = false;
@@ -2404,7 +2418,7 @@ function renderAuth() {
         <h2 id="auth-title">바로 시작하기</h2>
         <p id="auth-help" class="meta">닉네임과 6자리 코드는 같은 학습 데이터를 다시 여는 개인용 구분값입니다. 공개 서비스용 계정 보안은 아닙니다.</p>
       </div>
-      <form id="login-form" class="stack" novalidate>
+      <form id="login-form" class="stack ${state.authPending ? "is-pending" : ""}" novalidate aria-busy="${state.authPending ? "true" : "false"}">
         <label class="field">
           <span>닉네임</span>
           <input class="input" name="nickname" autocomplete="username" value="${escapeHtml(
@@ -2422,7 +2436,7 @@ function renderAuth() {
           } ${state.authPending ? "disabled" : ""} />
         </label>
         ${state.authError ? `<p id="auth-error" class="auth-error" role="alert">${escapeHtml(state.authError)}</p>` : ""}
-        <button class="primary-button full" type="submit" ${state.authPending ? "disabled" : ""}>${iconLabel(
+        <button class="primary-button full ${state.authPending ? "is-pending" : ""}" type="submit" ${state.authPending ? "disabled" : ""}>${iconLabel(
           "log-in",
           state.authPending ? "확인 중" : "들어가기",
         )}</button>
@@ -2441,16 +2455,17 @@ function renderConfirmDialog({ eyebrow, title, message, confirmLabel, confirmAct
   const isPending = state.pendingRequest?.action === confirmAction;
   dialogRoot.innerHTML = `
     <div class="dialog-backdrop" role="presentation">
-      <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title" aria-describedby="study-dialog-message">
+      <section class="dialog-panel ${isPending ? "is-pending" : ""}" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title" aria-describedby="study-dialog-message" aria-busy="${isPending ? "true" : "false"}">
         <p class="eyebrow">${escapeHtml(eyebrow)}</p>
         <h2 id="study-dialog-title">${escapeHtml(title)}</h2>
         <p id="study-dialog-message" class="meta">${escapeHtml(message)}</p>
+        ${isPending ? `<p class="pending-note" role="status">${escapeHtml(state.pendingRequest.label)}입니다. 잠시만 기다려 주세요.</p>` : ""}
         <div class="button-row">
           <button class="ghost-button" type="button" data-action="close-dialog" ${isPending ? "disabled" : ""}>${iconLabel(
             "x",
             "취소",
           )}</button>
-          <button class="${buttonClass}" type="button" data-action="${confirmAction}" ${isPending ? "disabled" : ""}>${iconLabel(
+          <button class="${buttonClass} ${isPending ? "is-pending" : ""}" type="button" data-action="${confirmAction}" ${isPending ? "disabled" : ""}>${iconLabel(
             confirmIcon,
             isPending ? state.pendingRequest.label : confirmLabel,
           )}</button>
@@ -2476,16 +2491,26 @@ async function runDialogRequest(action, label, task) {
 async function runFormRequest(form, label, task) {
   const button = form.querySelector('button[type="submit"]');
   const originalMarkup = button?.innerHTML || "";
+  const originalBusy = form.getAttribute("aria-busy");
   if (button?.disabled) return;
+  form.classList.add("is-pending");
+  form.setAttribute("aria-busy", "true");
   if (button) {
     button.disabled = true;
+    button.classList.add("is-pending");
     button.innerHTML = iconLabel("save", label);
   }
   try {
     await task();
   } finally {
+    if (form.isConnected) {
+      form.classList.remove("is-pending");
+      if (originalBusy === null) form.removeAttribute("aria-busy");
+      else form.setAttribute("aria-busy", originalBusy);
+    }
     if (button?.isConnected) {
       button.disabled = false;
+      button.classList.remove("is-pending");
       button.innerHTML = originalMarkup;
     }
   }
@@ -4567,6 +4592,7 @@ function renderBulkCardForm(groupId) {
 
 function renderBulkPreview(preview) {
   const canCreate = preview.items.length > 0 && !preview.errors.length && preview.warningCount === 0;
+  const isPending = state.pendingRequest?.action === "confirm-bulk-cards";
   const displayItems = preview.items.slice(0, BULK_PREVIEW_RENDER_LIMIT);
   const hiddenCount = Math.max(0, preview.items.length - displayItems.length);
   const statusText = preview.errors.length
@@ -4582,7 +4608,7 @@ function renderBulkPreview(preview) {
         ? ""
         : "등록할 카드가 없습니다.";
   return `
-    <section class="bulk-preview" aria-labelledby="bulk-preview-title">
+    <section class="bulk-preview ${isPending ? "is-pending" : ""}" aria-labelledby="bulk-preview-title" aria-busy="${isPending ? "true" : "false"}">
       <div class="completion-header">
         <div>
           <h3 id="bulk-preview-title">등록 미리보기</h3>
@@ -4610,11 +4636,12 @@ function renderBulkPreview(preview) {
             )}개만 표시합니다. 등록하면 확인된 ${number(preview.items.length)}개가 모두 저장됩니다.</p>`
           : ""
       }
-      <button class="primary-button full" type="button" data-action="confirm-bulk-cards" ${
-        canCreate && state.pendingRequest?.action !== "confirm-bulk-cards" ? "" : "disabled"
+      ${isPending ? `<p class="pending-note" role="status">등록 중입니다. 잠시만 기다려 주세요.</p>` : ""}
+      <button class="primary-button full ${isPending ? "is-pending" : ""}" type="button" data-action="confirm-bulk-cards" ${
+        canCreate && !isPending ? "" : "disabled"
       }>${iconLabel(
         "check",
-        state.pendingRequest?.action === "confirm-bulk-cards" ? state.pendingRequest.label : "미리보기대로 등록",
+        isPending ? state.pendingRequest.label : "미리보기대로 등록",
       )}</button>
       ${canCreate || !disabledReason ? "" : renderDisabledReason(disabledReason)}
     </section>
@@ -6580,7 +6607,7 @@ document.addEventListener("click", async (event) => {
       }
     }
   } catch (error) {
-    showToast(error.message);
+    showRequestError(error);
   }
 });
 
@@ -6655,7 +6682,7 @@ document.addEventListener("change", async (event) => {
       }
     }
   } catch (error) {
-    showToast(error.message);
+    showRequestError(error);
   }
 });
 
@@ -6721,7 +6748,7 @@ document.addEventListener("submit", async (event) => {
     if (form.id === "backup-import-form") prepareBackupRestore(form);
     if (form.id === "settings-form") await runFormRequest(form, "저장 중", () => saveSettings(form));
   } catch (error) {
-    showToast(error.message);
+    showRequestError(error);
   }
 });
 
