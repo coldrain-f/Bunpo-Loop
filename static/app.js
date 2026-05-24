@@ -3790,7 +3790,7 @@ function getCompletionModeLabel(session) {
 
 function renderCompletionRecordBadge(session) {
   const label = getCompletionModeLabel(session);
-  const tone = session.studyMode === "practice" ? "muted" : "done";
+  const tone = session.studyMode === "practice" ? "muted" : session.studyMode === "weak" ? "review" : "done";
   return `<span class="status-pill ${tone}">${label}</span>`;
 }
 
@@ -3805,9 +3805,9 @@ function renderCompletionRecordNote(session) {
   }
   if (session.studyMode === "weak") {
     return `
-      <section class="completion-record-note">
-        <strong>약점 복습을 완료했습니다.</strong>
-        <p>오답 기준에 걸린 카드를 따로 훑어본 결과입니다. 소그룹 공식 회독 흐름과는 구분해서 보여줍니다.</p>
+      <section class="completion-record-note review">
+        <strong>공식 회독에 저장하지 않았습니다.</strong>
+        <p>약점 복습은 오답 기준에 걸린 카드를 따로 훑어본 결과입니다. 소그룹 회독 수, 공식 정답률, 학습 이력에는 반영하지 않습니다.</p>
       </section>
     `;
   }
@@ -3820,8 +3820,9 @@ function renderCompletionScoreboard(summary, round, session) {
     ? Math.round((summary.firstPassCorrectCount / summary.uniqueCardCount) * 100)
     : 0;
   const modeLabel = getCompletionModeLabel(session);
+  const modeClass = session.studyMode === "practice" ? "practice" : session.studyMode === "weak" ? "review" : "";
   return `
-    <div class="completion-scoreboard ${session.studyMode === "practice" ? "practice" : ""}">
+    <div class="completion-scoreboard ${modeClass}">
       <div class="completion-main-score">
         <span>${modeLabel} 결과</span>
         <strong>${firstAttemptRate}%</strong>
@@ -3915,15 +3916,15 @@ function getCompletionActionConfig(session) {
 function renderCompletionStickyActions(session) {
   const actions = getCompletionActionConfig(session);
   return `
-    <div class="completion-sticky-actions" aria-label="결과 화면 작업">
-      <button class="ghost-button full" type="button" data-action="scroll-completion-section" data-target="completion-summary">
-        ${iconLabel("chevron-up", "요약")}
+    <div class="completion-sticky-actions" aria-label="완료 후 작업">
+      <button class="primary-button full" type="button" data-action="${actions.primary.action}">
+        ${iconLabel(actions.primary.icon, actions.primary.label)}
       </button>
       <button class="secondary-button full" type="button" data-action="${actions.secondary.action}">
         ${iconLabel(actions.secondary.icon, actions.secondary.label)}
       </button>
-      <button class="primary-button full" type="button" data-action="${actions.primary.action}">
-        ${iconLabel(actions.primary.icon, actions.primary.label)}
+      <button class="ghost-button full" type="button" data-action="scroll-completion-section" data-target="completion-summary">
+        ${iconLabel("chevron-up", "요약")}
       </button>
     </div>
   `;

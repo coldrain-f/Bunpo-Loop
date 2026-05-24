@@ -70,9 +70,9 @@ Core mobile rules:
   - [x] 2.1 Back & Return Flow
   - [x] 2.2 Tab State & Scroll Restoration
   - [x] 2.3 Resume & Session Continuity
-- [ ] Phase 3. Study Session Ergonomics
+- [x] Phase 3. Study Session Ergonomics
   - [x] 3.1 Card Reading & Flip Comfort
-  - [ ] 3.2 Answer Bar & Completion Flow
+  - [x] 3.2 Answer Bar & Completion Flow
 - [ ] Phase 4. Mobile Forms & Keyboard
   - [ ] 4.1 Settings Form Pass
   - [ ] 4.2 Card Creation Form Pass
@@ -298,11 +298,11 @@ Purpose:
 정답/오답 선택과 완료 후 다음 행동이 모바일 엄지 영역에서 안정적으로 이어지게 한다.
 
 Tasks:
-- [ ] 정답/오답 버튼의 위치, 높이, label 길이를 360px에서 확인한다.
-- [ ] 정답/오답 피드백이 버튼 위치를 흔들지 않는지 확인한다.
-- [ ] 마지막 카드 후 완료 화면으로 넘어가는 전환이 즉시 이해되는지 확인한다.
-- [ ] 완료 화면의 주요 CTA가 한 손 조작 영역 안에 들어오는지 확인한다.
-- [ ] 약점 복습 완료는 공식 기록 완료와 다르게 보이는지 확인한다.
+- [x] 정답/오답 버튼의 위치, 높이, label 길이를 360px에서 확인한다.
+- [x] 정답/오답 피드백이 버튼 위치를 흔들지 않는지 확인한다.
+- [x] 마지막 카드 후 완료 화면으로 넘어가는 전환이 즉시 이해되는지 확인한다.
+- [x] 완료 화면의 주요 CTA가 한 손 조작 영역 안에 들어오는지 확인한다.
+- [x] 약점 복습 완료는 공식 기록 완료와 다르게 보이는지 확인한다.
 
 Files:
 - `static/app.js`
@@ -312,6 +312,13 @@ Acceptance Criteria:
 - 학습 중 가장 많이 누르는 버튼이 항상 같은 곳에 있다.
 - 완료 화면에서 "다음에 무엇을 할지"가 설명 없이 보인다.
 - 기록 없는 학습이 공식 회독처럼 보이지 않는다.
+
+Verification:
+- 정답/오답 버튼은 360px 이하에서도 짧은 label의 2열 버튼을 유지하고, 피드백 중에는 같은 action bar 안에서 색과 shadow만 바뀌게 했다.
+- 완료 화면 작업 bar를 bottom nav 위 fixed action으로 바꿔 결과 화면 첫 진입 시에도 다음 행동이 엄지 영역 안에 보이도록 했다.
+- 완료 작업 bar는 primary action을 전체 폭으로 두고, 보조 action과 요약 이동은 한 줄 아래/위계 낮은 버튼으로 분리했다.
+- 약점 복습 완료는 `review` tone과 명시 copy를 추가해 소그룹 회독 수, 공식 정답률, 학습 이력에 반영되지 않는 결과로 보이게 했다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200/UTF-8 title 확인을 통과했다. 이 환경의 브라우저 권한 제한 때문에 실제 스크린샷 검증은 보류한다.
 
 ## Phase 4. Mobile Forms & Keyboard
 

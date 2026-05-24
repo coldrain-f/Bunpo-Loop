@@ -2407,6 +2407,12 @@ button:active,
   color: var(--muted);
 }
 
+.status-pill.review {
+  border-color: rgba(185, 121, 24, 0.28);
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
 .subgroup-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2649,7 +2655,7 @@ button:active,
 
 .completion-panel {
   gap: 14px;
-  padding-bottom: 88px;
+  padding-bottom: 158px;
 }
 
 .completion-title-row {
@@ -2676,6 +2682,11 @@ button:active,
 .completion-record-note.practice {
   border-color: var(--line);
   background: var(--surface-strong);
+}
+
+.completion-record-note.review {
+  border-color: rgba(185, 121, 24, 0.28);
+  background: var(--gold-soft);
 }
 
 .completion-record-note strong {
@@ -2748,6 +2759,11 @@ button:active,
   background: var(--surface-strong);
 }
 
+.completion-scoreboard.review .completion-main-score {
+  border-color: rgba(185, 121, 24, 0.28);
+  background: var(--gold-soft);
+}
+
 .completion-main-score strong {
   display: block;
   color: var(--teal);
@@ -2774,6 +2790,12 @@ button:active,
 .completion-scoreboard.practice .completion-main-score span,
 .completion-scoreboard.practice .completion-main-score p {
   color: var(--ink);
+}
+
+.completion-scoreboard.review .completion-main-score strong,
+.completion-scoreboard.review .completion-main-score span,
+.completion-scoreboard.review .completion-main-score p {
+  color: var(--gold);
 }
 
 .completion-metric-grid {
@@ -3120,12 +3142,14 @@ button:active,
 }
 
 .completion-sticky-actions {
-  position: sticky;
+  position: fixed;
+  left: 50%;
   bottom: calc(72px + env(safe-area-inset-bottom));
   z-index: 18;
   display: grid;
-  grid-template-columns: 0.64fr 1.08fr 1.38fr;
-  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(calc(100% - 32px), 528px);
+  transform: translateX(-50%);
   gap: 6px;
   padding: 6px;
   border: 1px solid rgba(214, 224, 219, 0.92);
@@ -3139,17 +3163,28 @@ button:active,
   min-height: 44px;
   padding-right: 6px;
   padding-left: 6px;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
+}
+
+.completion-sticky-actions .primary-button {
+  grid-column: 1 / -1;
+  order: 2;
+  min-height: 48px;
+}
+
+.completion-sticky-actions .secondary-button,
+.completion-sticky-actions .ghost-button {
+  order: 1;
 }
 
 .completion-sticky-actions .button-content {
   gap: 4px;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .completion-sticky-actions .button-content span {
-  overflow-wrap: normal;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .completion-sticky-actions .icon {
