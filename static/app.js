@@ -3336,6 +3336,7 @@ function renderStudyCollectionChoiceItem(collection) {
           <span>소그룹 ${groupCount}개</span>
           <span>카드 ${cardCount}개</span>
           <span>소그룹 합산</span>
+          <span class="group-choice-action">선택 ${icon("chevron-right")}</span>
         </div>
       </button>
       ${
@@ -3371,6 +3372,9 @@ function renderStudyGroupChoiceItem(group) {
         ${renderGroupStatusPills(group)}
         ${renderGroupMetricRow(group)}
         <p class="meta">${escapeHtml(lastStudyText)} · 누적 정답 ${number(group.correct_total)} · 누적 오답 ${number(group.wrong_total)}</p>
+        <div class="group-choice-footer subgroup-choice-footer">
+          <span class="group-choice-action">${active ? "선택됨" : "선택"} ${icon(active ? "check" : "chevron-right")}</span>
+        </div>
       </button>
       ${
         cardCount
