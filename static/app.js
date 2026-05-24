@@ -176,7 +176,10 @@ let deferredSearchRenderId = null;
 let historyInitialized = false;
 let lastHistoryRouteKey = "";
 let isApplyingHistoryRoute = false;
+let lastHiddenAtMs = 0;
+let resumeRefreshPending = false;
 const ANSWER_FEEDBACK_MS = 230;
+const RESUME_REFRESH_AFTER_MS = 5 * 60 * 1000;
 const FOCUSABLE_SELECTOR = [
   "button:not([disabled])",
   "input:not([disabled])",
@@ -1005,6 +1008,59 @@ function handleHistoryPop(event) {
     return;
   }
   completeHistoryNavigation(route);
+}
+
+function isDraftScreenActive() {
+  if (isTypingTarget(document.activeElement)) return true;
+  if (state.activeTab === "settings") return true;
+  if (state.activeTab === "cards" && state.cardScreen === "form") return true;
+  if (state.activeTab === "groups" && state.groupScreen !== "list") return true;
+  return false;
+}
+
+function canRefreshDataOnResume() {
+  if (!state.user || state.appStatus !== "ready") return false;
+  if (state.pendingRequest || state.authPending || resumeRefreshPending) return false;
+  if (state.activeDialog) return false;
+  if (state.session && !state.session.savedRound) return false;
+  if (isDraftScreenActive()) return false;
+  return true;
+}
+
+async function refreshDataOnResume({ force = false } = {}) {
+  const elapsedHiddenMs = lastHiddenAtMs ? Date.now() - lastHiddenAtMs : 0;
+  if (!force && elapsedHiddenMs < RESUME_REFRESH_AFTER_MS) return;
+  if (!canRefreshDataOnResume()) return;
+  resumeRefreshPending = true;
+  saveCurrentScrollPosition();
+  try {
+    await loadData();
+    render();
+    restoreCurrentScrollPosition();
+  } catch (error) {
+    if (error?.status === 401 || error?.code === "auth") {
+      handleLoadDataError(error);
+    } else {
+      showToast("최신 데이터를 확인하지 못했습니다. 연결 상태를 확인해 주세요.");
+    }
+  } finally {
+    resumeRefreshPending = false;
+    lastHiddenAtMs = 0;
+  }
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === "hidden") {
+    lastHiddenAtMs = Date.now();
+    return;
+  }
+  if (document.visibilityState === "visible") {
+    refreshDataOnResume();
+  }
+}
+
+function handlePageShow(event) {
+  refreshDataOnResume({ force: Boolean(event.persisted) });
 }
 
 function resetCardListLimit() {
@@ -6525,6 +6581,8 @@ window.addEventListener("beforeunload", (event) => {
 });
 
 window.addEventListener("popstate", handleHistoryPop);
+document.addEventListener("visibilitychange", handleVisibilityChange);
+window.addEventListener("pageshow", handlePageShow);
 
 async function init() {
   state.user = loadStoredUser();

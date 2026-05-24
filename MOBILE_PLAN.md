@@ -66,10 +66,10 @@ Core mobile rules:
   - [x] 1.1 Viewport QA Matrix
   - [x] 1.2 Safe Area & Fixed Chrome
   - [x] 1.3 Mobile Browser Quirks
-- [ ] Phase 2. One-Hand Navigation
+- [x] Phase 2. One-Hand Navigation
   - [x] 2.1 Back & Return Flow
   - [x] 2.2 Tab State & Scroll Restoration
-  - [ ] 2.3 Resume & Session Continuity
+  - [x] 2.3 Resume & Session Continuity
 - [ ] Phase 3. Study Session Ergonomics
   - [ ] 3.1 Card Reading & Flip Comfort
   - [ ] 3.2 Answer Bar & Completion Flow
@@ -239,11 +239,11 @@ Purpose:
 모바일에서 앱을 잠깐 나갔다가 돌아왔을 때 학습 맥락과 데이터 상태가 믿을 만하게 유지되게 한다.
 
 Tasks:
-- [ ] active session 중 화면 잠금/앱 전환 후 돌아왔을 때 현재 카드와 진행률이 유지되는지 확인한다.
-- [ ] 학습 중 새로고침 또는 브라우저 재진입 시 사용자가 잃는 정보가 무엇인지 제품적으로 정한다.
-- [ ] 저장/삭제 요청 중 앱을 벗어났다가 돌아오는 경우 pending state와 toast가 어색하지 않은지 확인한다.
-- [ ] 인증 또는 사용자 상태가 만료됐을 때 모바일에서 다시 로그인하는 흐름이 막히지 않는지 확인한다.
-- [ ] 오래 머문 탭으로 돌아왔을 때 데이터 재동기화가 필요한지 판단한다.
+- [x] active session 중 화면 잠금/앱 전환 후 돌아왔을 때 현재 카드와 진행률이 유지되는지 확인한다.
+- [x] 학습 중 새로고침 또는 브라우저 재진입 시 사용자가 잃는 정보가 무엇인지 제품적으로 정한다.
+- [x] 저장/삭제 요청 중 앱을 벗어났다가 돌아오는 경우 pending state와 toast가 어색하지 않은지 확인한다.
+- [x] 인증 또는 사용자 상태가 만료됐을 때 모바일에서 다시 로그인하는 흐름이 막히지 않는지 확인한다.
+- [x] 오래 머문 탭으로 돌아왔을 때 데이터 재동기화가 필요한지 판단한다.
 
 Files:
 - `static/app.js`
@@ -253,6 +253,14 @@ Acceptance Criteria:
 - 잠깐 다른 앱을 보고 돌아와도 사용자가 현재 위치를 이해할 수 있다.
 - 저장 여부가 불확실한 상태를 만들지 않는다.
 - 세션 만료나 재연결이 학습 기록을 잘못 저장하지 않는다.
+
+Verification:
+- `visibilitychange`로 앱을 벗어난 시점을 기록하고, 5분 이상 지난 뒤 안전한 읽기 화면으로 돌아오면 `loadData()`로 최신 데이터를 다시 확인한다.
+- `pageshow.persisted`로 BFCache 복귀가 감지되면 시간 조건 없이 같은 안전성 검사를 거쳐 최신 데이터를 확인한다.
+- 저장되지 않은 active session, dialog, pending request, 설정 화면, 카드 form, 대그룹 detail/form 화면에서는 자동 재동기화를 건너뛰어 입력값과 진행 중인 학습을 덮어쓰지 않는다.
+- 학습 중 새로고침은 진행 중인 답변 상태를 복원하지 않는 것으로 정리했다. 기존 `beforeunload` 경고로 실수 새로고침을 막고, 공식 기록은 완료 저장 시점에만 쌓는다.
+- 인증 만료는 기존 `handleLoadDataError()` 경로를 그대로 사용해 저장된 사용자를 정리하고 로그인 화면으로 돌려보낸다.
+- 390px 로컬 앱에서 통계 탭 진입과 일반 회독 session 시작 화면을 확인했고, `static/app.js` 문법 검사를 통과했다. 인앱 브라우저 연결이 중간에 끊겨 lifecycle 이벤트의 시각 검증은 코드 경로 검토와 정적 검사로 보완했다.
 
 ## Phase 3. Study Session Ergonomics
 
