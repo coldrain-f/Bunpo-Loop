@@ -1,4 +1,4 @@
-const SHELL_CACHE = "kokko-shell-20260524-3";
+const SHELL_CACHE = "kokko-shell-20260525-1";
 
 const APP_SHELL = [
   "/",
@@ -25,6 +25,7 @@ const APP_SHELL = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(APP_SHELL)));
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -33,16 +34,18 @@ self.addEventListener("activate", (event) => {
       .keys()
       .then((keys) => Promise.all(keys.filter((key) => key !== SHELL_CACHE).map((key) => caches.delete(key)))),
   );
+  event.waitUntil(self.clients.claim());
 });
 
 async function networkFirst(request, fallbackUrl = "") {
   const cache = await caches.open(SHELL_CACHE);
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, { cache: "reload" });
     if (response.ok) await cache.put(request, response.clone());
     return response;
   } catch (error) {
-    const cached = await cache.match(request);
+    const url = new URL(request.url);
+    const cached = (await cache.match(request)) || (await cache.match(url.pathname));
     if (cached) return cached;
     if (fallbackUrl) {
       const fallback = await cache.match(fallbackUrl);
@@ -60,6 +63,10 @@ async function cacheFirst(request) {
   if (response.ok) await cache.put(request, response.clone());
   return response;
 }
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+});
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;

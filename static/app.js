@@ -7009,26 +7009,44 @@ window.addEventListener("offline", () => syncConnectionState({ notify: true }));
 window.addEventListener("online", () => syncConnectionState({ notify: true }));
 
 function notifyServiceWorkerUpdate() {
-  showToast("새 버전은 다음 실행 때 적용됩니다.", { duration: 4200 });
+  showToast("새 버전을 적용하는 중입니다.", { duration: 2400 });
+}
+
+function applyServiceWorkerUpdate(worker) {
+  if (!worker) return;
+  notifyServiceWorkerUpdate();
+  worker.postMessage({ type: "SKIP_WAITING" });
 }
 
 function watchServiceWorkerUpdate(registration) {
-  if (registration.waiting && navigator.serviceWorker.controller) notifyServiceWorkerUpdate();
+  if (registration.waiting && navigator.serviceWorker.controller) applyServiceWorkerUpdate(registration.waiting);
   registration.addEventListener("updatefound", () => {
     const worker = registration.installing;
     if (!worker) return;
     worker.addEventListener("statechange", () => {
-      if (worker.state === "installed" && navigator.serviceWorker.controller) notifyServiceWorkerUpdate();
+      if (worker.state === "installed" && navigator.serviceWorker.controller) applyServiceWorkerUpdate(worker);
     });
   });
 }
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
+  let refreshingForServiceWorker = false;
+  let hadServiceWorkerController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadServiceWorkerController) {
+      hadServiceWorkerController = true;
+      return;
+    }
+    if (refreshingForServiceWorker) return;
+    refreshingForServiceWorker = true;
+    window.location.reload();
+  });
   window.addEventListener("load", async () => {
     try {
-      const registration = await navigator.serviceWorker.register("/sw.js");
+      const registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
       watchServiceWorkerUpdate(registration);
+      await registration.update();
     } catch (error) {
       console.warn("Service worker registration failed", error);
     }

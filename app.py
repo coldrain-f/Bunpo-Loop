@@ -1620,6 +1620,8 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+        if file_path.suffix == ".webmanifest":
+            content_type = "application/manifest+json"
         data = file_path.read_bytes()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
@@ -1627,6 +1629,8 @@ class AppHandler(BaseHTTPRequestHandler):
         if is_service_worker:
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Service-Worker-Allowed", "/")
+        elif file_path.name == "index.html" or file_path.suffix in {".js", ".css", ".webmanifest"}:
+            self.send_header("Cache-Control", "no-cache, max-age=0, must-revalidate")
         self.end_headers()
         self.wfile.write(data)
 
