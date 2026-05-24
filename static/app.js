@@ -2367,7 +2367,12 @@ function renderDialog() {
   renderConfirmDialog({
     eyebrow: "중단",
     title: "회독을 포기할까요?",
-    message: "지금까지의 답변은 저장되지 않고, 현재 소그룹의 학습 설정 화면으로 돌아갑니다.",
+    message:
+      state.session?.studyMode === "weak"
+        ? state.session.returnTab === "stats"
+          ? "지금까지의 답변은 저장되지 않고, 통계 화면으로 돌아갑니다."
+          : "지금까지의 답변은 저장되지 않고, 약점 카드 목록으로 돌아갑니다."
+        : "지금까지의 답변은 저장되지 않고, 현재 소그룹의 학습 설정 화면으로 돌아갑니다.",
     confirmLabel: "포기",
     confirmAction: "confirm-quit-study",
   });
@@ -4956,6 +4961,7 @@ async function startBundleStudy() {
 function startWeakStudy() {
   const weakCards = getWeakCards();
   if (!weakCards.length) return showToast("아직 약점 카드가 없습니다.");
+  const returnTab = state.activeTab === "stats" ? "stats" : "study";
   state.session = {
     studyMode: "weak",
     group: { id: null, name: "약점 카드" },
@@ -4976,6 +4982,7 @@ function startWeakStudy() {
     results: [],
     previousRound: null,
     savedRound: null,
+    returnTab,
   };
   state.weakCardOpenId = null;
   state.weakPanelOpen = false;
@@ -5844,6 +5851,7 @@ document.addEventListener("click", async (event) => {
           state.studyStep = "ready";
         } else {
           state.studyStep = "select";
+          if (state.session.returnTab === "stats") state.activeTab = "stats";
         }
         state.session = null;
       }
