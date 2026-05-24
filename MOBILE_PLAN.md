@@ -77,9 +77,9 @@ Core mobile rules:
   - [x] 4.1 Settings Form Pass
   - [x] 4.2 Card Creation Form Pass
   - [x] 4.3 Bulk Input Pass
-- [ ] Phase 5. Dialogs & Bottom Sheets
+- [x] Phase 5. Dialogs & Bottom Sheets
   - [x] 5.1 Core Dialog Pass
-  - [ ] 5.2 Dense Picker Pass
+  - [x] 5.2 Dense Picker Pass
 - [ ] Phase 6. Mobile Performance
   - [ ] 6.1 Large List Responsiveness
   - [ ] 6.2 Loading & Network Feedback
@@ -441,10 +441,10 @@ Purpose:
 묶음 연습 소그룹 선택처럼 항목이 많은 picker가 모바일에서 부담 없이 작동하게 한다.
 
 Tasks:
-- [ ] 소그룹 체크리스트의 행 높이와 tap area를 확인한다.
-- [ ] selected count, disabled state, 기록 없음 안내가 과하게 길지 않은지 확인한다.
-- [ ] 항목이 많을 때 내부 스크롤이 안정적인지 확인한다.
-- [ ] 시작 CTA가 선택 리스트 아래에서 사라지지 않는지 확인한다.
+- [x] 소그룹 체크리스트의 행 높이와 tap area를 확인한다.
+- [x] selected count, disabled state, 기록 없음 안내가 과하게 길지 않은지 확인한다.
+- [x] 항목이 많을 때 내부 스크롤이 안정적인지 확인한다.
+- [x] 시작 CTA가 선택 리스트 아래에서 사라지지 않는지 확인한다.
 
 Files:
 - `static/app.js`
@@ -454,6 +454,12 @@ Acceptance Criteria:
 - 여러 소그룹을 선택해도 dialog가 무겁게 느껴지지 않는다.
 - 기록 없는 연습이라는 사실이 작지만 명확하게 남아 있다.
 - 시작 버튼이 선택 작업 뒤에 자연스럽게 보인다.
+
+Verification:
+- 묶음 연습 dialog를 header / 내부 scroll body / action footer 구조로 나눠 선택 개수와 시작 CTA가 항상 보이도록 했다.
+- 소그룹 row는 label 전체가 tap target이며, 카드 없는 소그룹 안내를 짧은 disabled copy와 panel note로 정리했다.
+- 많은 소그룹에서도 selection list와 dialog body가 각각 `overscroll-behavior: contain`으로 내부 scroll된다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200/title 확인을 통과했다. 인앱 브라우저 패널이 없어 실제 터치/시각 검증은 다음 브라우저 가능 시점에 다시 확인한다.
 
 ## Phase 6. Mobile Performance
 

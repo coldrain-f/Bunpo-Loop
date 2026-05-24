@@ -2631,7 +2631,7 @@ function closeDialog() {
     state.pendingAction = null;
     renderDialog();
     window.requestAnimationFrame(() => {
-      const panel = dialogRoot.querySelector(".collection-study-dialog");
+      const panel = getCollectionStudyScrollElement();
       if (!panel) return;
       const maxScrollTop = Math.max(0, panel.scrollHeight - panel.clientHeight);
       panel.scrollTop = Math.min(scrollTop, maxScrollTop);
@@ -2647,14 +2647,18 @@ function closeDialog() {
   renderDialog();
 }
 
+function getCollectionStudyScrollElement() {
+  return dialogRoot.querySelector(".collection-study-body") || dialogRoot.querySelector(".collection-study-dialog");
+}
+
 function rerenderCollectionStudyDialog({ preserveScroll = true, anchorSelector = "" } = {}) {
-  const currentPanel = dialogRoot.querySelector(".collection-study-dialog");
+  const currentPanel = getCollectionStudyScrollElement();
   const scrollTop = preserveScroll && currentPanel ? currentPanel.scrollTop : 0;
   const anchorTop = anchorSelector ? currentPanel?.querySelector(anchorSelector)?.getBoundingClientRect().top : null;
   renderDialog();
   if (!preserveScroll) return;
   window.requestAnimationFrame(() => {
-    const nextPanel = dialogRoot.querySelector(".collection-study-dialog");
+    const nextPanel = getCollectionStudyScrollElement();
     if (!nextPanel) return;
     const maxScrollTop = Math.max(0, nextPanel.scrollHeight - nextPanel.clientHeight);
     nextPanel.scrollTop = Math.min(scrollTop, maxScrollTop);
@@ -3161,6 +3165,7 @@ function renderStudySetup(selected) {
 
 function renderStudyGroupSelection(groups) {
   const selectableCount = groups.filter((group) => number(group.card_count) > 0).length;
+  const disabledCount = groups.length - selectableCount;
   if (!groups.length) {
     return `
       <section class="study-subgroup-panel">
@@ -3180,8 +3185,9 @@ function renderStudyGroupSelection(groups) {
     <section class="study-subgroup-panel">
       <div class="completion-header">
         <h3>학습할 소그룹</h3>
-        <span class="pill">${selectedCount}/${selectableCount}개</span>
+        <span class="pill">${selectedCount}/${selectableCount} 선택</span>
       </div>
+      ${disabledCount ? `<p class="study-subgroup-note">카드 없는 소그룹 ${number(disabledCount)}개는 선택에서 제외됩니다.</p>` : ""}
       <div class="button-row">
         <button class="secondary-button" type="button" data-action="select-all-study-subgroups">${iconLabel("check", "전체 선택")}</button>
         <button class="ghost-button" type="button" data-action="clear-study-subgroups">${iconLabel("x", "선택 해제")}</button>
@@ -3206,7 +3212,7 @@ function renderStudyGroupSelection(groups) {
                   <strong>${escapeHtml(group.name)}</strong>
                   <small>${
                     disabled
-                      ? "카드 없음 · 선택할 수 없음"
+                      ? "카드 없음 · 제외"
                       : `카드 ${number(group.card_count)}개 · ${escapeHtml(lastStudyText)} · 오답 ${number(group.wrong_total)}`
                   }</small>
                 </span>
@@ -3228,11 +3234,11 @@ function renderCollectionStudyDialog() {
   const selectedCardCount = getSelectedStudyCardCount();
   const canStart = selectedCardCount > 0;
   const summaryText = canStart
-    ? `${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]} · 공식 기록에 저장 안 함`
+    ? `${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]} · 공식 기록 제외`
     : "카드가 있는 소그룹을 하나 이상 선택하세요.";
   dialogRoot.innerHTML = `
     <div class="dialog-backdrop" role="presentation">
-      <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title">
+      <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title" aria-describedby="collection-study-help">
         <div class="row dialog-header">
           <div>
             <p class="eyebrow">묶음 연습</p>
@@ -3240,14 +3246,18 @@ function renderCollectionStudyDialog() {
           </div>
           <button class="ghost-button small-button" type="button" data-action="close-dialog">${iconLabel("x", "닫기")}</button>
         </div>
-        <p class="meta">선택한 소그룹의 카드만 임시로 섞어 연습합니다. 회독 기록과 통계에는 저장되지 않습니다.</p>
-        <label class="field">
-          <span>대그룹</span>
-          <select id="study-collection-select" class="select" aria-label="학습 대그룹 선택">
-            ${collectionOptions(collection.id)}
-          </select>
-        </label>
-        <section class="study-start-panel practice-summary">
+        <div class="collection-study-body">
+          <p id="collection-study-help" class="meta collection-study-note">선택한 소그룹 카드만 섞어 연습합니다. 회독 기록과 통계에는 저장되지 않습니다.</p>
+          <label class="field">
+            <span>대그룹</span>
+            <select id="study-collection-select" class="select" aria-label="학습 대그룹 선택">
+              ${collectionOptions(collection.id)}
+            </select>
+          </label>
+          ${renderStudyGroupSelection(groups)}
+          ${renderStudyOptionsPanel()}
+        </div>
+        <section class="study-start-panel practice-summary" aria-live="polite">
           <div>
             <span class="today-action-label">기록 없는 연습</span>
             <strong>${selectedGroups.length}개 소그룹 · 카드 ${selectedCardCount}개</strong>
@@ -3262,8 +3272,6 @@ function renderCollectionStudyDialog() {
             </button>
           </div>
         </section>
-        ${renderStudyGroupSelection(groups)}
-        ${renderStudyOptionsPanel()}
       </section>
     </div>
   `;
@@ -6069,7 +6077,7 @@ document.addEventListener("click", async (event) => {
       renderDialog();
     }
     if (action === "preview-bundle-cards") {
-      const pickerPanel = dialogRoot.querySelector(".collection-study-dialog");
+      const pickerPanel = getCollectionStudyScrollElement();
       state.pendingAction = {
         type: "preview-bundle-cards",
         id: state.selectedCollectionId,

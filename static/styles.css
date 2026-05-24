@@ -1707,6 +1707,14 @@ button:active,
   gap: 10px;
 }
 
+.study-subgroup-note {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 760;
+  line-height: 1.42;
+}
+
 .quick-practice-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1731,11 +1739,12 @@ button:active,
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  min-height: 56px;
+  min-height: 58px;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
+  cursor: pointer;
 }
 
 .study-subgroup-option.active {
@@ -1747,6 +1756,7 @@ button:active,
   border-style: dashed;
   background: var(--surface-strong);
   color: var(--muted);
+  cursor: not-allowed;
   opacity: 1;
 }
 
@@ -4051,10 +4061,40 @@ button:active,
 
 .collection-study-dialog {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   max-height: min(86vh, 760px);
   gap: 12px;
+  overflow: hidden;
+}
+
+.collection-study-body {
+  display: grid;
+  min-height: 0;
+  gap: 12px;
   overflow-y: auto;
+  padding-right: 4px;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.collection-study-note {
+  margin: 0;
+}
+
+.collection-study-dialog .study-subgroup-panel {
+  min-height: 0;
+}
+
+.collection-study-dialog .study-subgroup-list {
+  max-height: min(36vh, 340px);
+  overflow-y: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.collection-study-dialog .practice-summary {
+  box-shadow: 0 -10px 24px rgba(35, 47, 43, 0.08);
 }
 
 .round-detail-dialog {
