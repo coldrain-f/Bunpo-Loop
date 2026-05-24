@@ -3808,12 +3808,16 @@ button:active,
 }
 
 #settings-form .field,
-#settings-form .number-setting {
+#settings-form .number-setting,
+#card-form .field,
+#card-form .example-row,
+#card-form .duplicate-warning {
   scroll-margin-top: 16px;
   scroll-margin-bottom: calc(112px + env(safe-area-inset-bottom));
 }
 
-.settings-form-actions {
+.settings-form-actions,
+.card-form-actions {
   position: sticky;
   bottom: calc(72px + env(safe-area-inset-bottom));
   z-index: 12;
@@ -4176,6 +4180,10 @@ button:active,
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+
+  .card-location-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 380px) {
@@ -4218,7 +4226,8 @@ button:active,
     padding-left: 8px;
   }
 
-  .settings-form-actions .primary-button {
+  .settings-form-actions .primary-button,
+  .card-form-actions .primary-button {
     order: -1;
   }
 

@@ -75,7 +75,7 @@ Core mobile rules:
   - [x] 3.2 Answer Bar & Completion Flow
 - [ ] Phase 4. Mobile Forms & Keyboard
   - [x] 4.1 Settings Form Pass
-  - [ ] 4.2 Card Creation Form Pass
+  - [x] 4.2 Card Creation Form Pass
   - [ ] 4.3 Bulk Input Pass
 - [ ] Phase 5. Dialogs & Bottom Sheets
   - [ ] 5.1 Core Dialog Pass
@@ -355,10 +355,10 @@ Purpose:
 카드 한 장을 빠르게 추가하고 수정하는 흐름을 모바일에서 편하게 만든다.
 
 Tasks:
-- [ ] 대그룹/소그룹 dependent select가 모바일에서 순서대로 이해되는지 확인한다.
-- [ ] 앞면/뒷면/메모 textarea focus와 scroll 위치를 점검한다.
-- [ ] 저장 후 다음 카드 입력을 이어갈지, 목록으로 돌아갈지 흐름을 확인한다.
-- [ ] validation message가 키보드나 sticky action과 겹치지 않는지 확인한다.
+- [x] 대그룹/소그룹 dependent select가 모바일에서 순서대로 이해되는지 확인한다.
+- [x] 앞면/뒷면/메모 textarea focus와 scroll 위치를 점검한다.
+- [x] 저장 후 다음 카드 입력을 이어갈지, 목록으로 돌아갈지 흐름을 확인한다.
+- [x] validation message가 키보드나 sticky action과 겹치지 않는지 확인한다.
 
 Files:
 - `static/app.js`
@@ -368,6 +368,14 @@ Acceptance Criteria:
 - 카드 추가가 손가락 이동이 적은 반복 작업처럼 느껴진다.
 - select와 textarea 사이의 맥락이 끊기지 않는다.
 - 오류 메시지가 입력 위치 근처에서 이해된다.
+
+Verification:
+- 카드 저장 위치 select에 `card-location-grid`를 추가해 480px 이하에서 대그룹, 소그룹이 세로 순서로 읽히게 했다.
+- 새 카드 등록은 저장 후 같은 소그룹의 빈 카드 form으로 돌아가 `등록 후 계속` 흐름을 기본으로 하고, 수정 저장은 기존처럼 목록으로 돌아가게 정했다.
+- 카드 form action을 sticky bar로 처리하고, 입력 field/example/중복 경고에 scroll margin을 줘 모바일 키보드와 하단 action에 가려지지 않게 했다.
+- 중복 경고를 `role="alert"`로 두고 앞면 input에 연결해 저장 위치 근처가 아니라 앞면 입력 바로 아래에서 이해되게 했다.
+- 예문 추가 후 새 일본어 예문 textarea로 스크롤/focus되게 해 긴 form에서도 입력 위치를 놓치지 않게 했다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200/UTF-8 title 확인을 통과했다. 인앱 브라우저 패널이 없어 실제 터치/키보드 검증은 다음 브라우저 가능 시점에 다시 확인한다.
 
 ### 4.3 Bulk Input Pass
 

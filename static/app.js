@@ -1329,7 +1329,7 @@ function renderCardLocationPicker(selection, ids) {
         <strong>${escapeHtml(summary)}</strong>
         <p>대그룹을 바꾸면 선택 가능한 소그룹도 함께 바뀝니다.</p>
       </div>
-      <div class="card-filter-grid">
+      <div class="card-filter-grid card-location-grid">
         <label class="field"><span>대그룹</span><select id="${ids.collection}" class="select" name="collection_id" required>${collectionOptions(
           selection.collectionId,
         )}</select></label>
@@ -4392,14 +4392,14 @@ function renderCardForm(card, groupId) {
       ${
         groupMissingPanel ||
         `
-      <label class="field"><span>앞면</span><input class="input" name="front" value="${escapeHtml(
+      <label class="field"><span>앞면</span><input id="card-front-input" class="input" name="front" value="${escapeHtml(
         card?.front || "",
-      )}" placeholder="〜あまり" required /></label>
-      <p id="card-duplicate-warning" class="duplicate-warning" hidden></p>
-      <label class="field"><span>뒷면</span><textarea class="textarea" name="back" placeholder="~한 나머지" required>${escapeHtml(
+      )}" placeholder="〜あまり" required aria-describedby="card-duplicate-warning" autocomplete="off" enterkeyhint="next" /></label>
+      <p id="card-duplicate-warning" class="duplicate-warning" role="alert" hidden></p>
+      <label class="field"><span>뒷면</span><textarea id="card-back-textarea" class="textarea" name="back" placeholder="~한 나머지" required>${escapeHtml(
         card?.back || "",
       )}</textarea></label>
-      <label class="field"><span>메모</span><textarea class="textarea" name="memo" placeholder="접속, 뉘앙스, 헷갈리는 표현">${escapeHtml(
+      <label class="field"><span>메모</span><textarea id="card-memo-textarea" class="textarea" name="memo" placeholder="접속, 뉘앙스, 헷갈리는 표현">${escapeHtml(
         card?.memo || "",
       )}</textarea></label>
       <div class="field">
@@ -4409,9 +4409,12 @@ function renderCardForm(card, groupId) {
           .join("")}</div>
       </div>
       <button class="ghost-button full" type="button" data-action="add-example">${iconLabel("plus", "예문 추가")}</button>
-      <div class="form-actions">
-        <button class="ghost-button" type="button" data-action="show-card-list">${iconLabel("x", "취소")}</button>
-        <button class="primary-button" type="submit">${iconLabel("save", card ? "저장" : "등록")}</button>
+      <div class="form-actions card-form-actions">
+        <button class="ghost-button" type="button" data-action="show-card-list">${iconLabel(
+          card ? "x" : "list",
+          card ? "취소" : "목록 보기",
+        )}</button>
+        <button class="primary-button" type="submit">${iconLabel("save", card ? "저장" : "등록 후 계속")}</button>
       </div>
         `
       }
@@ -5384,7 +5387,6 @@ async function saveCard(form) {
     body: JSON.stringify(payload),
   });
   state.editingCardId = null;
-  state.cardScreen = "list";
   state.cardEntryMode = "single";
   state.selectedGroupId = payload.group_id;
   const targetGroup = state.groups.find((group) => Number(group.id) === Number(payload.group_id));
@@ -5393,9 +5395,16 @@ async function saveCard(form) {
   state.cardFilterGroupId = String(payload.group_id);
   resetCardListLimit();
   await loadData();
+  state.cardScreen = isEditing ? "list" : "form";
   render();
-  focusAfterRender("#cards-title");
-  showToast(isEditing ? "카드를 저장했습니다." : "카드를 등록했습니다.");
+  if (isEditing) {
+    focusAfterRender("#cards-title");
+    showToast("카드를 저장했습니다.");
+    return;
+  }
+  scrollToTop();
+  focusAfterRender("#card-form [name='front']");
+  showToast("카드를 등록했습니다. 다음 카드를 이어서 입력하세요.");
 }
 
 function previewBulkCards(form) {
@@ -6295,6 +6304,9 @@ document.addEventListener("click", async (event) => {
       const list = document.querySelector("#example-editor-list");
       const index = list.querySelectorAll(".example-row").length;
       list.insertAdjacentHTML("beforeend", renderExampleEditorRow({}, index, false));
+      const textarea = list.lastElementChild?.querySelector('[name="example_japanese"]');
+      textarea?.scrollIntoView({ behavior: "smooth", block: "center" });
+      textarea?.focus();
     }
     if (action === "toggle-example-row") {
       const row = actionEl.closest(".example-row");
