@@ -13,6 +13,7 @@
 - 주요 세션: 1-5분 단위의 회독, 약점 복습, 카드 추가/수정.
 - 주요 입력: 모바일 키보드, select picker, 터치 탭/스크롤.
 - 주요 이탈/복귀: 브라우저 뒤로가기, 홈 화면 전환, 잠금 해제, 탭 재진입.
+- 주요 브라우저: iOS Safari, Android Chrome. 주소창 show/hide, 입력 focus 확대, dynamic viewport height 차이를 고려한다.
 - 공식 기록: 소그룹 학습만 저장한다.
 - 보조 학습: 묶음 연습과 약점 복습은 공식 통계와 분리한다.
 
@@ -55,6 +56,7 @@ Core mobile rules:
 - 한 phase 안의 모든 하위 항목이 끝나면 phase도 체크한다.
 - UI 변경 전에는 `DESIGN.md`를 먼저 확인한다.
 - 모바일 UI 변경은 최소 360px, 390px viewport에서 확인한다.
+- 체크리스트는 코드만 보고 체크하지 않고, 실제 화면 또는 자동화된 viewport 검사 결과가 있을 때만 완료 처리한다.
 - 학습/기록 관련 변경은 공식 소그룹 기록과 기록 없는 연습의 분리를 다시 확인한다.
 - 각 작업 단위가 끝나면 `main`에 commit & push한다.
 
@@ -63,9 +65,11 @@ Core mobile rules:
 - [ ] Phase 1. Mobile Viewport Baseline
   - [ ] 1.1 Viewport QA Matrix
   - [ ] 1.2 Safe Area & Fixed Chrome
+  - [ ] 1.3 Mobile Browser Quirks
 - [ ] Phase 2. One-Hand Navigation
   - [ ] 2.1 Back & Return Flow
   - [ ] 2.2 Tab State & Scroll Restoration
+  - [ ] 2.3 Resume & Session Continuity
 - [ ] Phase 3. Study Session Ergonomics
   - [ ] 3.1 Card Reading & Flip Comfort
   - [ ] 3.2 Answer Bar & Completion Flow
@@ -82,6 +86,7 @@ Core mobile rules:
 - [ ] Phase 7. Touch & Accessibility
   - [ ] 7.1 Touch Target Audit
   - [ ] 7.2 Screen Reader & Focus Audit
+  - [ ] 7.3 Motion & Scroll Preferences
 - [ ] Phase 8. PWA & Offline Readiness
   - [ ] 8.1 Install Surface
   - [ ] 8.2 Offline Behavior
@@ -132,6 +137,27 @@ Acceptance Criteria:
 - toast와 하단 nav가 서로 겹치지 않는다.
 - 학습 중 정답/오답 버튼이 항상 누르기 쉬운 위치에 있다.
 
+### 1.3 Mobile Browser Quirks
+
+Purpose:
+iOS Safari와 Android Chrome의 모바일 웹 특성을 앱 품질 기준 안에 명시한다.
+
+Tasks:
+- [ ] viewport meta가 모바일 확대/축소, safe area, installed mode에 적절한지 확인한다.
+- [ ] input, select, textarea의 font-size가 iOS focus 확대를 유발하지 않는지 확인한다.
+- [ ] `100vh` 사용 여부를 점검하고, 필요한 곳은 `100dvh`/fallback 또는 layout-safe 방식으로 조정한다.
+- [ ] 주소창 show/hide 후 fixed bottom nav, dialog, active session 높이가 갑자기 튀지 않는지 확인한다.
+- [ ] pull-to-refresh, overscroll, momentum scroll이 dialog와 내부 scroll 영역에서 어색하지 않은지 확인한다.
+
+Files:
+- `static/index.html`
+- `static/styles.css`
+
+Acceptance Criteria:
+- iOS Safari에서 입력 focus 시 의도치 않은 zoom이 발생하지 않는다.
+- 주소창 높이 변화에도 하단 nav와 answer bar가 주요 콘텐츠를 가리지 않는다.
+- dialog 내부 스크롤이 페이지 전체 스크롤과 헷갈리지 않는다.
+
 ## Phase 2. One-Hand Navigation
 
 ### 2.1 Back & Return Flow
@@ -173,6 +199,27 @@ Acceptance Criteria:
 - 목록에서 항목 하나를 보고 돌아왔을 때 처음부터 다시 찾지 않아도 된다.
 - 탭 이동이 reset처럼 느껴지지 않는다.
 - 저장 직후 변경된 항목이 어디에 반영됐는지 알 수 있다.
+
+### 2.3 Resume & Session Continuity
+
+Purpose:
+모바일에서 앱을 잠깐 나갔다가 돌아왔을 때 학습 맥락과 데이터 상태가 믿을 만하게 유지되게 한다.
+
+Tasks:
+- [ ] active session 중 화면 잠금/앱 전환 후 돌아왔을 때 현재 카드와 진행률이 유지되는지 확인한다.
+- [ ] 학습 중 새로고침 또는 브라우저 재진입 시 사용자가 잃는 정보가 무엇인지 제품적으로 정한다.
+- [ ] 저장/삭제 요청 중 앱을 벗어났다가 돌아오는 경우 pending state와 toast가 어색하지 않은지 확인한다.
+- [ ] 인증 또는 사용자 상태가 만료됐을 때 모바일에서 다시 로그인하는 흐름이 막히지 않는지 확인한다.
+- [ ] 오래 머문 탭으로 돌아왔을 때 데이터 재동기화가 필요한지 판단한다.
+
+Files:
+- `static/app.js`
+- backend/session files only if behavior requires server changes
+
+Acceptance Criteria:
+- 잠깐 다른 앱을 보고 돌아와도 사용자가 현재 위치를 이해할 수 있다.
+- 저장 여부가 불확실한 상태를 만들지 않는다.
+- 세션 만료나 재연결이 학습 기록을 잘못 저장하지 않는다.
 
 ## Phase 3. Study Session Ergonomics
 
@@ -409,6 +456,26 @@ Acceptance Criteria:
 - focus ring이 보이고, focus가 예기치 않게 사라지지 않는다.
 - 설명을 숨긴 help도 접근 가능한 이름과 상태를 가진다.
 
+### 7.3 Motion & Scroll Preferences
+
+Purpose:
+모바일에서 작은 animation과 scroll 보정이 편안하게 느껴지도록 한다.
+
+Tasks:
+- [ ] `prefers-reduced-motion` 환경에서 essential action이 animation에 의존하지 않는지 확인한다.
+- [ ] smooth scroll, focus scroll, dialog transition이 과하거나 어지럽지 않은지 확인한다.
+- [ ] active session에서 card flip이나 feedback transition이 버튼 위치를 흔들지 않는지 확인한다.
+- [ ] scroll restoration 또는 focus 이동이 사용자를 갑자기 화면 밖으로 보내지 않는지 확인한다.
+
+Files:
+- `static/styles.css`
+- `static/app.js` if scroll behavior changes are needed
+
+Acceptance Criteria:
+- 모션을 줄인 환경에서도 모든 정보를 이해할 수 있다.
+- 화면 전환이 가볍고 예측 가능하다.
+- scroll/focus 보정이 사용자의 현재 작업을 방해하지 않는다.
+
 ## Phase 8. PWA & Offline Readiness
 
 ### 8.1 Install Surface
@@ -497,4 +564,3 @@ Acceptance Criteria:
 - 모바일 개선 후에도 제품의 데이터 규칙이 유지된다.
 - 핵심 화면에 horizontal overflow, 가려진 CTA, 읽기 어려운 설명이 없다.
 - `MOBILE_PLAN.md`의 모든 체크가 실제 확인 결과와 맞다.
-
