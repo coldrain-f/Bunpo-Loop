@@ -78,7 +78,7 @@ Core mobile rules:
   - [x] 4.2 Card Creation Form Pass
   - [x] 4.3 Bulk Input Pass
 - [ ] Phase 5. Dialogs & Bottom Sheets
-  - [ ] 5.1 Core Dialog Pass
+  - [x] 5.1 Core Dialog Pass
   - [ ] 5.2 Dense Picker Pass
 - [ ] Phase 6. Mobile Performance
   - [ ] 6.1 Large List Responsiveness
@@ -413,11 +413,11 @@ Purpose:
 확인, 삭제, preview, 기록 상세 dialog가 모바일 bottom sheet처럼 안정적으로 동작하게 한다.
 
 Tasks:
-- [ ] 모든 dialog의 max-height가 86vh 안에서 작동하는지 확인한다.
-- [ ] close, cancel, confirm 버튼 순서가 `DESIGN.md`와 맞는지 확인한다.
-- [ ] 삭제 confirm은 대상 이름과 영향 범위를 작은 화면에서도 명확히 보여준다.
-- [ ] dialog open/close 후 focus가 trigger로 자연스럽게 돌아오는지 확인한다.
-- [ ] backdrop tap, Escape, close button 동작을 dialog 성격별로 점검한다.
+- [x] 모든 dialog의 max-height가 86vh 안에서 작동하는지 확인한다.
+- [x] close, cancel, confirm 버튼 순서가 `DESIGN.md`와 맞는지 확인한다.
+- [x] 삭제 confirm은 대상 이름과 영향 범위를 작은 화면에서도 명확히 보여준다.
+- [x] dialog open/close 후 focus가 trigger로 자연스럽게 돌아오는지 확인한다.
+- [x] backdrop tap, Escape, close button 동작을 dialog 성격별로 점검한다.
 
 Files:
 - `static/app.js`
@@ -427,6 +427,13 @@ Acceptance Criteria:
 - dialog가 모바일에서 중앙 모달보다 bottom sheet에 가깝게 느껴진다.
 - 위험 action을 실수로 누를 가능성이 낮다.
 - dialog 내부 스크롤과 바깥 화면 스크롤이 충돌하지 않는다.
+
+Verification:
+- 모든 dialog panel에 `max-height: min(86vh, 760px)`와 내부 scroll/overscroll containment를 적용했다.
+- preview dialog는 header/action을 고정된 grid 영역에 두고 목록만 내부 scroll되도록 정리했다.
+- 삭제/초기화 confirm 문구가 대상 이름, 예문/회독 기록/정오답 누적 영향, 되돌릴 수 없음을 직접 말한다.
+- dismissible dialog는 backdrop tap과 Escape로 닫히고, confirm dialog는 backdrop/Escape에서 취소 버튼으로 focus를 돌린다.
+- `node --check static/app.js`, `git diff --check`, 로컬 HTTP 200 확인을 통과했다. 인앱 브라우저 패널이 없어 실제 터치/시각 검증은 다음 브라우저 가능 시점에 다시 확인한다.
 
 ### 5.2 Dense Picker Pass
 

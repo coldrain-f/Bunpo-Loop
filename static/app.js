@@ -2542,7 +2542,7 @@ function renderDialog() {
     renderConfirmDialog({
       eyebrow: "삭제",
       title: "카드를 삭제할까요?",
-      message: `${card.front} 카드를 삭제합니다. 예문과 기록도 함께 정리됩니다.`,
+      message: `${card.front} 카드와 연결된 예문, 이 카드의 답변 기록을 삭제합니다. 이 작업은 되돌릴 수 없습니다.`,
       confirmLabel: "삭제",
       confirmAction: "confirm-delete-card",
     });
@@ -2554,7 +2554,7 @@ function renderDialog() {
     renderConfirmDialog({
       eyebrow: "초기화",
       title: "학습기록을 초기화할까요?",
-      message: `${target.name} 소그룹의 회독 기록과 알맞음/틀림 통계를 초기화합니다. 카드와 예문은 유지됩니다.`,
+      message: `${target.name} 소그룹의 회독 기록과 카드별 알맞음/틀림 누적을 0으로 돌립니다. 카드와 예문은 유지되며, 이 작업은 되돌릴 수 없습니다.`,
       confirmLabel: "초기화",
       confirmAction: "confirm-reset-history",
     });
@@ -2566,7 +2566,7 @@ function renderDialog() {
     renderConfirmDialog({
       eyebrow: "초기화",
       title: "하위 소그룹 기록을 초기화할까요?",
-      message: `${target.name} 대그룹의 모든 소그룹 회독 기록과 카드 통계를 초기화합니다. 카드와 예문은 유지됩니다.`,
+      message: `${target.name} 대그룹의 모든 하위 소그룹 회독 기록과 카드별 알맞음/틀림 누적을 0으로 돌립니다. 카드와 예문은 유지되며, 이 작업은 되돌릴 수 없습니다.`,
       confirmLabel: "초기화",
       confirmAction: "confirm-reset-collection-history",
     });
@@ -2578,7 +2578,7 @@ function renderDialog() {
     renderConfirmDialog({
       eyebrow: "삭제",
       title: "소그룹을 삭제할까요?",
-      message: `${target.name} 소그룹과 카드 ${number(target.card_count)}개를 삭제합니다.`,
+      message: `${target.name} 소그룹과 카드 ${number(target.card_count)}개, 예문, 이 소그룹의 회독 기록을 삭제합니다. 이 작업은 되돌릴 수 없습니다.`,
       confirmLabel: "삭제",
       confirmAction: "confirm-delete-group",
     });
@@ -2590,7 +2590,7 @@ function renderDialog() {
     renderConfirmDialog({
       eyebrow: "삭제",
       title: "대그룹을 삭제할까요?",
-      message: `${target.name} 대그룹과 소그룹 ${number(target.group_count)}개, 카드 ${number(target.card_count)}개를 삭제합니다.`,
+      message: `${target.name} 대그룹과 하위 소그룹 ${number(target.group_count)}개, 카드 ${number(target.card_count)}개, 예문, 하위 회독 기록을 삭제합니다. 이 작업은 되돌릴 수 없습니다.`,
       confirmLabel: "삭제",
       confirmAction: "confirm-delete-collection",
     });
@@ -5769,8 +5769,15 @@ async function openRoundDetail(roundId) {
 }
 
 document.addEventListener("click", async (event) => {
-  closeHelpDisclosures(event.target.closest?.("summary")?.closest("details.help-disclosure") || null);
-  const tabButton = event.target.closest("[data-tab]");
+  const clickTarget = event.target instanceof Element ? event.target : null;
+  closeHelpDisclosures(clickTarget?.closest("summary")?.closest("details.help-disclosure") || null);
+  if (clickTarget?.classList.contains("dialog-backdrop")) {
+    if (state.pendingRequest) return;
+    if (canDismissActiveDialogWithEscape()) closeDialog();
+    else dialogRoot.querySelector('[data-action="close-dialog"]')?.focus({ preventScroll: true });
+    return;
+  }
+  const tabButton = clickTarget?.closest("[data-tab]");
   if (tabButton) {
     const nextTab = tabButton.dataset.tab;
     if (state.session && !state.session.savedRound && nextTab !== "study") {
@@ -5797,7 +5804,7 @@ document.addEventListener("click", async (event) => {
     }
     return;
   }
-  const actionEl = event.target.closest("[data-action]");
+  const actionEl = clickTarget?.closest("[data-action]");
   if (!actionEl) return;
   const action = actionEl.dataset.action;
   try {
