@@ -4267,7 +4267,7 @@ function renderCardEditorPanel(editing, formGroupId) {
           "목록 보기",
         )}</button>
       </div>
-      ${renderOrientationNote(["카드 관리", editing ? "카드 수정" : "카드 등록"], formPath)}
+      ${renderOrientationNote(["카드 관리", editing ? "카드 수정" : "카드 등록"], formPath, { exposeNote: true })}
       ${
         editing
           ? `<p class="meta">수정한 내용은 저장 후 카드 목록에서 다시 확인할 수 있어요.</p>`
