@@ -1426,8 +1426,15 @@ h3 {
 }
 
 .search-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.search-input-wrap {
   position: relative;
-  display: block;
+  min-width: 0;
 }
 
 .card-filter-grid {
@@ -1493,16 +1500,23 @@ h3 {
   line-height: 1.4;
 }
 
-.search-field .input {
+.search-input-wrap .input {
+  width: 100%;
   padding-right: 52px;
   padding-left: 42px;
 }
 
-.search-field .input::-webkit-search-cancel-button,
-.search-field .input::-webkit-search-decoration {
+.search-input-wrap .input::-webkit-search-cancel-button,
+.search-input-wrap .input::-webkit-search-decoration {
   -webkit-appearance: none;
   appearance: none;
   display: none;
+}
+
+.search-submit {
+  min-width: 74px;
+  height: 44px;
+  padding: 0 12px;
 }
 
 .search-icon {

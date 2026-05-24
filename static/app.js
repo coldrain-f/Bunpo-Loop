@@ -29,6 +29,16 @@ const EXAMPLE_DISPLAY_DESCRIPTIONS = {
   expanded: "카드 뒷면에서 예문을 처음부터 모두 보여줍니다.",
 };
 
+const EXAMPLE_ORDER_LABELS = {
+  sequence: "예문 순차",
+  random: "예문 랜덤",
+};
+
+const EXAMPLE_ORDER_DESCRIPTIONS = {
+  sequence: "등록한 예문 순서대로 봅니다.",
+  random: "세션을 시작할 때 카드별 예문 순서를 섞습니다.",
+};
+
 const STUDY_GROUP_SORT_LABELS = {
   recent: "최근순",
   wrong: "오답순",
@@ -93,15 +103,7 @@ const GROUP_LIST_PAGE_SIZE = 60;
 const STATS_COLLECTION_LIST_PAGE_SIZE = 40;
 const ROUND_DETAIL_SECTION_PAGE_SIZE = 60;
 const BULK_PREVIEW_RENDER_LIMIT = 80;
-const SEARCH_RENDER_DELAY_MS = 120;
 const CARD_SEARCH_TEXT_CACHE = new WeakMap();
-const SEARCH_INPUT_IDS = new Set([
-  "card-search",
-  "study-collection-search",
-  "study-group-search",
-  "collection-search",
-  "group-search",
-]);
 
 const state = {
   activeTab: "study",
@@ -155,6 +157,7 @@ const state = {
   statsCollectionListLimit: STATS_COLLECTION_LIST_PAGE_SIZE,
   orderMode: "sequence",
   exampleDisplayMode: "collapsed",
+  exampleOrderMode: "sequence",
   studyStep: "select",
   studyOptionsOpen: false,
   weakPanelOpen: false,
@@ -190,7 +193,6 @@ let studyTimerId = null;
 let renderedDialogName = null;
 let dialogReturnFocusEl = null;
 let shouldFocusDialogOnRender = false;
-let deferredSearchRenderId = null;
 let historyInitialized = false;
 let lastHistoryRouteKey = "";
 let isApplyingHistoryRoute = false;
@@ -835,6 +837,26 @@ function getCardSearchText(card) {
   return text;
 }
 
+function shuffleItems(items) {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
+function prepareStudyCards(cards, exampleOrderMode = state.exampleOrderMode) {
+  const shouldShuffleExamples = exampleOrderMode === "random";
+  return cards.map((card) => {
+    const examples = Array.isArray(card.examples) ? card.examples.map((example) => ({ ...example })) : [];
+    return {
+      ...card,
+      examples: shouldShuffleExamples ? shuffleItems(examples) : examples,
+    };
+  });
+}
+
 function cardMatchesQuery(card, needle) {
   return !needle || getCardSearchText(card).includes(needle);
 }
@@ -956,19 +978,22 @@ function buildBulkPreview(groupId, text) {
 
 function renderSearchInput({ id, value, placeholder }) {
   return `
-    <div class="search-field">
-      <span class="search-icon" aria-hidden="true">${icon("search")}</span>
-      <input id="${id}" class="input" type="search" value="${escapeHtml(value)}" placeholder="${escapeHtml(
-        placeholder,
-      )}" aria-label="${escapeHtml(placeholder)}" autocomplete="off" />
-      ${
-        value
-          ? `<button class="search-clear" type="button" data-action="clear-search" data-target="${id}" aria-label="${escapeHtml(
-              placeholder,
-            )} 지우기">${icon("x")}</button>`
-          : ""
-      }
-    </div>
+    <form class="search-field" data-search-target="${id}">
+      <div class="search-input-wrap">
+        <span class="search-icon" aria-hidden="true">${icon("search")}</span>
+        <input id="${id}" class="input" type="search" value="${escapeHtml(value)}" placeholder="${escapeHtml(
+          placeholder,
+        )}" aria-label="${escapeHtml(placeholder)}" autocomplete="off" />
+        ${
+          value
+            ? `<button class="search-clear" type="button" data-action="clear-search" data-target="${id}" aria-label="${escapeHtml(
+                placeholder,
+              )} 지우기">${icon("x")}</button>`
+            : ""
+        }
+      </div>
+      <button class="secondary-button search-submit" type="submit">${iconLabel("search", "검색")}</button>
+    </form>
   `;
 }
 
@@ -1211,22 +1236,36 @@ function resetStatsCollectionListLimit() {
   state.statsCollectionListLimit = STATS_COLLECTION_LIST_PAGE_SIZE;
 }
 
-function cancelSearchRender() {
-  window.clearTimeout(deferredSearchRenderId);
-  deferredSearchRenderId = null;
-}
-
-function scheduleSearchRender(renderTask, inputId) {
-  cancelSearchRender();
-  deferredSearchRenderId = window.setTimeout(() => {
-    deferredSearchRenderId = null;
-    renderTask();
-    refocusInput(inputId);
-  }, SEARCH_RENDER_DELAY_MS);
-}
-
-function isSearchInputTarget(target) {
-  return target instanceof HTMLInputElement && SEARCH_INPUT_IDS.has(target.id);
+function applySearchInput(target) {
+  const input = document.getElementById(target);
+  const query = input instanceof HTMLInputElement ? input.value : "";
+  if (target === "card-search") {
+    state.cardSearchQuery = query;
+    resetCardListLimit();
+    renderCards();
+    focusAfterRender("#card-search");
+  }
+  if (target === "study-collection-search") {
+    state.studyCollectionSearchQuery = query;
+    renderStudy();
+    focusAfterRender("#study-collection-search");
+  }
+  if (target === "study-group-search") {
+    state.studyGroupSearchQuery = query;
+    renderStudy();
+    focusAfterRender("#study-group-search");
+  }
+  if (target === "collection-search") {
+    state.collectionSearchQuery = query;
+    renderGroups();
+    focusAfterRender("#collection-search");
+  }
+  if (target === "group-search") {
+    state.groupSearchQuery = query;
+    resetGroupListLimit();
+    renderGroups();
+    focusAfterRender("#group-search");
+  }
 }
 
 function renderOrientationNote(parts, note, { exposeNote = false } = {}) {
@@ -2633,6 +2672,8 @@ function renderDialog() {
       eyebrow: "시작",
       title: `${number(selectedGroup.completed_rounds) + 1}회독을 시작할까요?`,
       message: `${selectedGroup.name} · 카드 ${number(selectedGroup.card_count)}개 · ${ORDER_LABELS[state.orderMode]} · ${
+        EXAMPLE_ORDER_LABELS[state.exampleOrderMode]
+      } · ${
         EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]
       }`,
       confirmLabel: "시작",
@@ -2646,7 +2687,9 @@ function renderDialog() {
     renderConfirmDialog({
       eyebrow: "복습",
       title: `약점 카드 ${weakCards.length}개를 복습할까요?`,
-      message: `최근 ${getWeakRecentRounds()}회독에서 ${getWeakRecentWrongThreshold()}회 이상, 또는 전체 ${getWeakCardThreshold()}회 이상 오답이 난 카드를 봅니다.`,
+      message: `최근 ${getWeakRecentRounds()}회독에서 ${getWeakRecentWrongThreshold()}회 이상, 또는 전체 ${getWeakCardThreshold()}회 이상 오답이 난 카드를 봅니다. ${EXAMPLE_ORDER_LABELS[state.exampleOrderMode]} · ${
+        EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]
+      }`,
       confirmLabel: "시작",
       confirmAction: "confirm-start-weak-study",
       tone: "primary",
@@ -2989,7 +3032,7 @@ function renderStudyGroupPicker() {
           <p class="eyebrow">학습</p>
           <h2 id="study-title">오늘의 학습</h2>
         </div>
-        <span class="pill">${state.collections.length}대그룹</span>
+        <span class="pill">대그룹 ${number(state.collections.length)}개</span>
       </div>
       <p class="meta">전체 ${totalCards}개의 카드 · 오늘은 먼저 이어서 회독할 소그룹을 고릅니다.</p>
       ${renderTodayStudyPanel(recentGroup, weakCards)}
@@ -3446,7 +3489,9 @@ function renderCollectionStudyDialog() {
   const selectedCardCount = getSelectedStudyCardCount();
   const canStart = selectedCardCount > 0;
   const summaryText = canStart
-    ? `${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]} · 공식 기록 제외`
+    ? `${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_ORDER_LABELS[state.exampleOrderMode]} · ${
+        EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]
+      } · 공식 기록 제외`
     : "카드가 있는 소그룹을 하나 이상 선택하세요.";
   dialogRoot.innerHTML = `
     <div class="dialog-backdrop" role="presentation">
@@ -3505,6 +3550,8 @@ function renderStudyStartPanel(group) {
         <span class="today-action-label">다음 회독</span>
         <strong>${nextRoundNo}회독 시작</strong>
         <p>카드 ${cardCount}개 · ${ORDER_LABELS[state.orderMode]} · ${
+          EXAMPLE_ORDER_LABELS[state.exampleOrderMode]
+        } · ${
           EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]
         }</p>
       </div>
@@ -3531,6 +3578,11 @@ function renderStudyStartPanel(group) {
 }
 
 function renderStudyOptionsPanel() {
+  const summary = [
+    ORDER_LABELS[state.orderMode],
+    EXAMPLE_ORDER_LABELS[state.exampleOrderMode],
+    EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode],
+  ].join(" · ");
   return `
     <section class="study-options-panel">
       <button class="study-options-toggle" type="button" data-action="toggle-study-options" aria-expanded="${
@@ -3538,7 +3590,7 @@ function renderStudyOptionsPanel() {
       }">
         <span>
           <strong>학습 옵션</strong>
-          <small>${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]}</small>
+          <small>${summary}</small>
         </span>
         <em aria-hidden="true">${icon(state.studyOptionsOpen ? "chevron-up" : "chevron-down")}</em>
       </button>
@@ -3546,6 +3598,7 @@ function renderStudyOptionsPanel() {
         state.studyOptionsOpen
           ? `<div class="study-options-body">
               ${renderOrderOptions()}
+              ${renderExampleOrderOptions()}
               ${renderExampleDisplayOptions()}
             </div>`
           : ""
@@ -3599,6 +3652,31 @@ function renderOrderOptions() {
               }">
                 <span>${label}</span>
                 <small>${ORDER_DESCRIPTIONS[mode]}</small>
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderExampleOrderOptions() {
+  return `
+    <section class="study-option-block">
+      <div class="completion-header">
+        <h3>예문 순서</h3>
+        <span class="pill">${EXAMPLE_ORDER_LABELS[state.exampleOrderMode]}</span>
+      </div>
+      <div class="order-options two" role="group" aria-label="예문 순서">
+        ${Object.entries(EXAMPLE_ORDER_LABELS)
+          .map(
+            ([mode, label]) => `
+              <button class="order-option ${state.exampleOrderMode === mode ? "active" : ""}" type="button" data-action="set-example-order" data-example-order="${mode}" aria-pressed="${
+                state.exampleOrderMode === mode ? "true" : "false"
+              }">
+                <span>${label}</span>
+                <small>${EXAMPLE_ORDER_DESCRIPTIONS[mode]}</small>
               </button>
             `,
           )
@@ -4888,7 +4966,11 @@ function renderCollectionEditorPanel(editing) {
           <h2 id="groups-title">${editing ? "대그룹 수정" : "대그룹 만들기"}</h2>
         </div>
       </div>
-      ${renderOrientationNote(["묶음", "대그룹 목록", editing ? "대그룹 수정" : "대그룹 만들기"], "대그룹은 소그룹을 담는 상위 구조입니다.")}
+      ${renderOrientationNote(
+        ["묶음", "대그룹 목록", editing ? "대그룹 수정" : "대그룹 만들기"],
+        "대그룹은 소그룹을 담는 상위 구조입니다.",
+        { exposeNote: true },
+      )}
       <form id="collection-form" class="stack">
         <label class="field"><span>대그룹명</span><input class="input" name="name" value="${escapeHtml(
           editing?.name || "",
@@ -5412,6 +5494,7 @@ async function startStudy() {
   if (!group) return showToast("학습할 소그룹을 선택하세요.");
   const data = await request(`/api/study?group_id=${group.id}&order=${state.orderMode}`);
   if (!data.cards.length) return showToast("이 소그룹에는 카드가 없습니다.");
+  const cards = prepareStudyCards(data.cards);
   state.session = {
     studyMode: "group",
     group: data.group,
@@ -5420,8 +5503,9 @@ async function startStudy() {
     roundNo: data.round_no,
     orderMode: data.order_mode,
     exampleDisplayMode: state.exampleDisplayMode,
-    allCards: data.cards,
-    cards: data.cards,
+    exampleOrderMode: state.exampleOrderMode,
+    allCards: cards,
+    cards,
     index: 0,
     passNo: 1,
     passResults: [],
@@ -5449,6 +5533,7 @@ async function startBundleStudy() {
     `/api/study?collection_id=${collection.id}&group_ids=${encodeURIComponent(groupIds)}&order=${state.orderMode}`,
   );
   if (!data.cards.length) return showToast("선택한 소그룹에 카드가 없습니다.");
+  const cards = prepareStudyCards(data.cards);
   state.session = {
     studyMode: "practice",
     group: { id: null, name: `${data.collection.name} 묶음 연습` },
@@ -5457,9 +5542,10 @@ async function startBundleStudy() {
     roundNo: data.round_no,
     orderMode: data.order_mode,
     exampleDisplayMode: state.exampleDisplayMode,
+    exampleOrderMode: state.exampleOrderMode,
     returnContext: state.collectionStudyReturnContext,
-    allCards: data.cards,
-    cards: data.cards,
+    allCards: cards,
+    cards,
     index: 0,
     passNo: 1,
     passResults: [],
@@ -5486,14 +5572,16 @@ function startWeakStudy() {
   const weakCards = getWeakCards();
   if (!weakCards.length) return showToast("아직 약점 카드가 없습니다.");
   const returnTab = state.activeTab === "stats" ? "stats" : "study";
+  const cards = prepareStudyCards(weakCards);
   state.session = {
     studyMode: "weak",
     group: { id: null, name: "약점 카드" },
     roundNo: null,
     orderMode: "wrong",
     exampleDisplayMode: state.exampleDisplayMode,
-    allCards: weakCards,
-    cards: weakCards,
+    exampleOrderMode: state.exampleOrderMode,
+    allCards: cards,
+    cards,
     index: 0,
     passNo: 1,
     passResults: [],
@@ -5896,6 +5984,7 @@ function logout() {
     studyGroupSearchQuery: "",
     collectionSearchQuery: "",
     studyGroupSortMode: "recent",
+    exampleOrderMode: "sequence",
     groupSearchQuery: "",
     cardListLimit: CARD_LIST_PAGE_SIZE,
     groupListLimit: GROUP_LIST_PAGE_SIZE,
@@ -6295,6 +6384,14 @@ document.addEventListener("click", async (event) => {
           })
         : render();
     }
+    if (action === "set-example-order") {
+      state.exampleOrderMode = actionEl.dataset.exampleOrder;
+      state.activeDialog === "collection-study-picker"
+        ? rerenderCollectionStudyDialog({
+            anchorSelector: `[data-action="set-example-order"][data-example-order="${actionEl.dataset.exampleOrder}"]`,
+          })
+        : render();
+    }
     if (action === "toggle-study-options") {
       state.studyOptionsOpen = !state.studyOptionsOpen;
       renderStudyPickerUpdate('[data-action="toggle-study-options"]');
@@ -6568,7 +6665,6 @@ document.addEventListener("click", async (event) => {
       const target = actionEl.dataset.target;
       const input = document.getElementById(target);
       if (input instanceof HTMLInputElement) input.value = "";
-      cancelSearchRender();
       if (target === "card-search") {
         state.cardSearchQuery = "";
         resetCardListLimit();
@@ -6813,7 +6909,6 @@ document.addEventListener("change", async (event) => {
 });
 
 function updateSearchInput(event) {
-  if (isSearchInputTarget(event.target) && !event.target.isConnected) return;
   if (event.target.closest("#card-form") && event.target.name === "front") {
     updateSingleDuplicateWarning(event.target.closest("#card-form"));
   }
@@ -6828,28 +6923,6 @@ function updateSearchInput(event) {
     refocusInput("backup-json");
   } else if (event.target.closest("#backup-import-form") && event.target.name === "backup_json") {
     state.backupDraftText = event.target.value;
-  }
-  if (event.target.id === "card-search") {
-    state.cardSearchQuery = event.target.value;
-    resetCardListLimit();
-    scheduleSearchRender(renderCards, "card-search");
-  }
-  if (event.target.id === "study-collection-search") {
-    state.studyCollectionSearchQuery = event.target.value;
-    scheduleSearchRender(renderStudy, "study-collection-search");
-  }
-  if (event.target.id === "study-group-search") {
-    state.studyGroupSearchQuery = event.target.value;
-    scheduleSearchRender(renderStudy, "study-group-search");
-  }
-  if (event.target.id === "collection-search") {
-    state.collectionSearchQuery = event.target.value;
-    scheduleSearchRender(renderGroups, "collection-search");
-  }
-  if (event.target.id === "group-search") {
-    state.groupSearchQuery = event.target.value;
-    resetGroupListLimit();
-    scheduleSearchRender(renderGroups, "group-search");
   }
 }
 
@@ -6866,6 +6939,10 @@ document.addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target;
   try {
+    if (form.classList.contains("search-field")) {
+      applySearchInput(form.dataset.searchTarget);
+      return;
+    }
     if (form.id === "login-form") await login(form);
     if (form.id === "card-form") await runFormRequest(form, "저장 중", () => saveCard(form));
     if (form.id === "bulk-card-form") previewBulkCards(form);
