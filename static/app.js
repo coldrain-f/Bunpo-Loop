@@ -82,7 +82,6 @@ const COMPLETION_MASCOTS = [
   { id: "shield", ...KOKKO_MASCOTS.shield },
 ];
 
-const JLPT_LEVELS = ["N1", "N2", "N3", "N4", "N5"];
 const DEFAULT_WEAK_CARD_THRESHOLD = 16;
 const DEFAULT_WEAK_RECENT_ROUNDS = 3;
 const DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8;
@@ -108,7 +107,6 @@ const state = {
   settings: {
     target_name: "",
     jlpt_exam_date: "",
-    jlpt_level: "",
     weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
     weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
     weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
@@ -522,7 +520,6 @@ async function loadData() {
   state.settings = {
     target_name: "",
     jlpt_exam_date: "",
-    jlpt_level: "",
     weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
     weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
     weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
@@ -625,14 +622,13 @@ function getExamDateInfo() {
 
 function getTargetLabel() {
   const customName = String(state.settings?.target_name || "").trim();
-  if (customName) return customName;
-  return state.settings?.jlpt_level ? `JLPT ${state.settings.jlpt_level}` : "목표";
+  return customName || "목표";
 }
 
 function renderHeader() {
   const examInfo = getExamDateInfo();
   const ddayMarkup =
-    state.user && (state.settings?.target_name || state.settings?.jlpt_level || examInfo)
+    state.user && (state.settings?.target_name || examInfo)
       ? `<strong class="dday-badge">${escapeHtml(getTargetLabel())}${
           examInfo ? ` ${escapeHtml(examInfo.label)}` : ""
         }</strong>`
@@ -2279,7 +2275,7 @@ function renderDialog() {
     renderConfirmDialog({
       eyebrow: "초기화",
       title: "학습 목표를 초기화할까요?",
-      message: "목표 이름, 선택 급수, 목표일을 모두 미정으로 돌립니다.",
+      message: "현재 학습 목표 정보를 모두 미정으로 돌립니다.",
       confirmLabel: "초기화",
       confirmAction: "confirm-clear-exam-date",
     });
@@ -4667,7 +4663,7 @@ function renderSettings() {
   const examInfo = getExamDateInfo();
   const targetLabel = getTargetLabel();
   const targetDateLabel = targetLabel === "목표" ? "목표일" : `${targetLabel} 목표일`;
-  const hasTargetSettings = Boolean(state.settings?.target_name || state.settings?.jlpt_exam_date || state.settings?.jlpt_level);
+  const hasTargetSettings = Boolean(state.settings?.target_name || state.settings?.jlpt_exam_date);
   const examDateMessage = examInfo
     ? examInfo.diffDays > 0
       ? `${escapeHtml(examInfo.dateLabel)}까지 ${number(examInfo.diffDays)}일 남았습니다.`
@@ -4696,7 +4692,6 @@ function renderSettings() {
             <p class="form-hint">목표 이름과 목표일은 선택 사항입니다. 일본어가 아니라도 시험명, 프로젝트명, 단어장 이름처럼 자유롭게 적을 수 있습니다.</p>
           </div>
           ${renderTargetNameField()}
-          ${renderLevelOptions()}
           ${renderExamDateSelects()}
         </section>
         ${renderWeakThresholdSetting()}
@@ -4706,7 +4701,7 @@ function renderSettings() {
           }>${iconLabel("rotate-ccw", "초기화")}</button>
           <button class="primary-button" type="submit">${iconLabel("save", "저장")}</button>
         </div>
-        ${hasTargetSettings ? "" : renderDisabledReason("초기화할 목표 이름, 목표일, JLPT 급수가 아직 없습니다.")}
+        ${hasTargetSettings ? "" : renderDisabledReason("초기화할 학습 목표가 아직 없습니다.")}
       </form>
     </div>
     ${renderPrivacyPanel()}
@@ -4759,28 +4754,6 @@ function renderWeakThresholdSetting() {
       </div>
       <p class="form-hint">약점 복습에서 틀린 횟수는 이 기준 계산에 넣지 않습니다.</p>
     </section>
-  `;
-}
-
-function renderLevelOptions() {
-  const currentLevel = state.settings?.jlpt_level || "";
-  return `
-    <div class="field">
-      <span>JLPT 급수 (선택)</span>
-      <p class="form-hint">JLPT 목표가 아닐 때는 미정으로 두면 됩니다.</p>
-      <div class="level-options" role="radiogroup" aria-label="JLPT 급수 선택">
-        ${["", ...JLPT_LEVELS]
-          .map(
-            (level) => `
-              <label class="level-option">
-                <input type="radio" name="jlpt_level" value="${level}" ${currentLevel === level ? "checked" : ""} />
-                <span>${level || "미정"}</span>
-              </label>
-            `,
-          )
-          .join("")}
-      </div>
-    </div>
   `;
 }
 
@@ -5296,7 +5269,6 @@ async function login(form) {
 async function saveSettings(form) {
   const examDate = getExamDateFromSettingsForm(form);
   const targetName = form.elements.target_name.value.trim();
-  const jlptLevel = form.elements.jlpt_level.value;
   const weakCardThreshold = Number(form.elements.weak_card_threshold.value);
   const weakRecentRounds = Number(form.elements.weak_recent_rounds.value);
   const weakRecentWrongThreshold = Number(form.elements.weak_recent_wrong_threshold.value);
@@ -5309,7 +5281,6 @@ async function saveSettings(form) {
     body: JSON.stringify({
       target_name: targetName,
       jlpt_exam_date: examDate,
-      jlpt_level: jlptLevel,
       weak_card_threshold: weakCardThreshold,
       weak_recent_rounds: weakRecentRounds,
       weak_recent_wrong_threshold: weakRecentWrongThreshold,
@@ -5324,7 +5295,7 @@ async function saveSettings(form) {
 async function clearExamDate() {
   const data = await request("/api/settings", {
     method: "PATCH",
-    body: JSON.stringify({ target_name: "", jlpt_exam_date: "", jlpt_level: "" }),
+    body: JSON.stringify({ target_name: "", jlpt_exam_date: "" }),
   });
   state.settings = data.settings;
   state.activeDialog = null;
@@ -5360,7 +5331,6 @@ function logout() {
     settings: {
       target_name: "",
       jlpt_exam_date: "",
-      jlpt_level: "",
       weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
       weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
       weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
