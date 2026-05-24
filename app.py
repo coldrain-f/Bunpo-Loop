@@ -1988,18 +1988,6 @@ class AppHandler(BaseHTTPRequestHandler):
         if len(valid_ids) != len(unique_card_ids):
             raise ValueError("존재하지 않는 카드가 포함되어 있습니다.")
 
-        for card_id, value in cleaned:
-            column = "correct_count" if value == "correct" else "wrong_count"
-            conn.execute(
-                f"""
-                UPDATE cards
-                SET {column} = {column} + 1,
-                    updated_at = {utc_now_sql()}
-                WHERE id = ?
-                """,
-                (card_id,),
-            )
-
         completed_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         correct_count = sum(1 for _, value in cleaned if value == "correct")
         self.send_json(
