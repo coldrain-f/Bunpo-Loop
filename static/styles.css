@@ -2442,34 +2442,16 @@ button:active,
   min-height: 106px;
   overflow: hidden;
   padding: 0;
-  border-color: var(--line-strong);
 }
 
-.group-choice::before {
+.group-choice.active::before {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 3px;
-  background: var(--line-strong);
-  content: "";
-  transition: background 140ms ease;
-}
-
-.group-choice:hover,
-.group-choice:focus-within {
-  border-color: rgba(23, 111, 102, 0.34);
-  box-shadow: 0 10px 24px rgba(35, 47, 43, 0.09);
-}
-
-.group-choice:hover::before,
-.group-choice:focus-within::before,
-.group-choice.active::before {
-  background: var(--teal);
-}
-
-.group-choice.active::before {
   width: 4px;
+  background: var(--teal);
+  content: "";
 }
 
 .group-choice.empty {
@@ -2477,19 +2459,13 @@ button:active,
 }
 
 .group-choice-main {
-  display: grid;
+  display: block;
   width: 100%;
-  padding: 14px 86px 14px 16px;
+  padding: 14px 86px 14px 14px;
   border-radius: 8px;
   background: transparent;
   color: var(--ink);
   text-align: left;
-  transition: background 140ms ease;
-}
-
-.group-choice-main:hover,
-.group-choice-main:focus-visible {
-  background: rgba(232, 243, 239, 0.42);
 }
 
 .group-choice-main:focus-visible,
@@ -2520,46 +2496,6 @@ button:active,
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 800;
-}
-
-.subgroup-choice-footer {
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-
-.group-choice-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: 32px;
-  margin-left: auto;
-  padding: 0 9px 0 10px;
-  border: 1px solid rgba(23, 111, 102, 0.2);
-  border-radius: 8px;
-  background: var(--teal-soft);
-  color: var(--teal);
-  font-size: 0.76rem;
-  font-weight: 900;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.group-choice-action .icon {
-  width: 15px;
-  height: 15px;
-}
-
-.group-choice-main:hover .group-choice-action,
-.group-choice-main:focus-visible .group-choice-action {
-  border-color: rgba(23, 111, 102, 0.28);
-  background: var(--surface);
-}
-
-.group-choice.active .group-choice-action {
-  border-color: var(--teal);
-  background: var(--teal);
-  color: white;
 }
 
 .group-status-strip {
