@@ -34,8 +34,8 @@
 
 - 회독을 반복하며 "이 카드는 이제 잠시 안 봐도 된다"를 표시할 방법이 없다.
 - 쉬운 카드를 삭제하면 기록과 콘텐츠가 사라지므로 안전한 제외 상태가 필요하다.
-- 현재 컨트롤러 입력은 `A = 뒤집기/알맞음`, `B = 틀림`으로 고정되어 있다.
-- 사용자가 컨디션이나 손 위치에 따라 A/B 동작을 바꾸고 싶을 수 있다.
+- 현재 컨트롤러 입력은 `A = 뒤집기/알맞음`, `B = 틀림`, `X/Y = 사용 안 함` 기본값을 가진다.
+- 사용자가 컨디션이나 손 위치에 따라 A/B/X/Y 동작을 바꾸고 싶을 수 있다.
 - 컨트롤러 입력 상태는 보이지만, 매핑을 확인하거나 바꾸는 설정은 없다.
 
 ## Progress Tracker
@@ -69,11 +69,13 @@
 ### 1.1 Settings Data Model
 
 Purpose:
-사용자별로 A/B 입력의 학습 동작을 저장한다.
+사용자별로 A/B/X/Y 입력의 학습 동작을 저장한다.
 
 Default mapping:
 - A: `primary`
 - B: `wrong`
+- X: `disabled`
+- Y: `disabled`
 
 Action meanings:
 - `primary`: 앞면에서는 뒤집기, 뒷면에서는 알맞음
@@ -81,8 +83,8 @@ Action meanings:
 - `disabled`: 사용 안 함
 
 Tasks:
-- [x] 사용자 설정에 `controller_a_action`, `controller_b_action`을 추가한다.
-- [x] 기존 사용자에게는 기본값 `A = primary`, `B = wrong`을 적용한다.
+- [x] 사용자 설정에 `controller_a_action`, `controller_b_action`, `controller_x_action`, `controller_y_action`을 추가한다.
+- [x] 기존 사용자에게는 기본값 `A = primary`, `B = wrong`, `X/Y = disabled`를 적용한다.
 - [x] 설정 저장/조회 API와 client state에 값을 연결한다.
 - [x] 설정이 없거나 잘못된 값이면 기본 매핑으로 보정한다.
 
@@ -98,12 +100,14 @@ Acceptance Criteria:
 ### 1.2 Settings UI
 
 Purpose:
-설정 화면에서 A/B 동작을 짧고 명확하게 바꿀 수 있게 한다.
+설정 화면에서 A/B/X/Y 동작을 짧고 명확하게 바꿀 수 있게 한다.
 
 Tasks:
 - [x] 설정 화면에 "컨트롤러" 섹션을 추가한다.
 - [x] A 버튼 동작 select를 제공한다.
 - [x] B 버튼 동작 select를 제공한다.
+- [x] X 버튼 동작 select를 제공한다.
+- [x] Y 버튼 동작 select를 제공한다.
 - [x] 선택지는 `뒤집기/알맞음`, `틀림`, `사용 안 함`으로 둔다.
 - [x] "기본값으로 되돌리기" action을 제공한다.
 - [x] 설정 설명은 길게 쓰지 않고, 필요한 경우 inline help로 숨긴다.
@@ -116,17 +120,19 @@ Files:
 Acceptance Criteria:
 - 360px 모바일 폭에서 select와 버튼 텍스트가 넘치지 않는다.
 - 기본값이 현재 동작과 같아서 기존 사용자가 다시 배울 필요가 없다.
-- A와 B를 서로 바꾸는 설정이 가능하다.
+- A, B, X, Y에 원하는 동작을 지정할 수 있다.
 
 ### 1.3 Study Input Integration
 
 Purpose:
-키보드 A/B와 Gamepad A/B가 같은 매핑 테이블을 통해 학습 동작을 실행하게 한다.
+키보드 A/B/X/Y와 Gamepad A/B/X/Y가 같은 매핑 테이블을 통해 학습 동작을 실행하게 한다.
 
 Tasks:
 - [x] `handleStudyControllerAction` 앞에 raw input을 logical action으로 변환하는 helper를 둔다.
 - [x] keyboard `a`와 gamepad button 0/15는 A 매핑을 따른다.
 - [x] keyboard `b`와 gamepad button 1/14는 B 매핑을 따른다.
+- [x] keyboard `x`와 gamepad button 2는 X 매핑을 따른다.
+- [x] keyboard `y`와 gamepad button 3은 Y 매핑을 따른다.
 - [x] `disabled`인 입력은 아무 동작도 하지 않는다.
 - [x] 현재 250ms 쿨다운과 controller status pill은 유지한다.
 - [x] status pill은 실제 실행된 동작 이름을 보여준다.
@@ -136,7 +142,7 @@ Files:
 
 Acceptance Criteria:
 - 기본 설정에서 현재와 동일하게 A는 뒤집기/알맞음, B는 틀림이다.
-- A와 B를 뒤바꾸면 A가 틀림, B가 뒤집기/알맞음으로 동작한다.
+- A/B/X/Y 중 어느 버튼이든 뒤집기/알맞음, 틀림, 사용 안 함으로 설정할 수 있다.
 - 뒷면이 아닌 상태에서 `wrong` 입력은 카드를 넘기지 않는다.
 
 ### 1.4 Controller Mapping QA
@@ -147,6 +153,7 @@ Purpose:
 Tasks:
 - [ ] 기본 매핑으로 A/B 동작을 확인한다.
 - [ ] A/B 뒤바꿈 매핑으로 동작을 확인한다.
+- [ ] X/Y 매핑으로 동작을 확인한다.
 - [ ] 한쪽 버튼을 `사용 안 함`으로 두고 입력 무시를 확인한다.
 - [ ] PWA 캐시 갱신 뒤 설정이 반영되는지 확인한다.
 

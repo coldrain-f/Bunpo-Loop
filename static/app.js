@@ -100,10 +100,18 @@ const DEFAULT_WEAK_RECENT_ROUNDS = 3;
 const DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8;
 const DEFAULT_CONTROLLER_A_ACTION = "primary";
 const DEFAULT_CONTROLLER_B_ACTION = "wrong";
+const DEFAULT_CONTROLLER_X_ACTION = "disabled";
+const DEFAULT_CONTROLLER_Y_ACTION = "disabled";
 const CONTROLLER_ACTION_LABELS = {
   primary: "뒤집기/알맞음",
   wrong: "틀림",
   disabled: "사용 안 함",
+};
+const CONTROLLER_BUTTON_LABELS = {
+  a: "A 버튼",
+  b: "B 버튼",
+  x: "X 버튼",
+  y: "Y 버튼",
 };
 const CARD_LIST_PAGE_SIZE = 80;
 const GROUP_LIST_PAGE_SIZE = 60;
@@ -113,6 +121,8 @@ const BULK_PREVIEW_RENDER_LIMIT = 80;
 const CSV_IMPORT_ACCEPT = "text/csv,.csv";
 const STUDY_GAMEPAD_A_BUTTONS = new Set([0, 15]);
 const STUDY_GAMEPAD_B_BUTTONS = new Set([1, 14]);
+const STUDY_GAMEPAD_X_BUTTONS = new Set([2]);
+const STUDY_GAMEPAD_Y_BUTTONS = new Set([3]);
 const STUDY_CONTROLLER_COOLDOWN_MS = 250;
 const STUDY_CONTROLLER_STATUS_FLASH_MS = 1200;
 const CARD_SEARCH_TEXT_CACHE = new WeakMap();
@@ -141,6 +151,8 @@ const state = {
     weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
     controller_a_action: DEFAULT_CONTROLLER_A_ACTION,
     controller_b_action: DEFAULT_CONTROLLER_B_ACTION,
+    controller_x_action: DEFAULT_CONTROLLER_X_ACTION,
+    controller_y_action: DEFAULT_CONTROLLER_Y_ACTION,
   },
   selectedCollectionId: null,
   selectedStudyGroupIds: [],
@@ -725,6 +737,8 @@ async function loadData() {
     weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
     controller_a_action: DEFAULT_CONTROLLER_A_ACTION,
     controller_b_action: DEFAULT_CONTROLLER_B_ACTION,
+    controller_x_action: DEFAULT_CONTROLLER_X_ACTION,
+    controller_y_action: DEFAULT_CONTROLLER_Y_ACTION,
     ...(settingsData.settings || {}),
   };
   reconcileLoadedState();
@@ -2500,6 +2514,12 @@ function getControllerInputAction(inputName) {
   if (inputName === "b") {
     return normalizeControllerAction(state.settings?.controller_b_action, DEFAULT_CONTROLLER_B_ACTION);
   }
+  if (inputName === "x") {
+    return normalizeControllerAction(state.settings?.controller_x_action, DEFAULT_CONTROLLER_X_ACTION);
+  }
+  if (inputName === "y") {
+    return normalizeControllerAction(state.settings?.controller_y_action, DEFAULT_CONTROLLER_Y_ACTION);
+  }
   return "disabled";
 }
 
@@ -2629,6 +2649,14 @@ function handleStudyControllerText(value) {
     void handleStudyControllerInput("b").catch(showRequestError);
     return true;
   }
+  if (text.includes("x")) {
+    void handleStudyControllerInput("x").catch(showRequestError);
+    return true;
+  }
+  if (text.includes("y")) {
+    void handleStudyControllerInput("y").catch(showRequestError);
+    return true;
+  }
   return false;
 }
 
@@ -2661,6 +2689,12 @@ function pollStudyGamepads() {
       } else if (STUDY_GAMEPAD_B_BUTTONS.has(index)) {
         handled = true;
         void handleStudyControllerInput("b").catch(showRequestError);
+      } else if (STUDY_GAMEPAD_X_BUTTONS.has(index)) {
+        handled = true;
+        void handleStudyControllerInput("x").catch(showRequestError);
+      } else if (STUDY_GAMEPAD_Y_BUTTONS.has(index)) {
+        handled = true;
+        void handleStudyControllerInput("y").catch(showRequestError);
       }
     });
   }
@@ -5649,22 +5683,22 @@ function renderControllerActionOptions(selected) {
     .join("");
 }
 
+function renderControllerMappingField(inputName) {
+  const label = CONTROLLER_BUTTON_LABELS[inputName] || inputName.toUpperCase();
+  return `<label class="field"><span class="field-label">${escapeHtml(label)}</span><select class="select" name="controller_${inputName}_action" aria-label="${escapeHtml(
+    `${label} 동작`,
+  )}">${renderControllerActionOptions(getControllerInputAction(inputName))}</select></label>`;
+}
+
 function renderControllerMappingSetting() {
-  const aAction = getControllerInputAction("a");
-  const bAction = getControllerInputAction("b");
   return `
     <section class="settings-subsection">
       ${renderSectionHeading(
         "컨트롤러",
-        "8BitDo Micro처럼 A/B 입력이 잡히는 컨트롤러의 학습 동작을 바꿉니다. 기본값은 A가 뒤집기/알맞음, B가 틀림입니다.",
+        "8BitDo Micro처럼 A/B/X/Y 입력이 잡히는 컨트롤러의 학습 동작을 바꿉니다. 기본값은 A가 뒤집기/알맞음, B가 틀림입니다.",
       )}
       <div class="controller-mapping-grid">
-        <label class="field"><span class="field-label">A 버튼</span><select class="select" name="controller_a_action" aria-label="A 버튼 동작">${renderControllerActionOptions(
-          aAction,
-        )}</select></label>
-        <label class="field"><span class="field-label">B 버튼</span><select class="select" name="controller_b_action" aria-label="B 버튼 동작">${renderControllerActionOptions(
-          bAction,
-        )}</select></label>
+        ${["a", "b", "x", "y"].map(renderControllerMappingField).join("")}
       </div>
       <button class="ghost-button full" type="button" data-action="reset-controller-mapping">${iconLabel(
         "rotate-ccw",
@@ -6223,11 +6257,13 @@ async function saveSettings(form) {
   const weakRecentWrongThreshold = Number(form.elements.weak_recent_wrong_threshold.value);
   const controllerAAction = normalizeControllerAction(form.elements.controller_a_action.value, "");
   const controllerBAction = normalizeControllerAction(form.elements.controller_b_action.value, "");
+  const controllerXAction = normalizeControllerAction(form.elements.controller_x_action.value, "");
+  const controllerYAction = normalizeControllerAction(form.elements.controller_y_action.value, "");
   const weakValues = [weakCardThreshold, weakRecentRounds, weakRecentWrongThreshold];
   if (weakValues.some((value) => !Number.isInteger(value) || value < 1 || value > 20)) {
     throw new Error("약점 카드 기준은 1~20 사이로 입력하세요.");
   }
-  if (!controllerAAction || !controllerBAction) {
+  if (!controllerAAction || !controllerBAction || !controllerXAction || !controllerYAction) {
     throw new Error("컨트롤러 동작 설정을 다시 선택하세요.");
   }
   const data = await request("/api/settings", {
@@ -6240,6 +6276,8 @@ async function saveSettings(form) {
       weak_recent_wrong_threshold: weakRecentWrongThreshold,
       controller_a_action: controllerAAction,
       controller_b_action: controllerBAction,
+      controller_x_action: controllerXAction,
+      controller_y_action: controllerYAction,
     }),
   });
   state.settings = data.settings;
@@ -6264,6 +6302,8 @@ function resetControllerMappingForm() {
   if (!(form instanceof HTMLFormElement)) return;
   form.elements.controller_a_action.value = DEFAULT_CONTROLLER_A_ACTION;
   form.elements.controller_b_action.value = DEFAULT_CONTROLLER_B_ACTION;
+  form.elements.controller_x_action.value = DEFAULT_CONTROLLER_X_ACTION;
+  form.elements.controller_y_action.value = DEFAULT_CONTROLLER_Y_ACTION;
   showToast("컨트롤러 기본값으로 바꿨어요. 저장을 누르면 적용됩니다.");
 }
 
@@ -6300,6 +6340,8 @@ function logout() {
       weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
       controller_a_action: DEFAULT_CONTROLLER_A_ACTION,
       controller_b_action: DEFAULT_CONTROLLER_B_ACTION,
+      controller_x_action: DEFAULT_CONTROLLER_X_ACTION,
+      controller_y_action: DEFAULT_CONTROLLER_Y_ACTION,
     },
     selectedCollectionId: null,
     selectedStudyGroupIds: [],
@@ -7376,16 +7418,20 @@ document.addEventListener("keydown", async (event) => {
   if (!isStudyControllerInput && isTypingTarget(target)) return;
   if (!state.session || state.session.savedRound) return;
   const studyKey = String(event.key || "").toLowerCase();
-  if (studyKey === "a" || event.key === "ArrowRight") {
+  const controllerInput =
+    studyKey === "a" || event.key === "ArrowRight"
+      ? "a"
+      : studyKey === "b" || event.key === "ArrowLeft"
+        ? "b"
+        : studyKey === "x"
+          ? "x"
+          : studyKey === "y"
+            ? "y"
+            : "";
+  if (controllerInput) {
     event.preventDefault();
     if (event.repeat) return;
-    await handleStudyControllerAction("primary");
-    return;
-  }
-  if (studyKey === "b" || event.key === "ArrowLeft") {
-    event.preventDefault();
-    if (event.repeat) return;
-    await handleStudyControllerAction("wrong");
+    await handleStudyControllerInput(controllerInput);
     return;
   }
   if (event.key === " " || event.key === "Enter") {

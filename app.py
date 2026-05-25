@@ -35,6 +35,8 @@ DEFAULT_WEAK_RECENT_ROUNDS = 3
 DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8
 DEFAULT_CONTROLLER_A_ACTION = "primary"
 DEFAULT_CONTROLLER_B_ACTION = "wrong"
+DEFAULT_CONTROLLER_X_ACTION = "disabled"
+DEFAULT_CONTROLLER_Y_ACTION = "disabled"
 CONTROLLER_ACTIONS = ("primary", "wrong", "disabled")
 BACKUP_VERSION = 2
 CSV_FRONT_HEADERS = ("front", "앞면", "카드앞면", "표현", "문법", "질문")
@@ -54,6 +56,8 @@ CREATE TABLE IF NOT EXISTS users (
     weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 8,
     controller_a_action TEXT NOT NULL DEFAULT 'primary',
     controller_b_action TEXT NOT NULL DEFAULT 'wrong',
+    controller_x_action TEXT NOT NULL DEFAULT 'disabled',
+    controller_y_action TEXT NOT NULL DEFAULT 'disabled',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -206,6 +210,10 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN controller_a_action TEXT NOT NULL DEFAULT 'primary'")
     if "controller_b_action" not in user_columns:
         conn.execute("ALTER TABLE users ADD COLUMN controller_b_action TEXT NOT NULL DEFAULT 'wrong'")
+    if "controller_x_action" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN controller_x_action TEXT NOT NULL DEFAULT 'disabled'")
+    if "controller_y_action" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN controller_y_action TEXT NOT NULL DEFAULT 'disabled'")
     conn.execute(
         """
         UPDATE users
@@ -221,6 +229,22 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         WHERE controller_b_action NOT IN (?, ?, ?)
         """,
         (DEFAULT_CONTROLLER_B_ACTION, *CONTROLLER_ACTIONS),
+    )
+    conn.execute(
+        """
+        UPDATE users
+        SET controller_x_action = ?
+        WHERE controller_x_action NOT IN (?, ?, ?)
+        """,
+        (DEFAULT_CONTROLLER_X_ACTION, *CONTROLLER_ACTIONS),
+    )
+    conn.execute(
+        """
+        UPDATE users
+        SET controller_y_action = ?
+        WHERE controller_y_action NOT IN (?, ?, ?)
+        """,
+        (DEFAULT_CONTROLLER_Y_ACTION, *CONTROLLER_ACTIONS),
     )
     conn.execute(
         """
@@ -251,9 +275,11 @@ def ensure_default_users(conn: sqlite3.Connection) -> None:
                 weak_recent_rounds,
                 weak_recent_wrong_threshold,
                 controller_a_action,
-                controller_b_action
+                controller_b_action,
+                controller_x_action,
+                controller_y_action
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(nickname) DO UPDATE SET
                 access_code = excluded.access_code
             """,
@@ -265,6 +291,8 @@ def ensure_default_users(conn: sqlite3.Connection) -> None:
                 DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
                 DEFAULT_CONTROLLER_A_ACTION,
                 DEFAULT_CONTROLLER_B_ACTION,
+                DEFAULT_CONTROLLER_X_ACTION,
+                DEFAULT_CONTROLLER_Y_ACTION,
             ),
         )
 
@@ -2112,9 +2140,11 @@ class AppHandler(BaseHTTPRequestHandler):
                     weak_recent_rounds,
                     weak_recent_wrong_threshold,
                     controller_a_action,
-                    controller_b_action
+                    controller_b_action,
+                    controller_x_action,
+                    controller_y_action
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     nickname,
@@ -2124,6 +2154,8 @@ class AppHandler(BaseHTTPRequestHandler):
                     DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
                     DEFAULT_CONTROLLER_A_ACTION,
                     DEFAULT_CONTROLLER_B_ACTION,
+                    DEFAULT_CONTROLLER_X_ACTION,
+                    DEFAULT_CONTROLLER_Y_ACTION,
                 ),
             )
             user = conn.execute(
@@ -2207,6 +2239,14 @@ class AppHandler(BaseHTTPRequestHandler):
                 user["controller_b_action"],
                 DEFAULT_CONTROLLER_B_ACTION,
             ),
+            "controller_x_action": normalize_controller_action(
+                user["controller_x_action"],
+                DEFAULT_CONTROLLER_X_ACTION,
+            ),
+            "controller_y_action": normalize_controller_action(
+                user["controller_y_action"],
+                DEFAULT_CONTROLLER_Y_ACTION,
+            ),
         }
 
     def update_settings(self, conn: sqlite3.Connection, user: sqlite3.Row) -> None:
@@ -2246,6 +2286,16 @@ class AppHandler(BaseHTTPRequestHandler):
             if "controller_b_action" in body
             else normalize_controller_action(user["controller_b_action"], DEFAULT_CONTROLLER_B_ACTION)
         )
+        controller_x_action = (
+            validate_controller_action(body.get("controller_x_action"))
+            if "controller_x_action" in body
+            else normalize_controller_action(user["controller_x_action"], DEFAULT_CONTROLLER_X_ACTION)
+        )
+        controller_y_action = (
+            validate_controller_action(body.get("controller_y_action"))
+            if "controller_y_action" in body
+            else normalize_controller_action(user["controller_y_action"], DEFAULT_CONTROLLER_Y_ACTION)
+        )
         conn.execute(
             """
             UPDATE users
@@ -2255,7 +2305,9 @@ class AppHandler(BaseHTTPRequestHandler):
                 weak_recent_rounds = ?,
                 weak_recent_wrong_threshold = ?,
                 controller_a_action = ?,
-                controller_b_action = ?
+                controller_b_action = ?,
+                controller_x_action = ?,
+                controller_y_action = ?
             WHERE id = ?
             """,
             (
@@ -2266,6 +2318,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 weak_recent_wrong_threshold,
                 controller_a_action,
                 controller_b_action,
+                controller_x_action,
+                controller_y_action,
                 user["id"],
             ),
         )
