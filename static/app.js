@@ -3600,7 +3600,6 @@ function renderStudyGroupChoiceItem(group) {
         <div class="item-title">
           <strong>${escapeHtml(group.name)}</strong>
         </div>
-        <p class="meta">${escapeHtml(group.collection_name)} · ${escapeHtml(group.description || "설명 없음")}</p>
         ${renderGroupStatusPills(group, { showRounds: true })}
         ${renderGroupMetricRow(group)}
         <p class="meta">${escapeHtml(lastStudyText)} · 누적 정답 ${number(group.correct_total)} · 누적 오답 ${number(group.wrong_total)}</p>
