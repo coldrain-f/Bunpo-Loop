@@ -43,6 +43,7 @@ CSV_FRONT_HEADERS = ("front", "앞면", "카드앞면", "표현", "문법", "질
 CSV_BACK_HEADERS = ("back", "뒷면", "뜻", "의미", "해석", "답")
 CSV_MEMO_HEADERS = ("memo", "메모", "note", "notes", "비고")
 CSV_EXAMPLES_HEADERS = ("examples", "예문", "예문목록", "example", "exampletext")
+CSV_STUDY_EXCLUDED_HEADERS = ("study_excluded", "학습제외", "학습 제외", "제외", "exclude", "excluded")
 
 USER_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -663,9 +664,9 @@ def normalize_bool(value: object, default: bool = False) -> int:
     if isinstance(value, (int, float)):
         return 1 if value else 0
     text = str(value).strip().lower()
-    if text in ("1", "true", "yes", "y", "on"):
+    if text in ("1", "true", "yes", "y", "on", "o", "예", "네", "학습제외", "제외"):
         return 1
-    if text in ("0", "false", "no", "n", "off", ""):
+    if text in ("0", "false", "no", "n", "off", "x", "아니오", "아니요", "학습포함", "포함", ""):
         return 0
     return 1 if default else 0
 
@@ -1646,6 +1647,7 @@ def parse_cards_csv(text: object) -> list[dict]:
                 "front": front,
                 "back": back,
                 "memo": csv_row_value(row, CSV_MEMO_HEADERS),
+                "study_excluded": normalize_bool(csv_row_value(row, CSV_STUDY_EXCLUDED_HEADERS), False),
                 "examples": parse_csv_examples(row),
             }
         )
@@ -1659,7 +1661,7 @@ def parse_cards_csv(text: object) -> list[dict]:
 def group_cards_csv_text(cards: list[dict]) -> str:
     max_examples = max([len(card.get("examples") or []) for card in cards], default=0)
     example_slots = max(1, max_examples)
-    fieldnames = ["앞면", "뒷면", "메모"]
+    fieldnames = ["앞면", "뒷면", "메모", "학습제외"]
     for index in range(1, example_slots + 1):
         fieldnames.extend([f"예문{index}", f"예문{index}_해석"])
 
@@ -1671,6 +1673,7 @@ def group_cards_csv_text(cards: list[dict]) -> str:
             "앞면": card.get("front", ""),
             "뒷면": card.get("back", ""),
             "메모": card.get("memo", ""),
+            "학습제외": "예" if normalize_bool(card.get("study_excluded"), False) else "아니오",
         }
         for index, example in enumerate(card.get("examples") or [], start=1):
             row[f"예문{index}"] = example.get("japanese", "")
@@ -2507,10 +2510,10 @@ class AppHandler(BaseHTTPRequestHandler):
         for item in items:
             cur = conn.execute(
                 """
-                INSERT INTO cards (group_id, front, back, memo)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO cards (group_id, front, back, memo, study_excluded)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (group_id, item["front"], item["back"], item["memo"]),
+                (group_id, item["front"], item["back"], item["memo"], item["study_excluded"]),
             )
             card_id = int(cur.lastrowid)
             created_ids.append(card_id)

@@ -53,7 +53,7 @@
   - [x] 2.3 Study Flow Filtering
   - [x] 2.4 Exclusion State Copy
 - [ ] Phase 3. Import, Export & Backup Compatibility
-  - [ ] 3.1 CSV Round Trip
+  - [x] 3.1 CSV Round Trip
   - [ ] 3.2 Backup/Restore Contract
   - [ ] 3.3 Migration Defaults
 - [ ] Phase 4. Review & Stats Policy
@@ -263,10 +263,10 @@ Purpose:
 소그룹 CSV로 카드 운영을 할 때 제외 상태가 사라지지 않게 한다.
 
 Tasks:
-- [ ] CSV export에 `학습제외` 컬럼을 추가한다.
-- [ ] CSV import에서 `학습제외` 컬럼이 있으면 읽는다.
-- [ ] 기존 CSV처럼 컬럼이 없으면 기본값 `false`로 처리한다.
-- [ ] 허용 값은 `TRUE/FALSE`, `1/0`, `예/아니오`, `Y/N` 중 필요한 범위를 정한다.
+- [x] CSV export에 `학습제외` 컬럼을 추가한다.
+- [x] CSV import에서 `학습제외` 컬럼이 있으면 읽는다.
+- [x] 기존 CSV처럼 컬럼이 없으면 기본값 `false`로 처리한다.
+- [x] 허용 값은 `TRUE/FALSE`, `1/0`, `예/아니오`, `Y/N` 중 필요한 범위를 정한다.
 
 Files:
 - `app.py`

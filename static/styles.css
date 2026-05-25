@@ -2235,6 +2235,10 @@ button:active,
   min-height: 44px;
 }
 
+.card-item .card-actions .danger-button {
+  grid-column: 1 / -1;
+}
+
 .round-item-button {
   display: block;
   width: 100%;
