@@ -98,14 +98,21 @@ const COMPLETION_MASCOTS = [
 const DEFAULT_WEAK_CARD_THRESHOLD = 16;
 const DEFAULT_WEAK_RECENT_ROUNDS = 3;
 const DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8;
+const DEFAULT_CONTROLLER_A_ACTION = "primary";
+const DEFAULT_CONTROLLER_B_ACTION = "wrong";
+const CONTROLLER_ACTION_LABELS = {
+  primary: "뒤집기/알맞음",
+  wrong: "틀림",
+  disabled: "사용 안 함",
+};
 const CARD_LIST_PAGE_SIZE = 80;
 const GROUP_LIST_PAGE_SIZE = 60;
 const STATS_COLLECTION_LIST_PAGE_SIZE = 40;
 const ROUND_DETAIL_SECTION_PAGE_SIZE = 60;
 const BULK_PREVIEW_RENDER_LIMIT = 80;
 const CSV_IMPORT_ACCEPT = "text/csv,.csv";
-const STUDY_GAMEPAD_PRIMARY_BUTTONS = new Set([0, 15]);
-const STUDY_GAMEPAD_WRONG_BUTTONS = new Set([1, 14]);
+const STUDY_GAMEPAD_A_BUTTONS = new Set([0, 15]);
+const STUDY_GAMEPAD_B_BUTTONS = new Set([1, 14]);
 const STUDY_CONTROLLER_COOLDOWN_MS = 250;
 const STUDY_CONTROLLER_STATUS_FLASH_MS = 1200;
 const CARD_SEARCH_TEXT_CACHE = new WeakMap();
@@ -132,6 +139,8 @@ const state = {
     weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
     weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
     weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+    controller_a_action: DEFAULT_CONTROLLER_A_ACTION,
+    controller_b_action: DEFAULT_CONTROLLER_B_ACTION,
   },
   selectedCollectionId: null,
   selectedStudyGroupIds: [],
@@ -714,6 +723,8 @@ async function loadData() {
     weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
     weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
     weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+    controller_a_action: DEFAULT_CONTROLLER_A_ACTION,
+    controller_b_action: DEFAULT_CONTROLLER_B_ACTION,
     ...(settingsData.settings || {}),
   };
   reconcileLoadedState();
@@ -2478,6 +2489,20 @@ function updateStudyTimer() {
   if (timerEl) timerEl.textContent = formatDuration(elapsedSeconds(state.session));
 }
 
+function normalizeControllerAction(action, fallback = "disabled") {
+  return CONTROLLER_ACTION_LABELS[action] ? action : fallback;
+}
+
+function getControllerInputAction(inputName) {
+  if (inputName === "a") {
+    return normalizeControllerAction(state.settings?.controller_a_action, DEFAULT_CONTROLLER_A_ACTION);
+  }
+  if (inputName === "b") {
+    return normalizeControllerAction(state.settings?.controller_b_action, DEFAULT_CONTROLLER_B_ACTION);
+  }
+  return "disabled";
+}
+
 function hasRecentStudyControllerInput(now = Date.now()) {
   return Boolean(
     studyControllerLastInputLabel &&
@@ -2573,6 +2598,12 @@ async function handleStudyControllerAction(action) {
   return false;
 }
 
+async function handleStudyControllerInput(inputName) {
+  const action = getControllerInputAction(inputName);
+  if (action === "disabled") return false;
+  return handleStudyControllerAction(action);
+}
+
 function focusStudyControllerInput() {
   const input = document.getElementById("study-controller-input");
   if (!(input instanceof HTMLElement)) return;
@@ -2591,11 +2622,11 @@ function handleStudyControllerText(value) {
   const text = String(value || "").toLowerCase();
   if (!text) return false;
   if (text.includes("a")) {
-    void handleStudyControllerAction("primary").catch(showRequestError);
+    void handleStudyControllerInput("a").catch(showRequestError);
     return true;
   }
   if (text.includes("b")) {
-    void handleStudyControllerAction("wrong").catch(showRequestError);
+    void handleStudyControllerInput("b").catch(showRequestError);
     return true;
   }
   return false;
@@ -2624,12 +2655,12 @@ function pollStudyGamepads() {
       }
       if (studyGamepadPressedButtons.has(key) || handled) return;
       studyGamepadPressedButtons.add(key);
-      if (STUDY_GAMEPAD_PRIMARY_BUTTONS.has(index)) {
+      if (STUDY_GAMEPAD_A_BUTTONS.has(index)) {
         handled = true;
-        void handleStudyControllerAction("primary").catch(showRequestError);
-      } else if (STUDY_GAMEPAD_WRONG_BUTTONS.has(index)) {
+        void handleStudyControllerInput("a").catch(showRequestError);
+      } else if (STUDY_GAMEPAD_B_BUTTONS.has(index)) {
         handled = true;
-        void handleStudyControllerAction("wrong").catch(showRequestError);
+        void handleStudyControllerInput("b").catch(showRequestError);
       }
     });
   }
@@ -5548,6 +5579,7 @@ function renderSettings() {
           ${renderExamDateSelects()}
         </section>
         ${renderWeakThresholdSetting()}
+        ${renderControllerMappingSetting()}
         <div class="form-actions settings-form-actions">
           <button class="ghost-button" type="button" data-action="clear-exam-date" ${
             hasTargetSettings ? "" : `disabled aria-describedby="${getDisabledReasonId(clearTargetDisabledReason)}"`
@@ -5604,6 +5636,40 @@ function renderWeakThresholdSetting() {
           <span>회 이상</span>
         </label>
       </div>
+    </section>
+  `;
+}
+
+function renderControllerActionOptions(selected) {
+  const normalized = normalizeControllerAction(selected);
+  return Object.entries(CONTROLLER_ACTION_LABELS)
+    .map(
+      ([value, label]) => `<option value="${value}" ${value === normalized ? "selected" : ""}>${label}</option>`,
+    )
+    .join("");
+}
+
+function renderControllerMappingSetting() {
+  const aAction = getControllerInputAction("a");
+  const bAction = getControllerInputAction("b");
+  return `
+    <section class="settings-subsection">
+      ${renderSectionHeading(
+        "컨트롤러",
+        "8BitDo Micro처럼 A/B 입력이 잡히는 컨트롤러의 학습 동작을 바꿉니다. 기본값은 A가 뒤집기/알맞음, B가 틀림입니다.",
+      )}
+      <div class="controller-mapping-grid">
+        <label class="field"><span class="field-label">A 버튼</span><select class="select" name="controller_a_action" aria-label="A 버튼 동작">${renderControllerActionOptions(
+          aAction,
+        )}</select></label>
+        <label class="field"><span class="field-label">B 버튼</span><select class="select" name="controller_b_action" aria-label="B 버튼 동작">${renderControllerActionOptions(
+          bAction,
+        )}</select></label>
+      </div>
+      <button class="ghost-button full" type="button" data-action="reset-controller-mapping">${iconLabel(
+        "rotate-ccw",
+        "기본값으로",
+      )}</button>
     </section>
   `;
 }
@@ -6155,9 +6221,14 @@ async function saveSettings(form) {
   const weakCardThreshold = Number(form.elements.weak_card_threshold.value);
   const weakRecentRounds = Number(form.elements.weak_recent_rounds.value);
   const weakRecentWrongThreshold = Number(form.elements.weak_recent_wrong_threshold.value);
+  const controllerAAction = normalizeControllerAction(form.elements.controller_a_action.value, "");
+  const controllerBAction = normalizeControllerAction(form.elements.controller_b_action.value, "");
   const weakValues = [weakCardThreshold, weakRecentRounds, weakRecentWrongThreshold];
   if (weakValues.some((value) => !Number.isInteger(value) || value < 1 || value > 20)) {
     throw new Error("약점 카드 기준은 1~20 사이로 입력하세요.");
+  }
+  if (!controllerAAction || !controllerBAction) {
+    throw new Error("컨트롤러 동작 설정을 다시 선택하세요.");
   }
   const data = await request("/api/settings", {
     method: "PATCH",
@@ -6167,6 +6238,8 @@ async function saveSettings(form) {
       weak_card_threshold: weakCardThreshold,
       weak_recent_rounds: weakRecentRounds,
       weak_recent_wrong_threshold: weakRecentWrongThreshold,
+      controller_a_action: controllerAAction,
+      controller_b_action: controllerBAction,
     }),
   });
   state.settings = data.settings;
@@ -6184,6 +6257,14 @@ async function clearExamDate() {
   state.activeDialog = null;
   render();
   showToast("학습 목표를 미정으로 초기화했습니다.");
+}
+
+function resetControllerMappingForm() {
+  const form = document.getElementById("settings-form");
+  if (!(form instanceof HTMLFormElement)) return;
+  form.elements.controller_a_action.value = DEFAULT_CONTROLLER_A_ACTION;
+  form.elements.controller_b_action.value = DEFAULT_CONTROLLER_B_ACTION;
+  showToast("컨트롤러 기본값으로 바꿨어요. 저장을 누르면 적용됩니다.");
 }
 
 function getExamDateFromSettingsForm(form) {
@@ -6217,6 +6298,8 @@ function logout() {
       weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
       weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
       weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+      controller_a_action: DEFAULT_CONTROLLER_A_ACTION,
+      controller_b_action: DEFAULT_CONTROLLER_B_ACTION,
     },
     selectedCollectionId: null,
     selectedStudyGroupIds: [],
@@ -6906,6 +6989,7 @@ document.addEventListener("click", async (event) => {
       renderDialog();
     }
     if (action === "confirm-clear-exam-date") await clearExamDate();
+    if (action === "reset-controller-mapping") resetControllerMappingForm();
     if (action === "open-group-form") {
       saveScrollPosition(state.groupDetailCollectionId ? `groups:detail:${state.groupDetailCollectionId}` : "groups:collections");
       state.editingGroupId = null;

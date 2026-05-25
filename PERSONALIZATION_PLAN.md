@@ -43,9 +43,9 @@
 완료한 작업은 `[ ]`를 `[x]`로 바꾼다. 한 phase 안의 모든 하위 항목이 끝나면 phase도 체크한다.
 
 - [ ] Phase 1. Controller Action Mapping
-  - [ ] 1.1 Settings Data Model
-  - [ ] 1.2 Settings UI
-  - [ ] 1.3 Study Input Integration
+  - [x] 1.1 Settings Data Model
+  - [x] 1.2 Settings UI
+  - [x] 1.3 Study Input Integration
   - [ ] 1.4 Controller Mapping QA
 - [ ] Phase 2. Card Study Exclusion
   - [ ] 2.1 Database & API
@@ -81,10 +81,10 @@ Action meanings:
 - `disabled`: 사용 안 함
 
 Tasks:
-- [ ] 사용자 설정에 `controller_a_action`, `controller_b_action`을 추가한다.
-- [ ] 기존 사용자에게는 기본값 `A = primary`, `B = wrong`을 적용한다.
-- [ ] 설정 저장/조회 API와 client state에 값을 연결한다.
-- [ ] 설정이 없거나 잘못된 값이면 기본 매핑으로 보정한다.
+- [x] 사용자 설정에 `controller_a_action`, `controller_b_action`을 추가한다.
+- [x] 기존 사용자에게는 기본값 `A = primary`, `B = wrong`을 적용한다.
+- [x] 설정 저장/조회 API와 client state에 값을 연결한다.
+- [x] 설정이 없거나 잘못된 값이면 기본 매핑으로 보정한다.
 
 Files:
 - `app.py`
@@ -101,12 +101,12 @@ Purpose:
 설정 화면에서 A/B 동작을 짧고 명확하게 바꿀 수 있게 한다.
 
 Tasks:
-- [ ] 설정 화면에 "컨트롤러" 섹션을 추가한다.
-- [ ] A 버튼 동작 select를 제공한다.
-- [ ] B 버튼 동작 select를 제공한다.
-- [ ] 선택지는 `뒤집기/알맞음`, `틀림`, `사용 안 함`으로 둔다.
-- [ ] "기본값으로 되돌리기" action을 제공한다.
-- [ ] 설정 설명은 길게 쓰지 않고, 필요한 경우 inline help로 숨긴다.
+- [x] 설정 화면에 "컨트롤러" 섹션을 추가한다.
+- [x] A 버튼 동작 select를 제공한다.
+- [x] B 버튼 동작 select를 제공한다.
+- [x] 선택지는 `뒤집기/알맞음`, `틀림`, `사용 안 함`으로 둔다.
+- [x] "기본값으로 되돌리기" action을 제공한다.
+- [x] 설정 설명은 길게 쓰지 않고, 필요한 경우 inline help로 숨긴다.
 
 Files:
 - `static/app.js`
@@ -124,12 +124,12 @@ Purpose:
 키보드 A/B와 Gamepad A/B가 같은 매핑 테이블을 통해 학습 동작을 실행하게 한다.
 
 Tasks:
-- [ ] `handleStudyControllerAction` 앞에 raw input을 logical action으로 변환하는 helper를 둔다.
-- [ ] keyboard `a`와 gamepad button 0/15는 A 매핑을 따른다.
-- [ ] keyboard `b`와 gamepad button 1/14는 B 매핑을 따른다.
-- [ ] `disabled`인 입력은 아무 동작도 하지 않는다.
-- [ ] 현재 250ms 쿨다운과 controller status pill은 유지한다.
-- [ ] status pill은 실제 실행된 동작 이름을 보여준다.
+- [x] `handleStudyControllerAction` 앞에 raw input을 logical action으로 변환하는 helper를 둔다.
+- [x] keyboard `a`와 gamepad button 0/15는 A 매핑을 따른다.
+- [x] keyboard `b`와 gamepad button 1/14는 B 매핑을 따른다.
+- [x] `disabled`인 입력은 아무 동작도 하지 않는다.
+- [x] 현재 250ms 쿨다운과 controller status pill은 유지한다.
+- [x] status pill은 실제 실행된 동작 이름을 보여준다.
 
 Files:
 - `static/app.js`

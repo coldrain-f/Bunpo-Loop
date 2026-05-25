@@ -33,6 +33,9 @@ DEFAULT_USER_CODES = {nickname: access_code for nickname, access_code in DEFAULT
 DEFAULT_WEAK_CARD_THRESHOLD = 16
 DEFAULT_WEAK_RECENT_ROUNDS = 3
 DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8
+DEFAULT_CONTROLLER_A_ACTION = "primary"
+DEFAULT_CONTROLLER_B_ACTION = "wrong"
+CONTROLLER_ACTIONS = ("primary", "wrong", "disabled")
 BACKUP_VERSION = 2
 CSV_FRONT_HEADERS = ("front", "앞면", "카드앞면", "표현", "문법", "질문")
 CSV_BACK_HEADERS = ("back", "뒷면", "뜻", "의미", "해석", "답")
@@ -49,6 +52,8 @@ CREATE TABLE IF NOT EXISTS users (
     weak_card_threshold INTEGER NOT NULL DEFAULT 16,
     weak_recent_rounds INTEGER NOT NULL DEFAULT 3,
     weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 8,
+    controller_a_action TEXT NOT NULL DEFAULT 'primary',
+    controller_b_action TEXT NOT NULL DEFAULT 'wrong',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -197,6 +202,26 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE users ADD COLUMN weak_recent_wrong_threshold INTEGER NOT NULL DEFAULT 8"
         )
+    if "controller_a_action" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN controller_a_action TEXT NOT NULL DEFAULT 'primary'")
+    if "controller_b_action" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN controller_b_action TEXT NOT NULL DEFAULT 'wrong'")
+    conn.execute(
+        """
+        UPDATE users
+        SET controller_a_action = ?
+        WHERE controller_a_action NOT IN (?, ?, ?)
+        """,
+        (DEFAULT_CONTROLLER_A_ACTION, *CONTROLLER_ACTIONS),
+    )
+    conn.execute(
+        """
+        UPDATE users
+        SET controller_b_action = ?
+        WHERE controller_b_action NOT IN (?, ?, ?)
+        """,
+        (DEFAULT_CONTROLLER_B_ACTION, *CONTROLLER_ACTIONS),
+    )
     conn.execute(
         """
         UPDATE users
@@ -224,9 +249,11 @@ def ensure_default_users(conn: sqlite3.Connection) -> None:
                 access_code,
                 weak_card_threshold,
                 weak_recent_rounds,
-                weak_recent_wrong_threshold
+                weak_recent_wrong_threshold,
+                controller_a_action,
+                controller_b_action
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(nickname) DO UPDATE SET
                 access_code = excluded.access_code
             """,
@@ -236,6 +263,8 @@ def ensure_default_users(conn: sqlite3.Connection) -> None:
                 DEFAULT_WEAK_CARD_THRESHOLD,
                 DEFAULT_WEAK_RECENT_ROUNDS,
                 DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+                DEFAULT_CONTROLLER_A_ACTION,
+                DEFAULT_CONTROLLER_B_ACTION,
             ),
         )
 
@@ -570,6 +599,18 @@ def validate_weak_recent_wrong_threshold(value: object) -> int:
     if threshold < 1 or threshold > 20:
         raise ValueError("최근 오답 기준은 1~20회 사이로 입력하세요.")
     return threshold
+
+
+def normalize_controller_action(value: object, default: str) -> str:
+    text = str(value or "").strip()
+    return text if text in CONTROLLER_ACTIONS else default
+
+
+def validate_controller_action(value: object) -> str:
+    text = str(value or "").strip()
+    if text not in CONTROLLER_ACTIONS:
+        raise ValueError("컨트롤러 동작 설정이 올바르지 않습니다.")
+    return text
 
 
 def secure_text_compare(left: str, right: str) -> bool:
@@ -2069,9 +2110,11 @@ class AppHandler(BaseHTTPRequestHandler):
                     access_code,
                     weak_card_threshold,
                     weak_recent_rounds,
-                    weak_recent_wrong_threshold
+                    weak_recent_wrong_threshold,
+                    controller_a_action,
+                    controller_b_action
                 )
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     nickname,
@@ -2079,6 +2122,8 @@ class AppHandler(BaseHTTPRequestHandler):
                     DEFAULT_WEAK_CARD_THRESHOLD,
                     DEFAULT_WEAK_RECENT_ROUNDS,
                     DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+                    DEFAULT_CONTROLLER_A_ACTION,
+                    DEFAULT_CONTROLLER_B_ACTION,
                 ),
             )
             user = conn.execute(
@@ -2154,6 +2199,14 @@ class AppHandler(BaseHTTPRequestHandler):
             "weak_recent_wrong_threshold": int(
                 user["weak_recent_wrong_threshold"] or DEFAULT_WEAK_RECENT_WRONG_THRESHOLD
             ),
+            "controller_a_action": normalize_controller_action(
+                user["controller_a_action"],
+                DEFAULT_CONTROLLER_A_ACTION,
+            ),
+            "controller_b_action": normalize_controller_action(
+                user["controller_b_action"],
+                DEFAULT_CONTROLLER_B_ACTION,
+            ),
         }
 
     def update_settings(self, conn: sqlite3.Connection, user: sqlite3.Row) -> None:
@@ -2183,6 +2236,16 @@ class AppHandler(BaseHTTPRequestHandler):
             if "weak_recent_wrong_threshold" in body
             else int(user["weak_recent_wrong_threshold"] or DEFAULT_WEAK_RECENT_WRONG_THRESHOLD)
         )
+        controller_a_action = (
+            validate_controller_action(body.get("controller_a_action"))
+            if "controller_a_action" in body
+            else normalize_controller_action(user["controller_a_action"], DEFAULT_CONTROLLER_A_ACTION)
+        )
+        controller_b_action = (
+            validate_controller_action(body.get("controller_b_action"))
+            if "controller_b_action" in body
+            else normalize_controller_action(user["controller_b_action"], DEFAULT_CONTROLLER_B_ACTION)
+        )
         conn.execute(
             """
             UPDATE users
@@ -2190,7 +2253,9 @@ class AppHandler(BaseHTTPRequestHandler):
                 jlpt_exam_date = ?,
                 weak_card_threshold = ?,
                 weak_recent_rounds = ?,
-                weak_recent_wrong_threshold = ?
+                weak_recent_wrong_threshold = ?,
+                controller_a_action = ?,
+                controller_b_action = ?
             WHERE id = ?
             """,
             (
@@ -2199,6 +2264,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 weak_card_threshold,
                 weak_recent_rounds,
                 weak_recent_wrong_threshold,
+                controller_a_action,
+                controller_b_action,
                 user["id"],
             ),
         )
