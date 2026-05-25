@@ -3893,12 +3893,7 @@ button:active,
 
 .example-editor-list {
   display: grid;
-  max-height: min(44vh, 420px);
   gap: 10px;
-  overflow-y: auto;
-  padding-right: 4px;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .example-row {
