@@ -3670,6 +3670,7 @@ function renderStudyGroupSelection(groups) {
   }
   const selectedIds = new Set(state.selectedStudyGroupIds.map(Number));
   const selectedCount = groups.filter((group) => selectedIds.has(Number(group.id)) && number(group.card_count) > 0).length;
+  const allSelected = Boolean(selectableCount && selectedCount === selectableCount);
   return `
     <section class="study-subgroup-panel">
       <div class="completion-header">
@@ -3678,7 +3679,9 @@ function renderStudyGroupSelection(groups) {
       </div>
       ${disabledCount ? `<p class="study-subgroup-note">카드 없는 소그룹 ${number(disabledCount)}개는 선택에서 제외됩니다.</p>` : ""}
       <div class="button-row">
-        <button class="secondary-button" type="button" data-action="select-all-study-subgroups">${iconLabel("check", "전체 선택")}</button>
+        <button class="secondary-button" type="button" data-action="select-all-study-subgroups" aria-pressed="${
+          allSelected ? "true" : "false"
+        }" ${selectableCount ? "" : "disabled"}>${iconLabel(allSelected ? "check" : "plus", allSelected ? "전체 선택됨" : "전체 선택")}</button>
         <button class="ghost-button" type="button" data-action="clear-study-subgroups">${iconLabel("x", "선택 해제")}</button>
       </div>
       <div class="quick-practice-grid" aria-label="빠른 선택">
