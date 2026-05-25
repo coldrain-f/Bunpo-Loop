@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import base64
+import csv
 import hmac
+import io
 import json
 import mimetypes
 import os
 import random
+import re
 import sqlite3
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 
 ROOT = Path(__file__).resolve().parent
@@ -31,6 +34,10 @@ DEFAULT_WEAK_CARD_THRESHOLD = 16
 DEFAULT_WEAK_RECENT_ROUNDS = 3
 DEFAULT_WEAK_RECENT_WRONG_THRESHOLD = 8
 BACKUP_VERSION = 2
+CSV_FRONT_HEADERS = ("front", "앞면", "카드앞면", "표현", "문법", "질문")
+CSV_BACK_HEADERS = ("back", "뒷면", "뜻", "의미", "해석", "답")
+CSV_MEMO_HEADERS = ("memo", "메모", "note", "notes", "비고")
+CSV_EXAMPLES_HEADERS = ("examples", "예문", "예문목록", "example", "exampletext")
 
 USER_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -1436,6 +1443,141 @@ def parse_bulk_cards(text: object) -> list[dict]:
     return items
 
 
+def normalize_csv_header(value: object) -> str:
+    return re.sub(r"[\s_-]+", "", str(value or "").strip().lower())
+
+
+def csv_row_value(row: dict[object, object], candidates: tuple[str, ...] | list[str]) -> str:
+    normalized = {
+        normalize_csv_header(key): str(value or "").strip()
+        for key, value in row.items()
+        if key is not None
+    }
+    for candidate in candidates:
+        value = normalized.get(normalize_csv_header(candidate), "")
+        if value:
+            return value
+    return ""
+
+
+def csv_example_limit(row: dict[object, object]) -> int:
+    indexes = []
+    for key in row:
+        normalized = normalize_csv_header(key)
+        if not normalized.startswith(("예문", "example", "japanese", "korean", "translation", "meaning")):
+            continue
+        match = re.search(r"\d+", normalized)
+        if match:
+            indexes.append(int(match.group()))
+    return max(indexes, default=10)
+
+
+def parse_csv_examples(row: dict[object, object]) -> list[tuple[str, str]]:
+    examples = parse_example_text(csv_row_value(row, CSV_EXAMPLES_HEADERS))
+    for index in range(1, csv_example_limit(row) + 1):
+        japanese = csv_row_value(
+            row,
+            [
+                f"예문{index}",
+                f"예문{index}일본어",
+                f"예문{index}원문",
+                f"example{index}",
+                f"example{index}japanese",
+                f"examplejapanese{index}",
+                f"examplejp{index}",
+                f"japanese{index}",
+            ],
+        )
+        korean = csv_row_value(
+            row,
+            [
+                f"예문{index}해석",
+                f"예문{index}뜻",
+                f"예문{index}한국어",
+                f"example{index}korean",
+                f"examplekorean{index}",
+                f"example{index}translation",
+                f"exampletranslation{index}",
+                f"korean{index}",
+                f"translation{index}",
+                f"meaning{index}",
+            ],
+        )
+        if japanese:
+            examples.append((japanese, korean))
+    return examples
+
+
+def parse_cards_csv(text: object) -> list[dict]:
+    raw_text = str(text or "").lstrip("\ufeff").strip()
+    if not raw_text:
+        raise ValueError("불러올 CSV 내용을 넣어주세요.")
+    reader = csv.DictReader(io.StringIO(raw_text))
+    if not reader.fieldnames:
+        raise ValueError("CSV 첫 줄에 열 이름이 필요합니다.")
+    normalized_headers = {normalize_csv_header(field) for field in reader.fieldnames if field}
+    if not any(normalize_csv_header(name) in normalized_headers for name in CSV_FRONT_HEADERS):
+        raise ValueError("CSV에 앞면 열이 필요합니다.")
+    if not any(normalize_csv_header(name) in normalized_headers for name in CSV_BACK_HEADERS):
+        raise ValueError("CSV에 뒷면 열이 필요합니다.")
+
+    items = []
+    for line_no, row in enumerate(reader, start=2):
+        if not any(str(value or "").strip() for key, value in row.items() if key is not None):
+            continue
+        front = validate_text(csv_row_value(row, CSV_FRONT_HEADERS), f"{line_no}번째 줄 앞면", 200)
+        back = validate_text(csv_row_value(row, CSV_BACK_HEADERS), f"{line_no}번째 줄 뒷면", 500)
+        items.append(
+            {
+                "front": front,
+                "back": back,
+                "memo": csv_row_value(row, CSV_MEMO_HEADERS),
+                "examples": parse_csv_examples(row),
+            }
+        )
+    if not items:
+        raise ValueError("등록할 카드가 없습니다.")
+    if len(items) > 500:
+        raise ValueError("한 번에 500개까지만 등록할 수 있습니다.")
+    return items
+
+
+def group_cards_csv_text(cards: list[dict]) -> str:
+    max_examples = max([len(card.get("examples") or []) for card in cards], default=0)
+    example_slots = max(1, max_examples)
+    fieldnames = ["앞면", "뒷면", "메모"]
+    for index in range(1, example_slots + 1):
+        fieldnames.extend([f"예문{index}", f"예문{index}_해석"])
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\n")
+    writer.writeheader()
+    for card in cards:
+        row = {
+            "앞면": card.get("front", ""),
+            "뒷면": card.get("back", ""),
+            "메모": card.get("memo", ""),
+        }
+        for index, example in enumerate(card.get("examples") or [], start=1):
+            row[f"예문{index}"] = example.get("japanese", "")
+            row[f"예문{index}_해석"] = example.get("korean", "")
+        writer.writerow(row)
+    return "\ufeff" + output.getvalue()
+
+
+def safe_csv_filename_part(value: object) -> str:
+    text = re.sub(r'[\\/:*?"<>|\r\n]+', "_", str(value or "").strip())
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:60] or "소그룹"
+
+
+def group_cards_csv_filename(collection: sqlite3.Row | None, group: sqlite3.Row) -> str:
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    collection_name = safe_csv_filename_part(collection["name"] if collection else "대그룹")
+    group_name = safe_csv_filename_part(group["name"])
+    return f"kokko-{collection_name}-{group_name}-{today}.csv"
+
+
 def parse_id_list(value: object) -> list[int]:
     raw_items: list[object]
     if value is None:
@@ -1747,6 +1889,15 @@ class AppHandler(BaseHTTPRequestHandler):
                     return
                 self.reset_group_history(conn, user_id, group_id)
                 return
+
+            if len(parts) == 4 and parts[:2] == ["api", "groups"] and parts[3] == "cards.csv":
+                group_id = int(parts[2])
+                if method == "GET":
+                    self.export_group_cards_csv(conn, user_id, group_id)
+                    return
+                if method == "POST":
+                    self.import_group_cards_csv(conn, user_id, group_id)
+                    return
 
             if len(parts) == 3 and parts[:2] == ["api", "groups"]:
                 group_id = int(parts[2])
@@ -2124,6 +2275,50 @@ class AppHandler(BaseHTTPRequestHandler):
             front = item["front"]
             if front in seen_fronts:
                 raise ValueError(f"대량 등록 안에 같은 앞면이 두 번 들어 있습니다: {front}")
+            seen_fronts.add(front)
+            if duplicate_card_exists(conn, user_id, group_id, front):
+                raise ValueError(f"같은 소그룹에 이미 같은 앞면 카드가 있습니다: {front}")
+        created_ids = []
+        for item in items:
+            cur = conn.execute(
+                """
+                INSERT INTO cards (group_id, front, back, memo)
+                VALUES (?, ?, ?, ?)
+                """,
+                (group_id, item["front"], item["back"], item["memo"]),
+            )
+            card_id = int(cur.lastrowid)
+            created_ids.append(card_id)
+            insert_examples(conn, card_id, item["examples"])
+        self.send_json(
+            {
+                "ok": True,
+                "created_count": len(created_ids),
+                "card_ids": created_ids,
+            },
+            HTTPStatus.CREATED,
+        )
+
+    def export_group_cards_csv(self, conn: sqlite3.Connection, user_id: int, group_id: int) -> None:
+        group = get_group(conn, user_id, group_id)
+        if group is None:
+            self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+            return
+        collection = get_collection(conn, user_id, int(group["collection_id"]))
+        cards = cards_payload(conn, user_id, group_id=group_id, order_mode="sequence")
+        self.send_csv(group_cards_csv_text(cards), group_cards_csv_filename(collection, group))
+
+    def import_group_cards_csv(self, conn: sqlite3.Connection, user_id: int, group_id: int) -> None:
+        if get_group(conn, user_id, group_id) is None:
+            self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+            return
+        body = parse_body(self)
+        items = parse_cards_csv(body.get("csv") or body.get("text"))
+        seen_fronts = set()
+        for item in items:
+            front = item["front"]
+            if front in seen_fronts:
+                raise ValueError(f"CSV 안에 같은 앞면이 두 번 들어 있습니다: {front}")
             seen_fronts.add(front)
             if duplicate_card_exists(conn, user_id, group_id, front):
                 raise ValueError(f"같은 소그룹에 이미 같은 앞면 카드가 있습니다: {front}")
@@ -2615,6 +2810,15 @@ class AppHandler(BaseHTTPRequestHandler):
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def send_csv(self, text: str, filename: str, status: HTTPStatus = HTTPStatus.OK) -> None:
+        data = text.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{quote(filename, safe='')}")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)

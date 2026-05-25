@@ -9,7 +9,7 @@ const {
   number,
 } = window.ByeorakchigiShared || window.JLPTShared;
 const { clearStoredUser, loadStoredUser, saveStoredUser } = window.ByeorakchigiStorage || window.JLPTStorage;
-const { downloadJson, readTextFile } = window.ByeorakchigiFiles || window.JLPTFiles;
+const { downloadBlob, downloadJson, readTextFile } = window.ByeorakchigiFiles || window.JLPTFiles;
 const reducedMotionQuery =
   typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
 
@@ -103,6 +103,7 @@ const GROUP_LIST_PAGE_SIZE = 60;
 const STATS_COLLECTION_LIST_PAGE_SIZE = 40;
 const ROUND_DETAIL_SECTION_PAGE_SIZE = 60;
 const BULK_PREVIEW_RENDER_LIMIT = 80;
+const CSV_IMPORT_ACCEPT = "text/csv,.csv";
 const CARD_SEARCH_TEXT_CACHE = new WeakMap();
 
 const state = {
@@ -470,6 +471,15 @@ function makeRequestError(message, details = {}) {
   return error;
 }
 
+function buildAuthHeaders(accept = "application/json", extra = {}) {
+  const headers = { Accept: accept, ...extra };
+  if (state.user) {
+    headers["X-Byeorakchigi-User-Id"] = String(state.user.id);
+    headers["X-Byeorakchigi-Code"] = state.user.accessCode;
+  }
+  return headers;
+}
+
 async function request(path, options = {}) {
   const method = String(options.method || "GET").toUpperCase();
   const isWrite = !["GET", "HEAD"].includes(method);
@@ -483,11 +493,7 @@ async function request(path, options = {}) {
       { code: "offline", method },
     );
   }
-  const headers = { Accept: "application/json", ...(options.headers || {}) };
-  if (state.user) {
-    headers["X-Byeorakchigi-User-Id"] = String(state.user.id);
-    headers["X-Byeorakchigi-Code"] = state.user.accessCode;
-  }
+  const headers = buildAuthHeaders("application/json", options.headers || {});
   if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
   let response;
   try {
@@ -513,6 +519,44 @@ async function request(path, options = {}) {
     });
   }
   return data;
+}
+
+async function requestBlob(path, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const isWrite = !["GET", "HEAD"].includes(method);
+  if (isBrowserOffline()) {
+    state.isOffline = true;
+    renderConnectionBanner();
+    throw makeRequestError(
+      isWrite
+        ? "오프라인 상태라 서버에 저장하지 못했습니다. 연결 후 다시 시도하세요."
+        : "오프라인 상태입니다. 연결 후 다시 시도하세요.",
+      { code: "offline", method },
+    );
+  }
+  const headers = buildAuthHeaders(options.accept || "text/csv", options.headers || {});
+  let response;
+  try {
+    response = await fetch(path, { ...options, headers });
+  } catch (error) {
+    throw makeRequestError("서버에 연결하지 못했습니다. 실행 중인지 확인한 뒤 다시 시도하세요.", {
+      code: "network",
+      method,
+      cause: error,
+    });
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw makeRequestError(data.error || "파일을 처리하지 못했습니다.", {
+      status: response.status,
+      code: response.status === 401 ? "auth" : "api",
+      detail: data.detail || "",
+    });
+  }
+  return {
+    blob: await response.blob(),
+    response,
+  };
 }
 
 function reconcileLoadedState() {
@@ -5471,6 +5515,15 @@ function renderGroupListItem(group) {
                 "카드 등록",
               )}</button>`
         }
+        <div class="subgroup-file-actions">
+          <button class="ghost-button" type="button" data-action="export-group-csv" data-group-id="${group.id}">${iconLabel(
+            "download",
+            "CSV 내보내기",
+          )}</button>
+          <label class="ghost-button file-button">${iconLabel("upload", "CSV 불러오기")}<input class="group-csv-input" type="file" accept="${CSV_IMPORT_ACCEPT}" data-group-id="${
+            group.id
+          }" /></label>
+        </div>
         <button class="ghost-button" type="button" data-action="edit-group" data-group-id="${group.id}">${iconLabel(
           "pencil",
           "수정",
@@ -6011,6 +6064,48 @@ async function exportBackup() {
   const data = await request("/api/backup");
   downloadJson(`byeorakchigi-backup-${new Date().toISOString().slice(0, 10)}.json`, data.backup);
   showToast("백업 파일을 만들었습니다. 개인 저장소에 보관하세요.");
+}
+
+function safeFilenamePart(value, fallback = "소그룹") {
+  const text = String(value || "")
+    .replace(/[\\/:*?"<>|\r\n]+/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (text || fallback).slice(0, 60);
+}
+
+function groupCsvFilename(group) {
+  const collectionName = safeFilenamePart(group?.collection_name, "대그룹");
+  const groupName = safeFilenamePart(group?.name, "소그룹");
+  return `kokko-${collectionName}-${groupName}-${new Date().toISOString().slice(0, 10)}.csv`;
+}
+
+async function exportGroupCsv(groupId) {
+  const group = state.groups.find((item) => Number(item.id) === Number(groupId));
+  if (!group) return showToast("소그룹을 찾을 수 없습니다.");
+  const { blob } = await requestBlob(`/api/groups/${groupId}/cards.csv`, { accept: "text/csv" });
+  downloadBlob(groupCsvFilename(group), blob);
+  showToast("소그룹 CSV 파일을 만들었습니다.");
+}
+
+async function importGroupCsv(groupId, file) {
+  const group = state.groups.find((item) => Number(item.id) === Number(groupId));
+  if (!group) return showToast("소그룹을 찾을 수 없습니다.");
+  const text = await readTextFile(file);
+  if (!text.trim()) return showToast("CSV 파일 내용이 비어 있습니다.");
+  const data = await request(`/api/groups/${groupId}/cards.csv`, {
+    method: "POST",
+    body: JSON.stringify({ csv: text }),
+  });
+  state.selectedGroupId = groupId;
+  state.selectedCollectionId = group.collection_id;
+  state.cardFilterCollectionId = String(group.collection_id);
+  state.cardFilterGroupId = String(groupId);
+  state.cardSearchQuery = "";
+  resetCardListLimit();
+  await loadData();
+  render();
+  showToast(`CSV에서 카드 ${number(data.created_count)}개를 등록했습니다.`);
 }
 
 function prepareBackupRestore(form) {
@@ -6602,6 +6697,7 @@ document.addEventListener("click", async (event) => {
       scrollToTop();
     }
     if (action === "export-backup") await exportBackup();
+    if (action === "export-group-csv") await exportGroupCsv(Number(actionEl.dataset.groupId));
     if (action === "confirm-bulk-cards") await confirmBulkCards();
     if (action === "toggle-data-panel") {
       state.dataPanelOpen = !state.dataPanelOpen;
@@ -6892,6 +6988,15 @@ document.addEventListener("change", async (event) => {
     if (event.target.closest("#bulk-card-form") && event.target.name === "group_id") {
       state.bulkDraftGroupId = Number(event.target.value);
       state.bulkPreview = null;
+    }
+    if (event.target.classList.contains("group-csv-input")) {
+      const input = event.target;
+      const file = input.files?.[0];
+      try {
+        if (file) await importGroupCsv(Number(input.dataset.groupId), file);
+      } finally {
+        input.value = "";
+      }
     }
     if (event.target.id === "backup-file-input") {
       const text = await readTextFile(event.target.files?.[0]);
