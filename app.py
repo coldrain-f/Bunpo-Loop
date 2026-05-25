@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS cards (
     front TEXT NOT NULL,
     back TEXT NOT NULL,
     memo TEXT NOT NULL DEFAULT '',
+    study_excluded INTEGER NOT NULL DEFAULT 0,
     correct_count INTEGER NOT NULL DEFAULT 0,
     wrong_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -214,6 +215,19 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN controller_x_action TEXT NOT NULL DEFAULT 'disabled'")
     if "controller_y_action" not in user_columns:
         conn.execute("ALTER TABLE users ADD COLUMN controller_y_action TEXT NOT NULL DEFAULT 'disabled'")
+    if table_exists(conn, "cards"):
+        card_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(cards)").fetchall()
+        }
+        if "study_excluded" not in card_columns:
+            conn.execute("ALTER TABLE cards ADD COLUMN study_excluded INTEGER NOT NULL DEFAULT 0")
+        conn.execute(
+            """
+            UPDATE cards
+            SET study_excluded = CASE WHEN study_excluded THEN 1 ELSE 0 END
+            """
+        )
     conn.execute(
         """
         UPDATE users
@@ -641,6 +655,21 @@ def validate_controller_action(value: object) -> str:
     return text
 
 
+def normalize_bool(value: object, default: bool = False) -> int:
+    if value is None:
+        return 1 if default else 0
+    if isinstance(value, bool):
+        return 1 if value else 0
+    if isinstance(value, (int, float)):
+        return 1 if value else 0
+    text = str(value).strip().lower()
+    if text in ("1", "true", "yes", "y", "on"):
+        return 1
+    if text in ("0", "false", "no", "n", "off", ""):
+        return 0
+    return 1 if default else 0
+
+
 def secure_text_compare(left: str, right: str) -> bool:
     return hmac.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
 
@@ -749,6 +778,8 @@ def collections_payload(conn: sqlite3.Connection, user_id: int) -> list[dict]:
             SELECT
                 g.collection_id,
                 COUNT(c.id) AS card_count,
+                COALESCE(SUM(CASE WHEN c.study_excluded = 0 THEN 1 ELSE 0 END), 0) AS study_card_count,
+                COALESCE(SUM(CASE WHEN c.study_excluded = 1 THEN 1 ELSE 0 END), 0) AS excluded_card_count,
                 COALESCE(SUM(c.correct_count), 0) AS correct_total,
                 COALESCE(SUM(c.wrong_count), 0) AS wrong_total
             FROM groups g
@@ -805,6 +836,8 @@ def collections_payload(conn: sqlite3.Connection, user_id: int) -> list[dict]:
             c.created_at,
             COALESCE(gs.group_count, 0) AS group_count,
             COALESCE(cs.card_count, 0) AS card_count,
+            COALESCE(cs.study_card_count, 0) AS study_card_count,
+            COALESCE(cs.excluded_card_count, 0) AS excluded_card_count,
             COALESCE(cs.correct_total, 0) AS correct_total,
             COALESCE(cs.wrong_total, 0) AS wrong_total,
             COALESCE(rs.completed_rounds, 0) AS completed_rounds,
@@ -836,6 +869,8 @@ def groups_payload(conn: sqlite3.Connection, user_id: int) -> list[dict]:
             SELECT
                 group_id,
                 COUNT(id) AS card_count,
+                COALESCE(SUM(CASE WHEN study_excluded = 0 THEN 1 ELSE 0 END), 0) AS study_card_count,
+                COALESCE(SUM(CASE WHEN study_excluded = 1 THEN 1 ELSE 0 END), 0) AS excluded_card_count,
                 COALESCE(SUM(correct_count), 0) AS correct_total,
                 COALESCE(SUM(wrong_count), 0) AS wrong_total
             FROM cards
@@ -884,6 +919,8 @@ def groups_payload(conn: sqlite3.Connection, user_id: int) -> list[dict]:
             g.created_at,
             c.name AS collection_name,
             COALESCE(cs.card_count, 0) AS card_count,
+            COALESCE(cs.study_card_count, 0) AS study_card_count,
+            COALESCE(cs.excluded_card_count, 0) AS excluded_card_count,
             COALESCE(cs.correct_total, 0) AS correct_total,
             COALESCE(cs.wrong_total, 0) AS wrong_total,
             COALESCE(rs.completed_rounds, 0) AS completed_rounds,
@@ -916,6 +953,7 @@ def cards_payload(
     query: str | None = None,
     order_mode: str = "created",
     recent_round_window: int = DEFAULT_WEAK_RECENT_ROUNDS,
+    include_excluded: bool = True,
 ) -> list[dict]:
     clauses: list[str] = ["col.user_id = ?"]
     params: list[object] = [user_id]
@@ -930,6 +968,8 @@ def cards_payload(
         clauses.append("(c.front LIKE ? OR c.back LIKE ?)")
         like = f"%{query}%"
         params.extend([like, like])
+    if not include_excluded:
+        clauses.append("c.study_excluded = 0")
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
     order_sql = "c.created_at DESC, c.id DESC"
@@ -953,6 +993,7 @@ def cards_payload(
             c.front,
             c.back,
             c.memo,
+            c.study_excluded,
             c.correct_count,
             c.wrong_count,
             COALESCE((
@@ -1328,18 +1369,20 @@ def restore_backup(conn: sqlite3.Connection, user_id: int, payload: dict) -> dic
                 front,
                 back,
                 memo,
+                study_excluded,
                 correct_count,
                 wrong_count,
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 group_id,
                 validate_text(card.get("front"), "앞면", 200),
                 validate_text(card.get("back"), "뒷면", 500),
                 str(card.get("memo") or "").strip(),
+                normalize_bool(card.get("study_excluded"), False),
                 int(card.get("correct_count") or 0),
                 int(card.get("wrong_count") or 0),
                 str(card.get("created_at") or now),
@@ -2052,7 +2095,13 @@ class AppHandler(BaseHTTPRequestHandler):
                         raise ValueError("학습할 소그룹을 하나 이상 선택하세요.")
                     selected_groups = groups_for_collection(conn, user_id, collection_id, group_ids)
                     selected_group_ids = [int(group["id"]) for group in selected_groups]
-                    cards = cards_payload(conn, user_id, group_ids=selected_group_ids, order_mode=order_mode)
+                    cards = cards_payload(
+                        conn,
+                        user_id,
+                        group_ids=selected_group_ids,
+                        order_mode=order_mode,
+                        include_excluded=False,
+                    )
                     self.send_json(
                         {
                             "scope_type": "practice",
@@ -2070,7 +2119,13 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
                     return
                 collection = get_collection(conn, user_id, int(group["collection_id"]))
-                cards = cards_payload(conn, user_id, group_id=group_id, order_mode=order_mode)
+                cards = cards_payload(
+                    conn,
+                    user_id,
+                    group_id=group_id,
+                    order_mode=order_mode,
+                    include_excluded=False,
+                )
                 self.send_json(
                     {
                         "scope_type": "group",
@@ -2334,6 +2389,7 @@ class AppHandler(BaseHTTPRequestHandler):
         front = validate_text(body.get("front"), "앞면", 200)
         back = validate_text(body.get("back"), "뒷면", 500)
         memo = str(body.get("memo") or "").strip()
+        study_excluded = normalize_bool(body.get("study_excluded"), False)
         examples = body.get("examples") or []
         if not isinstance(examples, list):
             raise ValueError("예문은 배열이어야 합니다.")
@@ -2341,10 +2397,10 @@ class AppHandler(BaseHTTPRequestHandler):
             raise ValueError("같은 소그룹에 이미 같은 앞면 카드가 있습니다.")
         cur = conn.execute(
             """
-            INSERT INTO cards (group_id, front, back, memo)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO cards (group_id, front, back, memo, study_excluded)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (group_id, front, back, memo),
+            (group_id, front, back, memo, study_excluded),
         )
         card_id = int(cur.lastrowid)
         insert_examples(conn, card_id, examples)
@@ -2364,6 +2420,7 @@ class AppHandler(BaseHTTPRequestHandler):
         front = validate_text(body.get("front", card["front"]), "앞면", 200)
         back = validate_text(body.get("back", card["back"]), "뒷면", 500)
         memo = str(body.get("memo", card["memo"]) or "").strip()
+        study_excluded = normalize_bool(body.get("study_excluded"), bool(card["study_excluded"]))
         examples = body.get("examples")
         if examples is not None and not isinstance(examples, list):
             raise ValueError("예문은 배열이어야 합니다.")
@@ -2376,10 +2433,11 @@ class AppHandler(BaseHTTPRequestHandler):
                 front = ?,
                 back = ?,
                 memo = ?,
+                study_excluded = ?,
                 updated_at = {utc_now_sql()}
             WHERE id = ?
             """,
-            (group_id, front, back, memo, card_id),
+            (group_id, front, back, memo, study_excluded, card_id),
         )
         if examples is not None:
             conn.execute("DELETE FROM examples WHERE card_id = ?", (card_id,))

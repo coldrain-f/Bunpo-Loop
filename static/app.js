@@ -625,7 +625,7 @@ function reconcileLoadedState() {
     .map(Number)
     .filter((groupId) => selectedCollectionGroupIds.has(groupId));
   if (!state.selectedStudyGroupIds.length) {
-    state.selectedStudyGroupIds = selectedCollectionGroups.filter((group) => number(group.card_count) > 0).map((group) => group.id);
+    state.selectedStudyGroupIds = selectedCollectionGroups.filter((group) => getGroupStudyCardCount(group) > 0).map((group) => group.id);
   }
 
   const selectedGroup = groupById.get(Number(state.selectedGroupId));
@@ -1405,12 +1405,37 @@ function getSelectedStudyGroups() {
   return getGroupsForCollection(state.selectedCollectionId).filter((group) => selectedIds.has(Number(group.id)));
 }
 
+function isCardStudyExcluded(card) {
+  return Boolean(number(card?.study_excluded));
+}
+
+function getGroupStudyCardCount(group) {
+  return number(group?.study_card_count ?? group?.card_count);
+}
+
+function getGroupExcludedCardCount(group) {
+  return number(group?.excluded_card_count);
+}
+
+function getCollectionStudyCardCount(collection) {
+  return number(collection?.study_card_count ?? collection?.card_count);
+}
+
+function getCollectionExcludedCardCount(collection) {
+  return number(collection?.excluded_card_count);
+}
+
+function studyCountText(totalCount, studyCount, excludedCount) {
+  if (excludedCount) return `학습 대상 ${studyCount}개 · 제외 ${excludedCount}개`;
+  return `카드 ${totalCount}개`;
+}
+
 function getSelectedStudyCardCount() {
-  return getSelectedStudyGroups().reduce((sum, group) => sum + number(group.card_count), 0);
+  return getSelectedStudyGroups().reduce((sum, group) => sum + getGroupStudyCardCount(group), 0);
 }
 
 function getPracticeSelectableGroups(collectionId = state.selectedCollectionId) {
-  return getGroupsForCollection(collectionId).filter((group) => number(group.card_count) > 0);
+  return getGroupsForCollection(collectionId).filter((group) => getGroupStudyCardCount(group) > 0);
 }
 
 function getPracticePresetGroups(preset) {
@@ -1717,21 +1742,26 @@ function getGroupLastStudyLabel(group) {
 
 function renderGroupStatusPills(group, { showRounds = false } = {}) {
   const cardCount = number(group.card_count);
+  const studyCount = getGroupStudyCardCount(group);
+  const excludedCount = getGroupExcludedCardCount(group);
   const wrongTotal = number(group.wrong_total);
   const roundCount = number(group.completed_rounds);
   const studiedToday = isToday(group.last_studied_at);
-  const status = cardCount
+  const status = studyCount
     ? studiedToday
       ? `<span class="status-pill done">오늘 완료</span>`
       : group.last_studied_at
         ? `<span class="status-pill">학습 기록 있음</span>`
         : `<span class="status-pill muted">미학습</span>`
-    : `<span class="status-pill muted">카드 없음</span>`;
+    : cardCount
+      ? `<span class="status-pill muted">전체 학습 제외</span>`
+      : `<span class="status-pill muted">카드 없음</span>`;
   const wrong = wrongTotal
     ? `<span class="status-pill bad">오답 ${wrongTotal}</span>`
     : `<span class="status-pill muted">오답 없음</span>`;
+  const excluded = excludedCount ? `<span class="status-pill muted">제외 ${excludedCount}</span>` : "";
   const rounds = showRounds ? `<span class="status-pill muted">${roundCount}회독</span>` : "";
-  return `<div class="group-status-strip">${status}${wrong}${rounds}</div>`;
+  return `<div class="group-status-strip">${status}${wrong}${excluded}${rounds}</div>`;
 }
 
 function renderGroupMetricRow(group) {
@@ -1761,7 +1791,7 @@ function sortStudyGroups(groups) {
     }
     if (state.studyGroupSortMode === "cards") {
       return (
-        number(right.card_count) - number(left.card_count) ||
+        getGroupStudyCardCount(right) - getGroupStudyCardCount(left) ||
         dateMs(right.last_studied_at) - dateMs(left.last_studied_at) ||
         compareGroupName(left, right)
       );
@@ -1781,6 +1811,7 @@ function getRecentStudyGroup(groups = state.groups) {
   return (
     [...groups]
       .filter((group) => dateMs(group.last_studied_at) > 0)
+      .filter((group) => getGroupStudyCardCount(group) > 0)
       .sort(
         (left, right) =>
           dateMs(right.last_studied_at) - dateMs(left.last_studied_at) ||
@@ -1831,7 +1862,7 @@ function isWeakCard(card) {
 
 function getWeakCards(cards = state.cards) {
   return [...cards]
-    .filter(isWeakCard)
+    .filter((card) => !isCardStudyExcluded(card) && isWeakCard(card))
     .sort(
       (left, right) =>
         cardRecentWrongCount(right) - cardRecentWrongCount(left) ||
@@ -1945,7 +1976,7 @@ function getStatsSummary() {
   const studiedGroups = scope.isAllTime
     ? scope.groups.filter((group) => number(group.completed_rounds) > 0).length
     : periodStudiedGroupIds.size;
-  const studyReadyGroups = scope.groups.filter((group) => number(group.card_count) > 0);
+  const studyReadyGroups = scope.groups.filter((group) => getGroupStudyCardCount(group) > 0);
   const todayGroups = studyReadyGroups.filter((group) => isToday(group.last_studied_at));
   const pendingTodayGroups = studyReadyGroups.filter((group) => !isToday(group.last_studied_at));
   const totalCorrect = scope.isAllTime
@@ -1974,7 +2005,7 @@ function getStatsSummary() {
   const weakCards = getWeakCards(scope.cards);
   const recentGroup = getRecentStudyGroup(scope.groups);
   const recommendedGroup =
-    sortStudyGroups(pendingTodayGroups)[0] || (recentGroup && number(recentGroup.card_count) > 0 ? recentGroup : null);
+    sortStudyGroups(pendingTodayGroups)[0] || (recentGroup && getGroupStudyCardCount(recentGroup) > 0 ? recentGroup : null);
   return {
     scope,
     totalCards,
@@ -3001,7 +3032,7 @@ function renderDialog() {
   const previewTarget = getPreviewTarget();
   if (state.activeDialog === "preview" && previewTarget) {
     const previewMode = state.pendingAction ? "sequence" : state.orderMode;
-    const previewCards = getPreviewCards(previewTarget.groupIds, previewMode);
+    const previewCards = getPreviewCards(previewTarget.groupIds, previewMode, previewTarget.includeExcluded);
     dialogRoot.innerHTML = `
       <div class="dialog-backdrop" role="presentation">
         <section class="dialog-panel preview-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title" aria-describedby="preview-dialog-summary">
@@ -3230,25 +3261,25 @@ function renderStudyPickerUpdate(anchorSelector = "") {
 function getPreviewTarget() {
   if (state.pendingAction?.type === "preview-group-cards") {
     const group = state.groups.find((item) => item.id === Number(state.pendingAction.id));
-    return group ? { name: getGroupLabel(group), groupIds: [group.id] } : null;
+    return group ? { name: getGroupLabel(group), groupIds: [group.id], includeExcluded: true } : null;
   }
   if (state.pendingAction?.type === "preview-collection-cards") {
     const collection = state.collections.find((item) => item.id === Number(state.pendingAction.id));
     if (!collection) return null;
-    return { name: collection.name, groupIds: getGroupsForCollection(collection.id).map((group) => group.id) };
+    return { name: collection.name, groupIds: getGroupsForCollection(collection.id).map((group) => group.id), includeExcluded: true };
   }
   if (state.pendingAction?.type === "preview-bundle-cards") {
     const collection = state.collections.find((item) => item.id === Number(state.pendingAction.id));
     const groupIds = state.pendingAction.groupIds || [];
-    return collection ? { name: `${collection.name} 묶음 연습`, groupIds } : null;
+    return collection ? { name: `${collection.name} 묶음 연습`, groupIds, includeExcluded: false } : null;
   }
   const group = getSelectedGroup();
-  return group ? { name: getGroupLabel(group), groupIds: [group.id] } : null;
+  return group ? { name: getGroupLabel(group), groupIds: [group.id], includeExcluded: false } : null;
 }
 
-function getPreviewCards(groupIds, orderMode = state.orderMode) {
+function getPreviewCards(groupIds, orderMode = state.orderMode, includeExcluded = true) {
   const groupIdSet = new Set((groupIds || []).map(Number));
-  const cards = state.cards.filter((card) => groupIdSet.has(Number(card.group_id)));
+  const cards = state.cards.filter((card) => groupIdSet.has(Number(card.group_id)) && (includeExcluded || !isCardStudyExcluded(card)));
   if (orderMode === "wrong") {
     return [...cards].sort((a, b) => {
       const aTotal = number(a.correct_count) + number(a.wrong_count);
@@ -3318,6 +3349,8 @@ function renderStudy() {
 
 function renderStudyGroupPicker() {
   const totalCards = state.collections.reduce((sum, collection) => sum + number(collection.card_count), 0);
+  const totalStudyCards = state.collections.reduce((sum, collection) => sum + getCollectionStudyCardCount(collection), 0);
+  const totalExcludedCards = state.collections.reduce((sum, collection) => sum + getCollectionExcludedCardCount(collection), 0);
   const recentGroup = getRecentStudyGroup();
   const weakCards = getWeakCards();
   const visibleCollections = state.collections.filter((collection) =>
@@ -3332,7 +3365,7 @@ function renderStudyGroupPicker() {
         </div>
         <span class="pill">대그룹 ${number(state.collections.length)}개</span>
       </div>
-      <p class="meta">전체 ${totalCards}개의 카드 · 오늘은 먼저 이어서 회독할 소그룹을 고릅니다.</p>
+      <p class="meta">${escapeHtml(studyCountText(totalCards, totalStudyCards, totalExcludedCards))} · 오늘은 먼저 이어서 회독할 소그룹을 고릅니다.</p>
       ${renderTodayStudyPanel(recentGroup, weakCards)}
       ${renderWeakCardsPanel()}
       <section id="study-collection-browser" class="group-browser-block">
@@ -3364,7 +3397,11 @@ function renderStudyGroupPicker() {
 }
 
 function renderStudySubgroupPicker(collection) {
-  const bundleDisabledReason = "카드가 있는 소그룹이 있어야 기록 없는 묶음 연습을 시작할 수 있습니다.";
+  const collectionStudyCount = getCollectionStudyCardCount(collection);
+  const collectionExcludedCount = getCollectionExcludedCardCount(collection);
+  const bundleDisabledReason = collectionExcludedCount
+    ? "학습 대상 카드가 없습니다. 제외한 카드를 다시 학습에 포함해 주세요."
+    : "카드가 있는 소그룹이 있어야 기록 없는 묶음 연습을 시작할 수 있습니다.";
   const collectionGroups = sortStudyGroups(
     getGroupsForCollection(collection.id).filter((group) =>
       matchesQuery([group.name, group.description, group.collection_name], state.studyGroupSearchQuery),
@@ -3391,12 +3428,12 @@ function renderStudySubgroupPicker(collection) {
         <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
         <div class="stat"><strong>${number(collection.completed_rounds)}</strong><span>소그룹 회독</span></div>
       </div>
-      <p class="meta">공식 기록은 소그룹 기록 합산입니다. 묶음 연습은 공식 기록에 저장되지 않습니다.</p>
+      <p class="meta">${escapeHtml(studyCountText(number(collection.card_count), collectionStudyCount, collectionExcludedCount))} · 묶음 연습은 공식 기록에 저장되지 않습니다.</p>
       <button class="secondary-button full" type="button" data-action="open-collection-study-dialog" ${
-        number(collection.card_count) ? "" : `disabled aria-describedby="${getDisabledReasonId(bundleDisabledReason)}"`
+        collectionStudyCount ? "" : `disabled aria-describedby="${getDisabledReasonId(bundleDisabledReason)}"`
       }>${iconLabel("repeat-2", "묶음 연습")}</button>
       ${
-        number(collection.card_count)
+        collectionStudyCount
           ? ""
           : renderDisabledReason(bundleDisabledReason)
       }
@@ -3625,9 +3662,11 @@ function renderWeakCardItem(card) {
 
 function renderStudyCollectionChoiceItem(collection) {
   const cardCount = number(collection.card_count);
+  const studyCount = getCollectionStudyCardCount(collection);
+  const excludedCount = getCollectionExcludedCardCount(collection);
   const groupCount = number(collection.group_count);
   return `
-    <article class="group-item group-choice ${cardCount ? "" : "empty"}">
+    <article class="group-item group-choice ${studyCount ? "" : "empty"}">
       <button class="group-choice-main" type="button" data-action="choose-study-collection" data-collection-id="${collection.id}">
         <div class="item-title">
           <strong>${escapeHtml(collection.name)}</strong>
@@ -3635,7 +3674,7 @@ function renderStudyCollectionChoiceItem(collection) {
         <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
         <div class="group-choice-footer">
           <span>소그룹 ${groupCount}개</span>
-          <span>카드 ${cardCount}개</span>
+          <span>${escapeHtml(studyCountText(cardCount, studyCount, excludedCount))}</span>
         </div>
       </button>
       ${
@@ -3718,7 +3757,7 @@ function renderStudySetup(selected) {
 }
 
 function renderStudyGroupSelection(groups) {
-  const selectableCount = groups.filter((group) => number(group.card_count) > 0).length;
+  const selectableCount = groups.filter((group) => getGroupStudyCardCount(group) > 0).length;
   const disabledCount = groups.length - selectableCount;
   if (!groups.length) {
     return `
@@ -3734,7 +3773,7 @@ function renderStudyGroupSelection(groups) {
     `;
   }
   const selectedIds = new Set(state.selectedStudyGroupIds.map(Number));
-  const selectedCount = groups.filter((group) => selectedIds.has(Number(group.id)) && number(group.card_count) > 0).length;
+  const selectedCount = groups.filter((group) => selectedIds.has(Number(group.id)) && getGroupStudyCardCount(group) > 0).length;
   const allSelected = Boolean(selectableCount && selectedCount === selectableCount);
   return `
     <section class="study-subgroup-panel">
@@ -3742,7 +3781,7 @@ function renderStudyGroupSelection(groups) {
         <h3>학습할 소그룹</h3>
         <span class="pill">${selectedCount}/${selectableCount} 선택</span>
       </div>
-      ${disabledCount ? `<p class="study-subgroup-note">카드 없는 소그룹 ${number(disabledCount)}개는 선택에서 제외됩니다.</p>` : ""}
+      ${disabledCount ? `<p class="study-subgroup-note">학습 대상이 없는 소그룹 ${number(disabledCount)}개는 선택에서 제외됩니다.</p>` : ""}
       <div class="button-row">
         <button class="secondary-button" type="button" data-action="select-all-study-subgroups" aria-pressed="${
           allSelected ? "true" : "false"
@@ -3757,8 +3796,11 @@ function renderStudyGroupSelection(groups) {
       <div class="study-subgroup-list">
         ${groups
           .map((group) => {
-            const checked = selectedIds.has(Number(group.id));
-            const disabled = !number(group.card_count);
+            const cardCount = number(group.card_count);
+            const studyCount = getGroupStudyCardCount(group);
+            const excludedCount = getGroupExcludedCardCount(group);
+            const disabled = !studyCount;
+            const checked = !disabled && selectedIds.has(Number(group.id));
             const lastStudyText = getGroupLastStudyLabel(group);
             return `
               <label class="study-subgroup-option ${checked ? "active" : ""} ${disabled ? "disabled" : ""}">
@@ -3769,8 +3811,12 @@ function renderStudyGroupSelection(groups) {
                   <strong>${escapeHtml(group.name)}</strong>
                   <small>${
                     disabled
-                      ? "카드 없음 · 제외"
-                      : `카드 ${number(group.card_count)}개 · ${escapeHtml(lastStudyText)} · 오답 ${number(group.wrong_total)}`
+                      ? cardCount
+                        ? `전체 학습 제외 · 제외 ${excludedCount}개`
+                        : "카드 없음 · 제외"
+                      : `${escapeHtml(studyCountText(cardCount, studyCount, excludedCount))} · ${escapeHtml(lastStudyText)} · 오답 ${number(
+                          group.wrong_total,
+                        )}`
                   }</small>
                 </span>
               </label>
@@ -3794,7 +3840,9 @@ function renderCollectionStudyDialog() {
     ? `${ORDER_LABELS[state.orderMode]} · ${EXAMPLE_ORDER_LABELS[state.exampleOrderMode]} · ${
         EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]
       } · 공식 기록 제외`
-    : "카드가 있는 소그룹을 하나 이상 선택하세요.";
+    : selectedGroups.length
+      ? "선택한 소그룹에 학습 대상 카드가 없습니다."
+      : "학습 대상 카드가 있는 소그룹을 하나 이상 선택하세요.";
   dialogRoot.innerHTML = `
     <div class="dialog-backdrop" role="presentation">
       <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title" aria-describedby="collection-study-help">
@@ -3844,14 +3892,18 @@ function renderCollectionStudyDialog() {
 function renderStudyStartPanel(group) {
   const nextRoundNo = number(group.completed_rounds) + 1;
   const cardCount = number(group.card_count);
-  const canStart = cardCount > 0;
-  const disabledReason = "카드를 등록하면 회독과 미리보기를 사용할 수 있습니다.";
+  const studyCount = getGroupStudyCardCount(group);
+  const excludedCount = getGroupExcludedCardCount(group);
+  const canStart = studyCount > 0;
+  const disabledReason = cardCount
+    ? "모든 카드가 학습 제외 상태입니다. 카드 관리에서 다시 학습에 포함해 주세요."
+    : "카드를 등록하면 회독과 미리보기를 사용할 수 있습니다.";
   return `
     <section class="study-start-panel">
       <div>
         <span class="today-action-label">다음 회독</span>
         <strong>${nextRoundNo}회독 시작</strong>
-        <p>카드 ${cardCount}개 · ${ORDER_LABELS[state.orderMode]} · ${
+        <p>${escapeHtml(studyCountText(cardCount, studyCount, excludedCount))} · ${ORDER_LABELS[state.orderMode]} · ${
           EXAMPLE_ORDER_LABELS[state.exampleOrderMode]
         } · ${
           EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]
@@ -3866,8 +3918,8 @@ function renderStudyStartPanel(group) {
               <button class="ghost-button full" type="button" data-action="preview-study-cards">
                 ${iconLabel("eye", "미리보기")}
               </button>`
-            : `<button class="primary-button full" type="button" data-action="add-card-to-study-group" data-group-id="${group.id}">
-                ${iconLabel("plus", "카드 등록")}
+            : `<button class="primary-button full" type="button" data-action="${cardCount ? "open-study-group-cards" : "add-card-to-study-group"}" data-group-id="${group.id}">
+                ${iconLabel(cardCount ? "list" : "plus", cardCount ? "카드 관리" : "카드 등록")}
               </button>
               <button class="ghost-button full" type="button" data-action="preview-study-cards" disabled aria-describedby="${getDisabledReasonId(disabledReason)}">
                 ${iconLabel("eye", "미리보기")}
@@ -3911,13 +3963,16 @@ function renderStudyOptionsPanel() {
 
 function renderSelectedGroupStats(group) {
   const recentFirstAttemptRate = getGroupRecentFirstAttemptRate(group);
+  const cardCount = number(group.card_count);
+  const studyCount = getGroupStudyCardCount(group);
+  const excludedCount = getGroupExcludedCardCount(group);
   return `
     <div class="stat-grid">
       <div class="stat"><strong>${number(group.card_count)}</strong><span>카드</span></div>
       <div class="stat"><strong>${number(group.correct_total)}</strong><span>정답</span></div>
       <div class="stat"><strong>${number(group.wrong_total)}</strong><span>오답</span></div>
     </div>
-    <p class="meta">마지막 학습 ${formatDate(group.last_studied_at)} · 최근 첫 시도 ${
+    <p class="meta">${escapeHtml(studyCountText(cardCount, studyCount, excludedCount))} · 마지막 학습 ${formatDate(group.last_studied_at)} · 최근 첫 시도 ${
       recentFirstAttemptRate === null ? "기록 없음" : `${recentFirstAttemptRate}%`
     }</p>
   `;
@@ -5026,6 +5081,13 @@ function renderCardForm(card, groupId) {
       <label class="field"><span>메모</span><textarea id="card-memo-textarea" class="textarea" name="memo" placeholder="접속, 뉘앙스, 헷갈리는 표현">${escapeHtml(
         card?.memo || "",
       )}</textarea></label>
+      <label class="checkbox-field">
+        <input type="checkbox" name="study_excluded" ${isCardStudyExcluded(card) ? "checked" : ""} />
+        <span>
+          <strong>학습에서 제외</strong>
+          <small>카드는 남겨두고 회독, 묶음 연습, 약점 복습에서만 빼둡니다.</small>
+        </span>
+      </label>
       <div class="field">
         ${renderFieldLabel("예문", "강조할 조각은 [[ ]]로 감싸면 학습 화면에서 하이라이트됩니다.")}
         <div id="example-editor-list" class="example-editor-list">${examples
@@ -5201,8 +5263,9 @@ function renderCardListItem(card) {
   const total = number(card.correct_count) + number(card.wrong_count);
   const exampleCount = card.examples?.length || 0;
   const hasMemo = Boolean(card.memo);
+  const excluded = isCardStudyExcluded(card);
   return `
-    <article class="card-item">
+    <article class="card-item ${excluded ? "study-excluded" : ""}">
       <div class="card-item-main">
         <p class="card-path">${escapeHtml(getCardPath(card))}</p>
         <strong class="card-front">${renderJapaneseText(card.front)}</strong>
@@ -5216,6 +5279,7 @@ function renderCardListItem(card) {
           : ""
       }
       <div class="card-meta-strip">
+        ${excluded ? `<span class="card-meta-excluded">학습 제외</span>` : ""}
         <span>예문 ${exampleCount}개</span>
         <span>메모 ${hasMemo ? "있음" : "없음"}</span>
         <span>정답 ${number(card.correct_count)}</span>
@@ -5223,6 +5287,10 @@ function renderCardListItem(card) {
         <span>총 ${total}</span>
       </div>
       <div class="card-actions quiet-actions">
+        <button class="ghost-button" type="button" data-action="toggle-card-exclusion" data-card-id="${card.id}">${iconLabel(
+          excluded ? "check" : "x",
+          excluded ? "학습 포함" : "학습 제외",
+        )}</button>
         <button class="ghost-button" type="button" data-action="edit-card" data-card-id="${card.id}">${iconLabel(
           "pencil",
           "수정",
@@ -5844,7 +5912,7 @@ async function startStudy() {
   const group = getSelectedGroup();
   if (!group) return showToast("학습할 소그룹을 선택하세요.");
   const data = await request(`/api/study?group_id=${group.id}&order=${state.orderMode}`);
-  if (!data.cards.length) return showToast("이 소그룹에는 카드가 없습니다.");
+  if (!data.cards.length) return showToast("학습 대상 카드가 없습니다. 제외한 카드를 다시 포함해 주세요.");
   const cards = prepareStudyCards(data.cards);
   state.session = {
     studyMode: "group",
@@ -5878,12 +5946,12 @@ async function startStudy() {
 async function startBundleStudy() {
   const collection = getSelectedCollection();
   const selectedGroups = getSelectedStudyGroups();
-  if (!collection || !selectedGroups.length) return showToast("카드가 있는 소그룹을 선택하세요.");
+  if (!collection || !selectedGroups.length) return showToast("학습 대상 카드가 있는 소그룹을 선택하세요.");
   const groupIds = selectedGroups.map((group) => group.id).join(",");
   const data = await request(
     `/api/study?collection_id=${collection.id}&group_ids=${encodeURIComponent(groupIds)}&order=${state.orderMode}`,
   );
-  if (!data.cards.length) return showToast("선택한 소그룹에 카드가 없습니다.");
+  if (!data.cards.length) return showToast("선택한 소그룹에 학습 대상 카드가 없습니다.");
   const cards = prepareStudyCards(data.cards);
   state.session = {
     studyMode: "practice",
@@ -6076,6 +6144,7 @@ async function saveCard(form) {
     front: form.elements.front.value.trim(),
     back: form.elements.back.value.trim(),
     memo: form.elements.memo.value.trim(),
+    study_excluded: form.elements.study_excluded?.checked || false,
     examples: collectExamples(form),
   };
   const isEditing = Boolean(state.editingCardId);
@@ -6480,6 +6549,19 @@ async function deletePendingCard() {
   showToast("카드를 삭제했습니다.");
 }
 
+async function toggleCardStudyExclusion(cardId) {
+  const card = state.cards.find((item) => Number(item.id) === Number(cardId));
+  if (!card) return showToast("카드를 찾을 수 없습니다.");
+  const nextExcluded = !isCardStudyExcluded(card);
+  await request(`/api/cards/${cardId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ study_excluded: nextExcluded }),
+  });
+  await loadData();
+  render();
+  showToast(nextExcluded ? "학습에서 제외했습니다." : "학습에 포함했습니다.");
+}
+
 async function resetPendingHistory() {
   const groupId = Number(state.pendingAction?.id);
   if (!groupId) return;
@@ -6621,7 +6703,7 @@ document.addEventListener("click", async (event) => {
     if (action === "study-stats-group") {
       const groupId = Number(actionEl.dataset.groupId);
       const group = state.groups.find((item) => Number(item.id) === groupId);
-      if (!group || !number(group.card_count)) return showToast("학습할 카드가 있는 소그룹을 선택하세요.");
+      if (!group || !getGroupStudyCardCount(group)) return showToast("학습 대상 카드가 있는 소그룹을 선택하세요.");
       state.activeTab = "study";
       state.selectedGroupId = groupId;
       state.selectedCollectionId = group.collection_id;
@@ -6708,7 +6790,7 @@ document.addEventListener("click", async (event) => {
       if (!collectionId) return showToast("대그룹을 먼저 만들어 주세요.");
       state.selectedCollectionId = collectionId;
       state.selectedStudyGroupIds = getGroupsForCollection(collectionId)
-        .filter((group) => number(group.card_count) > 0)
+        .filter((group) => getGroupStudyCardCount(group) > 0)
         .map((group) => group.id);
       state.collectionStudyReturnContext = getCollectionStudyReturnContext(collectionId);
       state.activeDialog = "collection-study-picker";
@@ -6727,6 +6809,23 @@ document.addEventListener("click", async (event) => {
       state.bulkPreview = null;
       render();
       focusAfterRender(['#card-form [name="front"]', '#card-form [name="collection_id"]']);
+      scrollToTop();
+    }
+    if (action === "open-study-group-cards") {
+      const groupId = Number(actionEl.dataset.groupId);
+      const group = state.groups.find((item) => Number(item.id) === groupId);
+      if (!group) return;
+      state.selectedGroupId = groupId;
+      state.cardFilterCollectionId = String(group.collection_id);
+      state.cardFilterGroupId = String(groupId);
+      state.activeTab = "cards";
+      state.cardScreen = "list";
+      state.cardEntryMode = "single";
+      state.editingCardId = null;
+      state.bulkPreview = null;
+      resetCardListLimit();
+      render();
+      focusAfterRender("#cards-title");
       scrollToTop();
     }
     if (action === "open-group-form-for-collection") {
@@ -7180,6 +7279,9 @@ document.addEventListener("click", async (event) => {
       render();
       scrollToTop();
     }
+    if (action === "toggle-card-exclusion") {
+      await toggleCardStudyExclusion(Number(actionEl.dataset.cardId));
+    }
     if (action === "reset-card-form") {
       state.editingCardId = null;
       state.cardScreen = "form";
@@ -7277,7 +7379,7 @@ document.addEventListener("change", async (event) => {
       const collectionId = Number(event.target.value);
       state.selectedCollectionId = collectionId;
       state.selectedStudyGroupIds = getGroupsForCollection(collectionId)
-        .filter((group) => number(group.card_count) > 0)
+        .filter((group) => getGroupStudyCardCount(group) > 0)
         .map((group) => group.id);
       renderDialog();
     }

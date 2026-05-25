@@ -47,11 +47,11 @@
   - [x] 1.2 Settings UI
   - [x] 1.3 Study Input Integration
   - [ ] 1.4 Controller Mapping QA
-- [ ] Phase 2. Card Study Exclusion
-  - [ ] 2.1 Database & API
-  - [ ] 2.2 Card Management UI
-  - [ ] 2.3 Study Flow Filtering
-  - [ ] 2.4 Exclusion State Copy
+- [x] Phase 2. Card Study Exclusion
+  - [x] 2.1 Database & API
+  - [x] 2.2 Card Management UI
+  - [x] 2.3 Study Flow Filtering
+  - [x] 2.4 Exclusion State Copy
 - [ ] Phase 3. Import, Export & Backup Compatibility
   - [ ] 3.1 CSV Round Trip
   - [ ] 3.2 Backup/Restore Contract
@@ -173,11 +173,11 @@ Data proposal:
 - optional later: `cards.study_excluded_at TEXT`
 
 Tasks:
-- [ ] SQLite migration에 `study_excluded` 컬럼을 추가한다.
-- [ ] 카드 조회 응답에 제외 여부를 포함한다.
-- [ ] 카드 생성 기본값은 `false`로 둔다.
-- [ ] 카드 수정 API에서 제외 여부를 저장할 수 있게 한다.
-- [ ] 빠른 토글 API가 필요한지 판단한다.
+- [x] SQLite migration에 `study_excluded` 컬럼을 추가한다.
+- [x] 카드 조회 응답에 제외 여부를 포함한다.
+- [x] 카드 생성 기본값은 `false`로 둔다.
+- [x] 카드 수정 API에서 제외 여부를 저장할 수 있게 한다.
+- [x] 빠른 토글 API가 필요한지 판단한다.
 
 Files:
 - `app.py`
@@ -195,11 +195,11 @@ Purpose:
 카드 목록과 카드 수정 흐름에서 제외 상태를 안전하게 바꿀 수 있게 한다.
 
 Tasks:
-- [ ] 카드 목록 item에 `학습 제외` 상태 pill을 표시한다.
-- [ ] 카드 수정 폼에 `학습에서 제외` 체크박스를 추가한다.
-- [ ] 카드 목록에서 빠르게 제외/포함을 바꾸는 action이 필요한지 판단한다.
-- [ ] 제외된 카드는 시각적으로 약하게 보이되 삭제/오답처럼 위험하게 보이지 않게 한다.
-- [ ] 검색/필터에 "제외 카드" 필터가 필요한지 판단한다.
+- [x] 카드 목록 item에 `학습 제외` 상태 pill을 표시한다.
+- [x] 카드 수정 폼에 `학습에서 제외` 체크박스를 추가한다.
+- [x] 카드 목록에서 빠르게 제외/포함을 바꾸는 action이 필요한지 판단한다.
+- [x] 제외된 카드는 시각적으로 약하게 보이되 삭제/오답처럼 위험하게 보이지 않게 한다.
+- [x] 검색/필터에 "제외 카드" 필터가 필요한지 판단한다.
 
 Files:
 - `static/app.js`
@@ -222,11 +222,11 @@ Default behavior:
 - 백업/CSV: 제외 카드 포함
 
 Tasks:
-- [ ] `startStudySession` 카드 준비 단계에서 제외 카드를 필터링한다.
-- [ ] 묶음 연습 카드 준비 단계에서도 제외 카드를 필터링한다.
-- [ ] 학습 시작 panel에 `학습 대상 n개 · 제외 m개`를 표시한다.
-- [ ] 모든 카드가 제외된 소그룹은 학습 시작 disabled reason을 보여준다.
-- [ ] 필요하면 "제외 카드 포함" 임시 옵션을 제공한다.
+- [x] `startStudySession` 카드 준비 단계에서 제외 카드를 필터링한다.
+- [x] 묶음 연습 카드 준비 단계에서도 제외 카드를 필터링한다.
+- [x] 학습 시작 panel에 `학습 대상 n개 · 제외 m개`를 표시한다.
+- [x] 모든 카드가 제외된 소그룹은 학습 시작 disabled reason을 보여준다.
+- [x] 필요하면 "제외 카드 포함" 임시 옵션을 제공한다.
 
 Files:
 - `static/app.js`
@@ -247,9 +247,9 @@ Copy guidelines:
 - Avoid: `숨김`, `삭제`, `비활성`, `제거`
 
 Tasks:
-- [ ] 카드 수정 폼 help text를 짧게 작성한다.
-- [ ] 학습 시작 disabled reason을 명확하게 작성한다.
-- [ ] 제외 상태 pill 색상은 muted/neutral 계열로 둔다.
+- [x] 카드 수정 폼 help text를 짧게 작성한다.
+- [x] 학습 시작 disabled reason을 명확하게 작성한다.
+- [x] 제외 상태 pill 색상은 muted/neutral 계열로 둔다.
 
 Acceptance Criteria:
 - 제외는 되돌릴 수 있는 학습 필터로 이해된다.
@@ -321,7 +321,7 @@ Default proposal:
 - 나중에 필요하면 `제외 카드 포함` 옵션을 추가한다.
 
 Tasks:
-- [ ] 약점 카드 계산에서 제외 카드를 뺄지 확정한다.
+- [x] 약점 카드 계산에서 제외 카드를 뺄지 확정한다.
 - [ ] 제외된 약점 카드 수를 별도로 보여줄지 판단한다.
 - [ ] 사용자가 의도치 않게 약점 복습에서 카드가 사라졌다고 느끼지 않도록 copy를 정리한다.
 

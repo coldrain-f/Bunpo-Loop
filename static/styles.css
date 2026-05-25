@@ -1396,6 +1396,45 @@ h3 {
   margin-top: 8px;
 }
 
+.checkbox-field {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.checkbox-field input {
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: var(--teal);
+}
+
+.checkbox-field span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.checkbox-field strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.checkbox-field small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 720;
+  line-height: 1.4;
+}
+
 .pending-note {
   margin: 0;
   padding: 9px 10px;
@@ -2128,6 +2167,10 @@ button:active,
   gap: 10px;
 }
 
+.card-item.study-excluded {
+  background: var(--surface-strong);
+}
+
 .card-item-main {
   display: grid;
   gap: 5px;
@@ -2176,6 +2219,11 @@ button:active,
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface-strong);
+}
+
+.card-meta-strip .card-meta-excluded {
+  background: var(--surface);
+  color: var(--muted);
 }
 
 .quiet-actions {
@@ -3986,6 +4034,7 @@ button:active,
 #settings-form .field,
 #settings-form .number-setting,
 #card-form .field,
+#card-form .checkbox-field,
 #card-form .example-row,
 #card-form .duplicate-warning {
   scroll-margin-top: 16px;
