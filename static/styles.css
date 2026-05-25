@@ -2471,8 +2471,10 @@ button:active,
 }
 
 .group-choice-main {
-  display: block;
+  display: grid;
+  min-width: 0;
   width: 100%;
+  gap: 0;
   padding: 14px 86px 14px 14px;
   border-radius: 8px;
   background: transparent;
@@ -2508,6 +2510,16 @@ button:active,
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 800;
+}
+
+.subgroup-picker-block .subgroup-metrics,
+.subgroup-picker-block .subgroup-choice .meta:last-child {
+  display: none;
+}
+
+.subgroup-picker-block .subgroup-choice-main {
+  min-height: 126px;
+  align-content: center;
 }
 
 .group-status-strip {

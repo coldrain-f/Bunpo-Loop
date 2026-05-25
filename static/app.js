@@ -3333,7 +3333,7 @@ function renderStudySubgroupPicker(collection) {
           ? ""
           : renderDisabledReason(bundleDisabledReason)
       }
-      <section class="group-browser-block">
+      <section class="group-browser-block subgroup-picker-block">
         <div class="completion-header">
           <h3>소그룹 선택</h3>
           <span class="pill">${collectionGroups.length}개</span>
