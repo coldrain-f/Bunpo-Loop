@@ -1430,6 +1430,11 @@ function studyCountText(totalCount, studyCount, excludedCount) {
   return `카드 ${totalCount}개`;
 }
 
+function cardScopeText(totalCount, studyCount, excludedCount) {
+  if (excludedCount) return `전체 ${totalCount}개 · 학습 대상 ${studyCount}개 · 제외 ${excludedCount}개`;
+  return `전체 카드 ${totalCount}개`;
+}
+
 function getSelectedStudyCardCount() {
   return getSelectedStudyGroups().reduce((sum, group) => sum + getGroupStudyCardCount(group), 0);
 }
@@ -1769,7 +1774,7 @@ function renderGroupMetricRow(group) {
   const accuracyTone = getAccuracyTone(rate);
   return `
     <div class="subgroup-metrics" aria-label="소그룹 학습 지표">
-      <div class="subgroup-metric"><strong>${number(group.card_count)}</strong><span>카드</span></div>
+      <div class="subgroup-metric"><strong>${number(group.card_count)}</strong><span>전체 카드</span></div>
       <div class="subgroup-metric"><strong>${number(group.completed_rounds)}</strong><span>회독</span></div>
       <div class="subgroup-metric accuracy ${accuracyTone}"><strong>${rate === null ? "-" : `${rate}%`}</strong><span>최근 첫 시도</span></div>
     </div>
@@ -1967,6 +1972,8 @@ function getRoundScopedGroupIds(round, groupIds) {
 function getStatsSummary() {
   const scope = getStatsScope();
   const totalCards = scope.cards.length;
+  const totalStudyCards = scope.groups.reduce((sum, group) => sum + getGroupStudyCardCount(group), 0);
+  const totalExcludedCards = scope.groups.reduce((sum, group) => sum + getGroupExcludedCardCount(group), 0);
   const learnedCards = scope.isAllTime
     ? scope.cards.filter((card) => cardAttemptCount(card) > 0).length
     : scope.rounds.reduce((sum, round) => sum + number(round.total_cards), 0);
@@ -2009,6 +2016,8 @@ function getStatsSummary() {
   return {
     scope,
     totalCards,
+    totalStudyCards,
+    totalExcludedCards,
     learnedCards,
     totalGroups,
     studiedGroups,
@@ -2112,7 +2121,7 @@ function renderStatsTodayPanel(summary) {
     tone: "quiet",
     eyebrow: "추천",
     title: "첫 학습 단위를 준비하세요.",
-    detail: "카드가 있는 소그룹이 생기면 오늘의 학습 상태를 더 정확히 보여줍니다.",
+    detail: "학습 대상 카드가 있는 소그룹이 생기면 오늘의 학습 상태를 더 정확히 보여줍니다.",
     buttonLabel: "묶음 탭으로",
     icon: "folder",
     action: "go-groups",
@@ -2165,7 +2174,7 @@ function renderStatsTodayPanel(summary) {
       }" ${action.attrs}>${iconLabel(action.icon, action.buttonLabel)}</button>
     </section>
     <div class="stats-status-grid">
-      ${renderStatsStatusItem("오늘 완료", `${number(todayCount)}/${number(readyCount)}`, "카드가 있는 소그룹", todayRate)}
+      ${renderStatsStatusItem("오늘 완료", `${number(todayCount)}/${number(readyCount)}`, "학습 대상이 있는 소그룹", todayRate)}
       ${renderStatsStatusItem("남은 소그룹", `${number(pendingCount)}개`, "오늘 아직 회독 전", getRate(readyCount - pendingCount, readyCount))}
       ${renderStatsStatusItem("약점 카드", `${number(summary.weakCards.length)}개`, "오답 기준에 걸림", summary.weakCards.length ? 100 : 0, summary.weakCards.length ? "danger" : "good")}
     </div>
@@ -2193,7 +2202,9 @@ function renderStatsOverviewSection(summary) {
   const cardMetricValue = summary.scope.isAllTime
     ? `${number(summary.learnedCards)}/${number(summary.totalCards)}`
     : `${number(summary.learnedCards)}장`;
-  const cardMetricDetail = summary.scope.isAllTime ? "한 번이라도 풀이한 카드" : `${summary.scope.rangeCopy.label} 회독에 나온 카드`;
+  const cardMetricDetail = summary.scope.isAllTime
+    ? cardScopeText(summary.totalCards, summary.totalStudyCards, summary.totalExcludedCards)
+    : `${summary.scope.rangeCopy.label} 회독에 나온 학습 대상 카드`;
   return `
     <section class="panel stack stats-overview-panel">
       <div class="completion-header">
@@ -2343,6 +2354,9 @@ function renderStatsCollectionSection(scope = getStatsScope()) {
 function renderStatsCollectionItem(collection, scope = getStatsScope()) {
   const stats = getCollectionStats(collection, scope);
   const lastStudy = collection.last_studied_at ? formatDate(collection.last_studied_at) : "학습 기록 없음";
+  const cardCount = number(collection.card_count);
+  const studyCount = getCollectionStudyCardCount(collection);
+  const excludedCount = getCollectionExcludedCardCount(collection);
   return `
     <article class="stats-collection-item">
       <div class="stats-item-heading">
@@ -2356,7 +2370,7 @@ function renderStatsCollectionItem(collection, scope = getStatsScope()) {
       </div>
       <div class="stats-chip-row">
         <span>소그룹 ${number(stats.studiedGroups)}/${number(stats.groups.length)}</span>
-        <span>카드 ${number(collection.card_count)}</span>
+        <span>${escapeHtml(cardScopeText(cardCount, studyCount, excludedCount))}</span>
         <span>회독 ${number(stats.roundCount)}</span>
         <span>최근 첫 시도 ${rateText(stats.latestRate)}</span>
       </div>
@@ -2388,8 +2402,8 @@ function getStatsFocusGroups(scope = getStatsScope()) {
   return [...scope.groups]
     .filter((group) =>
       scope.isAllTime
-        ? number(group.card_count) > 0 && number(group.wrong_total) > 0
-        : number(group.card_count) > 0 && number(periodWrongByGroup.get(Number(group.id))) > 0,
+        ? getGroupStudyCardCount(group) > 0 && number(group.wrong_total) > 0
+        : getGroupStudyCardCount(group) > 0 && number(periodWrongByGroup.get(Number(group.id))) > 0,
     )
     .sort((left, right) => {
       const leftAttempts = number(left.correct_total) + number(left.wrong_total);
@@ -2441,6 +2455,9 @@ function renderStatsFocusGroupItem(group) {
   const attempts = number(group.correct_total) + number(group.wrong_total);
   const wrongRate = getRate(wrongTotal, attempts);
   const recentRate = getGroupRecentFirstAttemptRate(group);
+  const cardCount = number(group.card_count);
+  const studyCount = getGroupStudyCardCount(group);
+  const excludedCount = getGroupExcludedCardCount(group);
   return `
     <article class="stats-focus-item">
       <div class="stats-item-heading">
@@ -2453,7 +2470,7 @@ function renderStatsFocusGroupItem(group) {
         }">${iconLabel("play", "학습")}</button>
       </div>
       <div class="stats-chip-row">
-        <span>카드 ${number(group.card_count)}</span>
+        <span>${escapeHtml(cardScopeText(cardCount, studyCount, excludedCount))}</span>
         <span>회독 ${number(group.completed_rounds)}</span>
         <span>오답 ${number(wrongTotal)}</span>
         <span>최근 첫 시도 ${rateText(recentRate)}</span>
@@ -2997,10 +3014,15 @@ function renderDialog() {
   }
   const selectedGroup = getSelectedGroup();
   if (state.activeDialog === "start" && selectedGroup) {
+    const selectedGroupCardText = studyCountText(
+      number(selectedGroup.card_count),
+      getGroupStudyCardCount(selectedGroup),
+      getGroupExcludedCardCount(selectedGroup),
+    );
     renderConfirmDialog({
       eyebrow: "시작",
       title: `${number(selectedGroup.completed_rounds) + 1}회독을 시작할까요?`,
-      message: `${selectedGroup.name} · 카드 ${number(selectedGroup.card_count)}개 · ${ORDER_LABELS[state.orderMode]} · ${
+      message: `${selectedGroup.name} · ${selectedGroupCardText} · ${ORDER_LABELS[state.orderMode]} · ${
         EXAMPLE_ORDER_LABELS[state.exampleOrderMode]
       } · ${
         EXAMPLE_DISPLAY_LABELS[state.exampleDisplayMode]
@@ -3403,7 +3425,7 @@ function renderStudySubgroupPicker(collection) {
   const collectionExcludedCount = getCollectionExcludedCardCount(collection);
   const bundleDisabledReason = collectionExcludedCount
     ? "학습 대상 카드가 없습니다. 제외한 카드를 다시 학습에 포함해 주세요."
-    : "카드가 있는 소그룹이 있어야 기록 없는 묶음 연습을 시작할 수 있습니다.";
+    : "학습 대상 카드가 있는 소그룹이 있어야 기록 없는 묶음 연습을 시작할 수 있습니다.";
   const collectionGroups = sortStudyGroups(
     getGroupsForCollection(collection.id).filter((group) =>
       matchesQuery([group.name, group.description, group.collection_name], state.studyGroupSearchQuery),
@@ -3427,7 +3449,7 @@ function renderStudySubgroupPicker(collection) {
       <p class="meta">${escapeHtml(collection.description || "설명 없음")}</p>
       <div class="stat-grid">
         <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
-        <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
+        <div class="stat"><strong>${number(collection.card_count)}</strong><span>전체 카드</span></div>
         <div class="stat"><strong>${number(collection.completed_rounds)}</strong><span>소그룹 회독</span></div>
       </div>
       <p class="meta">${escapeHtml(studyCountText(number(collection.card_count), collectionStudyCount, collectionExcludedCount))} · 묶음 연습은 공식 기록에 저장되지 않습니다.</p>
@@ -3869,7 +3891,7 @@ function renderCollectionStudyDialog() {
         <section class="study-start-panel practice-summary" aria-label="묶음 연습 요약" aria-live="polite">
           <div>
             <span class="today-action-label">기록 없는 연습</span>
-            <strong>${selectedGroups.length}개 소그룹 · 카드 ${selectedCardCount}개</strong>
+            <strong>${selectedGroups.length}개 소그룹 · 학습 대상 ${selectedCardCount}개</strong>
             <p id="collection-practice-summary">${escapeHtml(summaryText)}</p>
           </div>
           <div class="study-start-actions">
@@ -3970,7 +3992,7 @@ function renderSelectedGroupStats(group) {
   const excludedCount = getGroupExcludedCardCount(group);
   return `
     <div class="stat-grid">
-      <div class="stat"><strong>${number(group.card_count)}</strong><span>카드</span></div>
+      <div class="stat"><strong>${number(group.card_count)}</strong><span>전체 카드</span></div>
       <div class="stat"><strong>${number(group.correct_total)}</strong><span>정답</span></div>
       <div class="stat"><strong>${number(group.wrong_total)}</strong><span>오답</span></div>
     </div>
@@ -5489,6 +5511,11 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
   const displayLimit = Math.max(GROUP_LIST_PAGE_SIZE, number(state.groupListLimit));
   const displayGroups = visibleGroups.slice(0, displayLimit);
   const hiddenCount = Math.max(0, visibleGroups.length - displayGroups.length);
+  const collectionStudyCount = getCollectionStudyCardCount(collection);
+  const collectionExcludedCount = getCollectionExcludedCardCount(collection);
+  const bundleDisabledReason = collectionExcludedCount
+    ? "학습 대상 카드가 없습니다. 제외한 카드를 다시 학습에 포함해 주세요."
+    : "학습 대상 카드가 있는 소그룹이 있어야 기록 없는 묶음 연습을 시작할 수 있습니다.";
   return `
     <div class="panel stack">
       <div class="collection-detail-header">
@@ -5508,23 +5535,23 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
         <p>${escapeHtml(collection.description || "설명 없음")}</p>
         <div class="stat-grid">
           <div class="stat"><strong>${number(collection.group_count)}</strong><span>소그룹</span></div>
-          <div class="stat"><strong>${number(collection.card_count)}</strong><span>카드</span></div>
+          <div class="stat"><strong>${number(collection.card_count)}</strong><span>전체 카드</span></div>
           <div class="stat"><strong>${number(collection.completed_rounds)}</strong><span>소그룹 회독</span></div>
         </div>
-        <small>공식 기록은 소그룹 기록 합산입니다. 묶음 연습은 공식 기록에 저장되지 않습니다.</small>
+        <small>${escapeHtml(studyCountText(number(collection.card_count), collectionStudyCount, collectionExcludedCount))} · 공식 기록은 소그룹 기록 합산입니다. 묶음 연습은 공식 기록에 저장되지 않습니다.</small>
       </section>
       <div class="button-row">
         <button class="primary-button" type="button" data-action="open-group-form-for-collection" data-collection-id="${
           collection.id
         }">${iconLabel("plus", "소그룹 만들기")}</button>
         <button class="secondary-button" type="button" data-action="open-collection-study-dialog" ${
-          number(collection.card_count) ? "" : "disabled"
+          collectionStudyCount ? "" : `disabled aria-describedby="${getDisabledReasonId(bundleDisabledReason)}"`
         }>${iconLabel("repeat-2", "묶음 연습")}</button>
       </div>
       ${
-        number(collection.card_count)
+        collectionStudyCount
           ? ""
-          : renderDisabledReason("카드가 있는 소그룹이 있어야 기록 없는 묶음 연습을 시작할 수 있습니다.")
+          : renderDisabledReason(bundleDisabledReason)
       }
       ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "소그룹 검색" })}
       <div class="group-list">
@@ -5834,7 +5861,7 @@ function renderCollectionListItem(collection) {
         </div>
         <p class="collection-description">${escapeHtml(collection.description || "설명 없음")}</p>
         <div class="collection-metric-strip">
-          <span><strong>${number(collection.card_count)}</strong>카드</span>
+          <span><strong>${number(collection.card_count)}</strong>전체 카드</span>
           <span><strong>${number(collection.completed_rounds)}</strong>회독</span>
           <span><strong>${number(collection.wrong_total)}</strong>오답</span>
         </div>
