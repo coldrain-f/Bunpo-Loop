@@ -7086,6 +7086,23 @@ document.addEventListener("keydown", async (event) => {
   if (activateControlFromKeyboard(event)) return;
   if (isTypingTarget(target) || !state.session || state.session.savedRound) return;
   if (state.session.isAnswering) return;
+  const studyKey = String(event.key || "").toLowerCase();
+  if (studyKey === "a" || event.key === "ArrowRight") {
+    event.preventDefault();
+    if (event.repeat) return;
+    if (state.session.showingBack) await answerCard("correct");
+    else {
+      state.session.showingBack = true;
+      render();
+    }
+    return;
+  }
+  if (studyKey === "b" && state.session.showingBack) {
+    event.preventDefault();
+    if (event.repeat) return;
+    await answerCard("wrong");
+    return;
+  }
   if (event.key === " " || event.key === "Enter") {
     event.preventDefault();
     state.session.showingBack = true;
@@ -7094,10 +7111,6 @@ document.addEventListener("keydown", async (event) => {
   if (state.session.showingBack && event.key === "ArrowLeft") {
     event.preventDefault();
     await answerCard("wrong");
-  }
-  if (state.session.showingBack && event.key === "ArrowRight") {
-    event.preventDefault();
-    await answerCard("correct");
   }
 });
 
