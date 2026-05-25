@@ -3571,7 +3571,6 @@ function renderStudyCollectionChoiceItem(collection) {
         <div class="group-choice-footer">
           <span>소그룹 ${groupCount}개</span>
           <span>카드 ${cardCount}개</span>
-          <span>소그룹 합산</span>
         </div>
       </button>
       ${
