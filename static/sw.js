@@ -1,4 +1,4 @@
-const SHELL_CACHE = "kokko-shell-20260525-5";
+const SHELL_CACHE = "kokko-shell-20260525-6";
 
 const APP_SHELL = [
   "/",

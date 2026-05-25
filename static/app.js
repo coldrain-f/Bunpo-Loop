@@ -3395,6 +3395,9 @@ function renderTodayStudyPanel(recentGroup, weakCards = getWeakCards()) {
   const recentRounds = getWeakRecentRounds();
   const recentThreshold = getWeakRecentWrongThreshold();
   const nextRoundNo = recentGroup ? number(recentGroup.completed_rounds) + 1 : 1;
+  const recentTitle = recentGroup
+    ? [recentGroup.collection_name, recentGroup.name].filter(Boolean).join(" · ")
+    : "학습할 대그룹 고르기";
   const recentMeta = recentGroup
     ? `${nextRoundNo}회독 준비 · 마지막 ${formatDate(recentGroup.last_studied_at)}`
     : "아래에서 대그룹을 선택한 뒤 소그룹 회독을 시작하세요.";
@@ -3411,7 +3414,7 @@ function renderTodayStudyPanel(recentGroup, weakCards = getWeakCards()) {
       <div class="today-action-card primary today-primary-card">
         <div>
           <span class="today-action-label">오늘 바로 할 일</span>
-          <strong>${recentGroup ? escapeHtml(recentGroup.name) : "학습할 대그룹 고르기"}</strong>
+          <strong>${escapeHtml(recentTitle)}</strong>
           <p>${escapeHtml(recentMeta)}</p>
         </div>
         <button class="primary-button full" type="button" data-action="${
