@@ -58,8 +58,8 @@
   - [ ] 3.3 Migration Defaults
 - [ ] Phase 4. Review & Stats Policy
   - [ ] 4.1 Weak Review Behavior
-  - [ ] 4.2 Stats Wording
-  - [ ] 4.3 Edge Case QA
+  - [x] 4.2 Stats Wording
+  - [x] 4.3 Edge Case QA
 - [ ] Phase 5. Optional Controller Calibration
   - [ ] 5.1 Input Test Surface
   - [ ] 5.2 Button Detection
@@ -350,12 +350,12 @@ Purpose:
 제외 상태가 학습, 통계, CSV, 백업에서 어긋나지 않게 한다.
 
 Tasks:
-- [ ] 카드 1장 중 1장 제외 상태에서 공식 학습 시작이 막히는지 확인한다.
-- [ ] 카드 3장 중 1장 제외 상태에서 2장만 학습되는지 확인한다.
-- [ ] 제외 카드를 다시 포함하면 다음 학습에 포함되는지 확인한다.
-- [ ] 제외 카드의 기존 오답 기록이 유지되는지 확인한다.
-- [ ] CSV export/import 후 제외 상태가 유지되는지 확인한다.
-- [ ] 백업/복원 후 제외 상태와 설정이 유지되는지 확인한다.
+- [x] 카드 1장 중 1장 제외 상태에서 공식 학습 시작이 막히는지 확인한다.
+- [x] 카드 3장 중 1장 제외 상태에서 2장만 학습되는지 확인한다.
+- [x] 제외 카드를 다시 포함하면 다음 학습에 포함되는지 확인한다.
+- [x] 제외 카드의 기존 오답 기록이 유지되는지 확인한다.
+- [x] CSV export/import 후 제외 상태가 유지되는지 확인한다.
+- [x] 백업/복원 후 제외 상태와 설정이 유지되는지 확인한다.
 
 Acceptance Criteria:
 - 제외 상태 변경이 기록 손실을 만들지 않는다.

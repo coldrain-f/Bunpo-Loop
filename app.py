@@ -148,9 +148,17 @@ def utc_now_sql() -> str:
     return "datetime('now')"
 
 
+class ClosingConnection(sqlite3.Connection):
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
+        try:
+            return bool(super().__exit__(exc_type, exc, tb))
+        finally:
+            self.close()
+
+
 def connect() -> sqlite3.Connection:
     DATA_DIR.mkdir(exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, factory=ClosingConnection)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
@@ -2228,6 +2236,8 @@ class AppHandler(BaseHTTPRequestHandler):
                         raise ValueError("학습할 소그룹을 하나 이상 선택하세요.")
                     selected_groups = groups_for_collection(conn, user_id, collection_id, group_ids)
                     selected_group_ids = [int(group["id"]) for group in selected_groups]
+                    if len(selected_group_ids) != len(group_ids):
+                        raise ValueError("선택한 소그룹을 찾을 수 없습니다.")
                     cards = cards_payload(
                         conn,
                         user_id,
@@ -2235,6 +2245,8 @@ class AppHandler(BaseHTTPRequestHandler):
                         order_mode=order_mode,
                         include_excluded=False,
                     )
+                    if not cards:
+                        raise ValueError("선택한 소그룹에 학습 대상 카드가 없습니다.")
                     self.send_json(
                         {
                             "scope_type": "practice",
@@ -2259,6 +2271,8 @@ class AppHandler(BaseHTTPRequestHandler):
                     order_mode=order_mode,
                     include_excluded=False,
                 )
+                if not cards:
+                    raise ValueError("학습 대상 카드가 없습니다. 제외한 카드를 다시 포함해 주세요.")
                 self.send_json(
                     {
                         "scope_type": "group",
@@ -2766,7 +2780,10 @@ class AppHandler(BaseHTTPRequestHandler):
         card_placeholders = ",".join("?" for _ in unique_card_ids)
         rows = conn.execute(
             f"""
-            SELECT card.id, card.group_id
+            SELECT
+                card.id,
+                card.group_id,
+                card.study_excluded
             FROM cards card
             JOIN groups g ON g.id = card.group_id
             JOIN collections c ON c.id = g.collection_id
@@ -2779,6 +2796,8 @@ class AppHandler(BaseHTTPRequestHandler):
         valid_ids = {int(row["id"]) for row in rows}
         if len(valid_ids) != len(unique_card_ids):
             raise ValueError("선택한 소그룹에 속하지 않는 카드가 포함되어 있습니다.")
+        if any(int(row["study_excluded"]) for row in rows):
+            raise ValueError("학습에서 제외된 카드가 결과에 포함되어 있습니다.")
 
         correct_count = sum(1 for _, value in cleaned if value == "correct")
         wrong_count = len(cleaned) - correct_count
