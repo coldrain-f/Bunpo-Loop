@@ -38,7 +38,7 @@ DEFAULT_CONTROLLER_B_ACTION = "wrong"
 DEFAULT_CONTROLLER_X_ACTION = "disabled"
 DEFAULT_CONTROLLER_Y_ACTION = "disabled"
 CONTROLLER_ACTIONS = ("primary", "wrong", "disabled")
-BACKUP_VERSION = 2
+BACKUP_VERSION = 3
 CSV_FRONT_HEADERS = ("front", "앞면", "카드앞면", "표현", "문법", "질문")
 CSV_BACK_HEADERS = ("back", "뒷면", "뜻", "의미", "해석", "답")
 CSV_MEMO_HEADERS = ("memo", "메모", "note", "notes", "비고")
@@ -1048,10 +1048,46 @@ def table_payload(conn: sqlite3.Connection, table: str, order_by: str) -> list[d
     return [row_to_dict(row) for row in rows]
 
 
+def user_settings_payload(user: sqlite3.Row | None) -> dict:
+    return {
+        "target_name": str(user["target_name"] or "") if user else "",
+        "jlpt_exam_date": str(user["jlpt_exam_date"] or "") if user else "",
+        "weak_card_threshold": int(user["weak_card_threshold"] or DEFAULT_WEAK_CARD_THRESHOLD)
+        if user
+        else DEFAULT_WEAK_CARD_THRESHOLD,
+        "weak_recent_rounds": int(user["weak_recent_rounds"] or DEFAULT_WEAK_RECENT_ROUNDS)
+        if user
+        else DEFAULT_WEAK_RECENT_ROUNDS,
+        "weak_recent_wrong_threshold": int(
+            user["weak_recent_wrong_threshold"] or DEFAULT_WEAK_RECENT_WRONG_THRESHOLD
+        )
+        if user
+        else DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+        "controller_a_action": normalize_controller_action(
+            user["controller_a_action"] if user else "",
+            DEFAULT_CONTROLLER_A_ACTION,
+        ),
+        "controller_b_action": normalize_controller_action(
+            user["controller_b_action"] if user else "",
+            DEFAULT_CONTROLLER_B_ACTION,
+        ),
+        "controller_x_action": normalize_controller_action(
+            user["controller_x_action"] if user else "",
+            DEFAULT_CONTROLLER_X_ACTION,
+        ),
+        "controller_y_action": normalize_controller_action(
+            user["controller_y_action"] if user else "",
+            DEFAULT_CONTROLLER_Y_ACTION,
+        ),
+    }
+
+
 def backup_payload(conn: sqlite3.Connection, user_id: int) -> dict:
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     return {
         "version": BACKUP_VERSION,
         "exported_at": datetime.now(timezone.utc).isoformat(),
+        "settings": user_settings_payload(user),
         "collections": [
             row_to_dict(row)
             for row in conn.execute(
@@ -1181,6 +1217,95 @@ def normalize_backup_payload(payload: dict) -> tuple[dict, int]:
     return backup, version
 
 
+def normalize_backup_settings(value: object, current_user: sqlite3.Row) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    return {
+        "target_name": validate_optional_text(
+            value.get("target_name", current_user["target_name"]),
+            "목표 이름",
+            80,
+        ),
+        "jlpt_exam_date": validate_exam_date(
+            value.get("jlpt_exam_date", current_user["jlpt_exam_date"])
+        ),
+        "weak_card_threshold": validate_weak_card_threshold(
+            value.get(
+                "weak_card_threshold",
+                current_user["weak_card_threshold"] or DEFAULT_WEAK_CARD_THRESHOLD,
+            )
+        ),
+        "weak_recent_rounds": validate_weak_recent_rounds(
+            value.get(
+                "weak_recent_rounds",
+                current_user["weak_recent_rounds"] or DEFAULT_WEAK_RECENT_ROUNDS,
+            )
+        ),
+        "weak_recent_wrong_threshold": validate_weak_recent_wrong_threshold(
+            value.get(
+                "weak_recent_wrong_threshold",
+                current_user["weak_recent_wrong_threshold"] or DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+            )
+        ),
+        "controller_a_action": validate_controller_action(
+            value.get(
+                "controller_a_action",
+                normalize_controller_action(current_user["controller_a_action"], DEFAULT_CONTROLLER_A_ACTION),
+            )
+        ),
+        "controller_b_action": validate_controller_action(
+            value.get(
+                "controller_b_action",
+                normalize_controller_action(current_user["controller_b_action"], DEFAULT_CONTROLLER_B_ACTION),
+            )
+        ),
+        "controller_x_action": validate_controller_action(
+            value.get(
+                "controller_x_action",
+                normalize_controller_action(current_user["controller_x_action"], DEFAULT_CONTROLLER_X_ACTION),
+            )
+        ),
+        "controller_y_action": validate_controller_action(
+            value.get(
+                "controller_y_action",
+                normalize_controller_action(current_user["controller_y_action"], DEFAULT_CONTROLLER_Y_ACTION),
+            )
+        ),
+    }
+
+
+def restore_backup_settings(conn: sqlite3.Connection, user_id: int, settings: dict | None) -> None:
+    if settings is None:
+        return
+    conn.execute(
+        """
+        UPDATE users
+        SET target_name = ?,
+            jlpt_exam_date = ?,
+            weak_card_threshold = ?,
+            weak_recent_rounds = ?,
+            weak_recent_wrong_threshold = ?,
+            controller_a_action = ?,
+            controller_b_action = ?,
+            controller_x_action = ?,
+            controller_y_action = ?
+        WHERE id = ?
+        """,
+        (
+            settings["target_name"],
+            settings["jlpt_exam_date"],
+            settings["weak_card_threshold"],
+            settings["weak_recent_rounds"],
+            settings["weak_recent_wrong_threshold"],
+            settings["controller_a_action"],
+            settings["controller_b_action"],
+            settings["controller_x_action"],
+            settings["controller_y_action"],
+            user_id,
+        ),
+    )
+
+
 def table_count(conn: sqlite3.Connection, table: str) -> int:
     return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] or 0)
 
@@ -1291,6 +1416,10 @@ def delete_user_learning_data(conn: sqlite3.Connection, user_id: int) -> None:
 
 def restore_backup(conn: sqlite3.Connection, user_id: int, payload: dict) -> dict:
     backup, _version = normalize_backup_payload(payload)
+    current_user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    if current_user is None:
+        raise ValueError("복원할 사용자를 찾을 수 없습니다.")
+    settings = normalize_backup_settings(backup.get("settings"), current_user)
     collections = ensure_list(backup.get("collections", []), "대그룹 백업")
     groups = ensure_list(backup.get("groups", []), "소그룹 백업")
     cards = ensure_list(backup.get("cards", []), "카드 백업")
@@ -1300,6 +1429,7 @@ def restore_backup(conn: sqlite3.Connection, user_id: int, payload: dict) -> dic
     reviews = ensure_list(backup.get("reviews", []), "복습 백업")
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
+    restore_backup_settings(conn, user_id, settings)
     delete_user_learning_data(conn, user_id)
 
     if not collections and groups:
@@ -2281,31 +2411,7 @@ class AppHandler(BaseHTTPRequestHandler):
         return user
 
     def settings_payload(self, user: sqlite3.Row) -> dict:
-        return {
-            "target_name": str(user["target_name"] or ""),
-            "jlpt_exam_date": str(user["jlpt_exam_date"] or ""),
-            "weak_card_threshold": int(user["weak_card_threshold"] or DEFAULT_WEAK_CARD_THRESHOLD),
-            "weak_recent_rounds": int(user["weak_recent_rounds"] or DEFAULT_WEAK_RECENT_ROUNDS),
-            "weak_recent_wrong_threshold": int(
-                user["weak_recent_wrong_threshold"] or DEFAULT_WEAK_RECENT_WRONG_THRESHOLD
-            ),
-            "controller_a_action": normalize_controller_action(
-                user["controller_a_action"],
-                DEFAULT_CONTROLLER_A_ACTION,
-            ),
-            "controller_b_action": normalize_controller_action(
-                user["controller_b_action"],
-                DEFAULT_CONTROLLER_B_ACTION,
-            ),
-            "controller_x_action": normalize_controller_action(
-                user["controller_x_action"],
-                DEFAULT_CONTROLLER_X_ACTION,
-            ),
-            "controller_y_action": normalize_controller_action(
-                user["controller_y_action"],
-                DEFAULT_CONTROLLER_Y_ACTION,
-            ),
-        }
+        return user_settings_payload(user)
 
     def update_settings(self, conn: sqlite3.Connection, user: sqlite3.Row) -> None:
         body = parse_body(self)

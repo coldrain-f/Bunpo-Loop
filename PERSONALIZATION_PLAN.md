@@ -54,7 +54,7 @@
   - [x] 2.4 Exclusion State Copy
 - [ ] Phase 3. Import, Export & Backup Compatibility
   - [x] 3.1 CSV Round Trip
-  - [ ] 3.2 Backup/Restore Contract
+  - [x] 3.2 Backup/Restore Contract
   - [ ] 3.3 Migration Defaults
 - [ ] Phase 4. Review & Stats Policy
   - [ ] 4.1 Weak Review Behavior
@@ -282,10 +282,10 @@ Purpose:
 백업 JSON이 제외 상태와 컨트롤러 설정을 안전하게 보존하게 한다.
 
 Tasks:
-- [ ] 백업 export에 카드 제외 상태를 포함한다.
-- [ ] 백업 export에 컨트롤러 매핑 설정을 포함한다.
-- [ ] restore에서 필드가 없으면 기본값으로 보정한다.
-- [ ] 백업 schema/migration 메모를 문서화한다.
+- [x] 백업 export에 카드 제외 상태를 포함한다.
+- [x] 백업 export에 컨트롤러 매핑 설정을 포함한다.
+- [x] restore에서 필드가 없으면 기본값으로 보정한다.
+- [x] 백업 schema/migration 메모를 문서화한다.
 
 Files:
 - `app.py`

@@ -3183,7 +3183,9 @@ function renderDialog() {
       title: "현재 데이터를 백업 파일로 교체할까요?",
       message: `현재 학습 데이터는 삭제되고 백업의 대그룹 ${number(summary.collections)}개, 소그룹 ${number(
         summary.groups,
-      )}개, 카드 ${number(summary.cards)}개, 회독 ${number(summary.rounds)}개로 교체됩니다. 이 작업은 되돌릴 수 없습니다.`,
+      )}개, 카드 ${number(summary.cards)}개, 회독 ${number(summary.rounds)}개로 교체됩니다. ${
+        summary.hasSettings ? "학습 설정도 백업 값으로 복원됩니다. " : ""
+      }이 작업은 되돌릴 수 없습니다.`,
       confirmLabel: "교체 복원",
       confirmAction: "confirm-restore-backup",
     });
@@ -5556,6 +5558,7 @@ function backupSummary(backup) {
     groups: Array.isArray(payload.groups) ? payload.groups.length : 0,
     cards: Array.isArray(payload.cards) ? payload.cards.length : 0,
     rounds: Array.isArray(payload.study_rounds) ? payload.study_rounds.length : 0,
+    hasSettings: Boolean(payload.settings && typeof payload.settings === "object"),
   };
 }
 
@@ -5610,10 +5613,10 @@ function renderBackupPanel() {
         state.dataPanelOpen
           ? `
             <div class="data-safety-summary">
-              <strong>백업 파일에는 학습 데이터가 그대로 들어갑니다.</strong>
+              <strong>백업 파일에는 학습 데이터와 설정이 그대로 들어갑니다.</strong>
               <p>대그룹 ${number(state.collections.length)}개, 소그룹 ${number(state.groups.length)}개, 카드 ${number(
                 state.cards.length,
-              )}개와 예문, 회독 기록이 포함됩니다. 파일은 개인 저장소에 보관하세요.</p>
+              )}개와 예문, 회독 기록, 학습 설정이 포함됩니다. 파일은 개인 저장소에 보관하세요.</p>
             </div>
             <div class="button-row">
               <button class="secondary-button" type="button" data-action="export-backup">${iconLabel(
@@ -5628,7 +5631,7 @@ function renderBackupPanel() {
                 <textarea id="backup-json" class="textarea backup-textarea" name="backup_json" placeholder="백업 JSON" aria-describedby="backup-error backup-help">${escapeHtml(
                   state.backupDraftText,
                 )}</textarea>
-                <small id="backup-help" class="form-hint">복원하면 현재 대그룹, 소그룹, 카드, 예문, 회독 기록이 백업 파일 내용으로 교체됩니다.</small>
+                <small id="backup-help" class="form-hint">복원하면 현재 대그룹, 소그룹, 카드, 예문, 회독 기록과 학습 설정이 백업 파일 내용으로 교체됩니다.</small>
               </label>
               ${
                 state.backupError
