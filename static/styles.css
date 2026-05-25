@@ -3393,6 +3393,26 @@ button:active,
   font-weight: 760;
 }
 
+.study-controller-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  max-width: 100%;
+  margin-left: auto;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.study-controller-status.active {
+  border-color: rgba(23, 111, 102, 0.24);
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
 .study-card {
   position: relative;
   display: grid;

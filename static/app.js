@@ -106,6 +106,8 @@ const BULK_PREVIEW_RENDER_LIMIT = 80;
 const CSV_IMPORT_ACCEPT = "text/csv,.csv";
 const STUDY_GAMEPAD_PRIMARY_BUTTONS = new Set([0, 15]);
 const STUDY_GAMEPAD_WRONG_BUTTONS = new Set([1, 14]);
+const STUDY_CONTROLLER_COOLDOWN_MS = 250;
+const STUDY_CONTROLLER_STATUS_FLASH_MS = 1200;
 const CARD_SEARCH_TEXT_CACHE = new WeakMap();
 
 const state = {
@@ -195,6 +197,11 @@ const connectionBannerEl = document.querySelector("#connection-banner");
 let studyTimerId = null;
 let studyGamepadFrameId = null;
 const studyGamepadPressedButtons = new Set();
+let studyControllerLastActionAt = 0;
+let studyControllerLastInputAt = 0;
+let studyControllerLastInputLabel = "";
+let studyControllerStatusTimerId = null;
+let studyGamepadConnected = false;
 let renderedDialogName = null;
 let dialogReturnFocusEl = null;
 let shouldFocusDialogOnRender = false;
@@ -2469,6 +2476,60 @@ function updateStudyTimer() {
   if (timerEl) timerEl.textContent = formatDuration(elapsedSeconds(state.session));
 }
 
+function hasRecentStudyControllerInput(now = Date.now()) {
+  return Boolean(
+    studyControllerLastInputLabel &&
+      studyControllerLastInputAt &&
+      now - studyControllerLastInputAt < STUDY_CONTROLLER_STATUS_FLASH_MS,
+  );
+}
+
+function getStudyControllerStatusText(now = Date.now()) {
+  if (hasRecentStudyControllerInput(now)) return `${studyControllerLastInputLabel} 입력됨`;
+  if (studyGamepadConnected) return "컨트롤러 연결됨";
+  return "컨트롤러 대기";
+}
+
+function updateStudyControllerStatusElement() {
+  const statusEl = document.getElementById("study-controller-status");
+  if (!statusEl) return;
+  const now = Date.now();
+  const isRecent = hasRecentStudyControllerInput(now);
+  statusEl.textContent = getStudyControllerStatusText(now);
+  statusEl.classList.toggle("active", studyGamepadConnected || isRecent);
+}
+
+function scheduleStudyControllerStatusRefresh() {
+  if (studyControllerStatusTimerId) {
+    window.clearTimeout(studyControllerStatusTimerId);
+    studyControllerStatusTimerId = null;
+  }
+  if (!studyControllerLastInputAt) return;
+  const remaining = STUDY_CONTROLLER_STATUS_FLASH_MS - (Date.now() - studyControllerLastInputAt);
+  if (remaining <= 0) {
+    updateStudyControllerStatusElement();
+    return;
+  }
+  studyControllerStatusTimerId = window.setTimeout(() => {
+    studyControllerStatusTimerId = null;
+    updateStudyControllerStatusElement();
+  }, remaining);
+}
+
+function markStudyControllerInput(label) {
+  studyControllerLastInputAt = Date.now();
+  studyControllerLastInputLabel = label;
+  updateStudyControllerStatusElement();
+  scheduleStudyControllerStatusRefresh();
+}
+
+function setStudyGamepadConnected(isConnected) {
+  const nextConnected = Boolean(isConnected);
+  if (studyGamepadConnected === nextConnected) return;
+  studyGamepadConnected = nextConnected;
+  updateStudyControllerStatusElement();
+}
+
 function shouldHandleStudyController() {
   return Boolean(
     state.activeTab === "study" &&
@@ -2489,12 +2550,21 @@ function revealStudyCard() {
 
 async function handleStudyControllerAction(action) {
   if (!shouldHandleStudyController()) return false;
+  const showingBack = state.session.showingBack;
+  let actionLabel = "";
+  if (action === "primary") actionLabel = showingBack ? "알맞음" : "뒤집기";
+  else if (action === "wrong" && showingBack) actionLabel = "틀림";
+  if (!actionLabel) return false;
+  const now = Date.now();
+  if (now - studyControllerLastActionAt < STUDY_CONTROLLER_COOLDOWN_MS) return false;
+  studyControllerLastActionAt = now;
+  markStudyControllerInput(actionLabel);
   if (action === "primary") {
-    if (state.session.showingBack) await answerCard("correct");
+    if (showingBack) await answerCard("correct");
     else revealStudyCard();
     return true;
   }
-  if (action === "wrong" && state.session.showingBack) {
+  if (action === "wrong" && showingBack) {
     await answerCard("wrong");
     return true;
   }
@@ -2533,13 +2603,16 @@ function pollStudyGamepads() {
   studyGamepadFrameId = null;
   if (!state.session || state.session.savedRound) {
     studyGamepadPressedButtons.clear();
+    setStudyGamepadConnected(false);
     return;
   }
   studyGamepadFrameId = window.requestAnimationFrame(pollStudyGamepads);
   const pads = typeof navigator.getGamepads === "function" ? navigator.getGamepads() : [];
   let handled = false;
+  let hasGamepad = false;
   for (const pad of pads) {
     if (!pad) continue;
+    hasGamepad = true;
     pad.buttons.forEach((button, index) => {
       const key = `${pad.index}:${index}`;
       const pressed = Boolean(button?.pressed || Number(button?.value || 0) > 0.5);
@@ -2558,6 +2631,7 @@ function pollStudyGamepads() {
       }
     });
   }
+  setStudyGamepadConnected(hasGamepad);
 }
 
 function syncStudyGamepad() {
@@ -2571,6 +2645,7 @@ function syncStudyGamepad() {
       studyGamepadFrameId = null;
     }
     studyGamepadPressedButtons.clear();
+    setStudyGamepadConnected(false);
   }
 }
 
@@ -4183,6 +4258,9 @@ function renderStudySession() {
       <div class="study-quick-stats">
         <span>남은 ${Math.max(0, total - session.index - 1)}개</span>
         <span>이번 차수 오답 ${currentWrongCount}개</span>
+        <span id="study-controller-status" class="study-controller-status ${
+          studyGamepadConnected || hasRecentStudyControllerInput() ? "active" : ""
+        }" role="status" aria-live="polite" aria-atomic="true">${escapeHtml(getStudyControllerStatusText())}</span>
       </div>
       <div class="study-card ${session.showingBack ? "back" : "front"} ${feedbackClass}" ${
         session.showingBack
