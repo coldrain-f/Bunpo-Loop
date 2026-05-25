@@ -1741,17 +1741,25 @@ function getAccuracyTone(rate) {
   return "bad";
 }
 
+function getAccuracyStatusTone(rate) {
+  if (rate === null) return "muted";
+  if (rate >= 80) return "done";
+  if (rate >= 50) return "review";
+  return "bad";
+}
+
 function getGroupLastStudyLabel(group) {
   return group.last_studied_at ? `마지막 ${formatDate(group.last_studied_at)}` : "학습 기록 없음";
 }
 
-function renderGroupStatusPills(group, { showRounds = false } = {}) {
+function renderGroupStatusPills(group, { showRounds = false, showAccuracy = false } = {}) {
   const cardCount = number(group.card_count);
   const studyCount = getGroupStudyCardCount(group);
   const excludedCount = getGroupExcludedCardCount(group);
   const wrongTotal = number(group.wrong_total);
   const roundCount = number(group.completed_rounds);
   const studiedToday = isToday(group.last_studied_at);
+  const accuracyRate = getGroupRecentFirstAttemptRate(group);
   const status = studyCount
     ? studiedToday
       ? `<span class="status-pill done">오늘 완료</span>`
@@ -1766,7 +1774,12 @@ function renderGroupStatusPills(group, { showRounds = false } = {}) {
     : `<span class="status-pill muted">오답 없음</span>`;
   const excluded = excludedCount ? `<span class="status-pill muted">제외 ${excludedCount}</span>` : "";
   const rounds = showRounds ? `<span class="status-pill muted">${roundCount}회독</span>` : "";
-  return `<div class="group-status-strip">${status}${wrong}${excluded}${rounds}</div>`;
+  const accuracy = showAccuracy
+    ? `<span class="status-pill ${getAccuracyStatusTone(accuracyRate)}">최근 정답률 ${
+        accuracyRate === null ? "없음" : `${accuracyRate}%`
+      }</span>`
+    : "";
+  return `<div class="group-status-strip">${status}${accuracy}${wrong}${excluded}${rounds}</div>`;
 }
 
 function renderGroupMetricRow(group) {
@@ -3730,7 +3743,7 @@ function renderStudyGroupChoiceItem(group) {
         <div class="item-title">
           <strong>${escapeHtml(group.name)}</strong>
         </div>
-        ${renderGroupStatusPills(group, { showRounds: true })}
+        ${renderGroupStatusPills(group, { showRounds: true, showAccuracy: true })}
         ${renderGroupMetricRow(group)}
         <p class="meta">${escapeHtml(lastStudyText)} · 누적 정답 ${number(group.correct_total)} · 누적 오답 ${number(group.wrong_total)}</p>
       </button>
