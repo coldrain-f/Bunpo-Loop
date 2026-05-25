@@ -3366,10 +3366,20 @@ button:active,
 }
 
 .study-shell {
+  position: relative;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   min-height: 0;
   height: 100%;
   padding-bottom: 0;
+}
+
+.study-controller-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .study-quick-stats {

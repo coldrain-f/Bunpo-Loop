@@ -104,6 +104,8 @@ const STATS_COLLECTION_LIST_PAGE_SIZE = 40;
 const ROUND_DETAIL_SECTION_PAGE_SIZE = 60;
 const BULK_PREVIEW_RENDER_LIMIT = 80;
 const CSV_IMPORT_ACCEPT = "text/csv,.csv";
+const STUDY_GAMEPAD_PRIMARY_BUTTONS = new Set([0, 15]);
+const STUDY_GAMEPAD_WRONG_BUTTONS = new Set([1, 14]);
 const CARD_SEARCH_TEXT_CACHE = new WeakMap();
 
 const state = {
@@ -191,6 +193,8 @@ const headerGreetingEl = document.querySelector("#header-greeting");
 const headerContextEl = document.querySelector("#header-context");
 const connectionBannerEl = document.querySelector("#connection-banner");
 let studyTimerId = null;
+let studyGamepadFrameId = null;
+const studyGamepadPressedButtons = new Set();
 let renderedDialogName = null;
 let dialogReturnFocusEl = null;
 let shouldFocusDialogOnRender = false;
@@ -2465,6 +2469,111 @@ function updateStudyTimer() {
   if (timerEl) timerEl.textContent = formatDuration(elapsedSeconds(state.session));
 }
 
+function shouldHandleStudyController() {
+  return Boolean(
+    state.activeTab === "study" &&
+      state.session &&
+      !state.session.savedRound &&
+      !state.session.saving &&
+      !state.session.isAnswering &&
+      !state.activeDialog,
+  );
+}
+
+function revealStudyCard() {
+  if (!state.session || state.session.showingBack) return false;
+  state.session.showingBack = true;
+  render();
+  return true;
+}
+
+async function handleStudyControllerAction(action) {
+  if (!shouldHandleStudyController()) return false;
+  if (action === "primary") {
+    if (state.session.showingBack) await answerCard("correct");
+    else revealStudyCard();
+    return true;
+  }
+  if (action === "wrong" && state.session.showingBack) {
+    await answerCard("wrong");
+    return true;
+  }
+  return false;
+}
+
+function focusStudyControllerInput() {
+  const input = document.getElementById("study-controller-input");
+  if (!(input instanceof HTMLElement)) return;
+  try {
+    input.focus({ preventScroll: true });
+  } catch {
+    input.focus();
+  }
+}
+
+function focusStudyControllerInputSoon() {
+  window.requestAnimationFrame(focusStudyControllerInput);
+}
+
+function handleStudyControllerText(value) {
+  const text = String(value || "").toLowerCase();
+  if (!text) return false;
+  if (text.includes("a")) {
+    void handleStudyControllerAction("primary").catch(showRequestError);
+    return true;
+  }
+  if (text.includes("b")) {
+    void handleStudyControllerAction("wrong").catch(showRequestError);
+    return true;
+  }
+  return false;
+}
+
+function pollStudyGamepads() {
+  studyGamepadFrameId = null;
+  if (!state.session || state.session.savedRound) {
+    studyGamepadPressedButtons.clear();
+    return;
+  }
+  studyGamepadFrameId = window.requestAnimationFrame(pollStudyGamepads);
+  const pads = typeof navigator.getGamepads === "function" ? navigator.getGamepads() : [];
+  let handled = false;
+  for (const pad of pads) {
+    if (!pad) continue;
+    pad.buttons.forEach((button, index) => {
+      const key = `${pad.index}:${index}`;
+      const pressed = Boolean(button?.pressed || Number(button?.value || 0) > 0.5);
+      if (!pressed) {
+        studyGamepadPressedButtons.delete(key);
+        return;
+      }
+      if (studyGamepadPressedButtons.has(key) || handled) return;
+      studyGamepadPressedButtons.add(key);
+      if (STUDY_GAMEPAD_PRIMARY_BUTTONS.has(index)) {
+        handled = true;
+        void handleStudyControllerAction("primary").catch(showRequestError);
+      } else if (STUDY_GAMEPAD_WRONG_BUTTONS.has(index)) {
+        handled = true;
+        void handleStudyControllerAction("wrong").catch(showRequestError);
+      }
+    });
+  }
+}
+
+function syncStudyGamepad() {
+  const shouldRun = Boolean(state.session && !state.session.savedRound);
+  if (shouldRun && !studyGamepadFrameId && typeof navigator.getGamepads === "function") {
+    studyGamepadFrameId = window.requestAnimationFrame(pollStudyGamepads);
+  }
+  if (!shouldRun) {
+    if (studyGamepadFrameId) {
+      window.cancelAnimationFrame(studyGamepadFrameId);
+      studyGamepadFrameId = null;
+    }
+    studyGamepadPressedButtons.clear();
+  }
+}
+
 function render() {
   state.isOffline = isBrowserOffline();
   renderConnectionBanner();
@@ -2477,6 +2586,7 @@ function render() {
     renderAuth();
     renderDialog();
     syncStudyTimer();
+    syncStudyGamepad();
     writeCurrentHistoryRoute();
     return;
   }
@@ -2487,6 +2597,7 @@ function render() {
     renderAppShellState();
     renderDialog();
     syncStudyTimer();
+    syncStudyGamepad();
     writeCurrentHistoryRoute();
     return;
   }
@@ -2496,6 +2607,7 @@ function render() {
   renderActiveTab();
   renderDialog();
   syncStudyTimer();
+  syncStudyGamepad();
   writeCurrentHistoryRoute();
 }
 
@@ -4051,6 +4163,7 @@ function renderStudySession() {
   const frontClass = `grammar ${getStudyTextScriptClass(card.front)} ${getStudyTextDensityClass(card.front)}`;
   views.study.innerHTML = `
     <div class="stack study-shell">
+      <input id="study-controller-input" class="study-controller-input" type="text" inputmode="none" autocomplete="off" autocapitalize="none" spellcheck="false" tabindex="-1" aria-hidden="true" />
       <div class="row">
         <div>
           <p class="eyebrow">${escapeHtml(session.group.name)} · ${getSessionOrderLabel(session)} · ${
@@ -4108,6 +4221,7 @@ function renderStudySession() {
       </div>
     </div>
   `;
+  focusStudyControllerInputSoon();
 }
 
 function getCompletionSummary(session) {
@@ -7014,6 +7128,12 @@ document.addEventListener("change", async (event) => {
 });
 
 function updateSearchInput(event) {
+  if (event.target.id === "study-controller-input") {
+    const value = event.target.value;
+    event.target.value = "";
+    handleStudyControllerText(value);
+    return;
+  }
   if (event.target.closest("#card-form") && event.target.name === "front") {
     updateSingleDuplicateWarning(event.target.closest("#card-form"));
   }
@@ -7084,33 +7204,25 @@ document.addEventListener("keydown", async (event) => {
   }
   const target = event.target;
   if (activateControlFromKeyboard(event)) return;
-  if (isTypingTarget(target) || !state.session || state.session.savedRound) return;
-  if (state.session.isAnswering) return;
+  const isStudyControllerInput = target instanceof HTMLElement && target.id === "study-controller-input";
+  if (!isStudyControllerInput && isTypingTarget(target)) return;
+  if (!state.session || state.session.savedRound) return;
   const studyKey = String(event.key || "").toLowerCase();
   if (studyKey === "a" || event.key === "ArrowRight") {
     event.preventDefault();
     if (event.repeat) return;
-    if (state.session.showingBack) await answerCard("correct");
-    else {
-      state.session.showingBack = true;
-      render();
-    }
+    await handleStudyControllerAction("primary");
     return;
   }
-  if (studyKey === "b" && state.session.showingBack) {
+  if (studyKey === "b" || event.key === "ArrowLeft") {
     event.preventDefault();
     if (event.repeat) return;
-    await answerCard("wrong");
+    await handleStudyControllerAction("wrong");
     return;
   }
   if (event.key === " " || event.key === "Enter") {
     event.preventDefault();
-    state.session.showingBack = true;
-    render();
-  }
-  if (state.session.showingBack && event.key === "ArrowLeft") {
-    event.preventDefault();
-    await answerCard("wrong");
+    if (shouldHandleStudyController()) revealStudyCard();
   }
 });
 
