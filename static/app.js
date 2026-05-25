@@ -1690,9 +1690,10 @@ function getGroupLastStudyLabel(group) {
   return group.last_studied_at ? `마지막 ${formatDate(group.last_studied_at)}` : "학습 기록 없음";
 }
 
-function renderGroupStatusPills(group) {
+function renderGroupStatusPills(group, { showRounds = false } = {}) {
   const cardCount = number(group.card_count);
   const wrongTotal = number(group.wrong_total);
+  const roundCount = number(group.completed_rounds);
   const studiedToday = isToday(group.last_studied_at);
   const status = cardCount
     ? studiedToday
@@ -1704,7 +1705,8 @@ function renderGroupStatusPills(group) {
   const wrong = wrongTotal
     ? `<span class="status-pill bad">오답 ${wrongTotal}</span>`
     : `<span class="status-pill muted">오답 없음</span>`;
-  return `<div class="group-status-strip">${status}${wrong}</div>`;
+  const rounds = showRounds ? `<span class="status-pill muted">${roundCount}회독</span>` : "";
+  return `<div class="group-status-strip">${status}${wrong}${rounds}</div>`;
 }
 
 function renderGroupMetricRow(group) {
@@ -3599,7 +3601,7 @@ function renderStudyGroupChoiceItem(group) {
           <strong>${escapeHtml(group.name)}</strong>
         </div>
         <p class="meta">${escapeHtml(group.collection_name)} · ${escapeHtml(group.description || "설명 없음")}</p>
-        ${renderGroupStatusPills(group)}
+        ${renderGroupStatusPills(group, { showRounds: true })}
         ${renderGroupMetricRow(group)}
         <p class="meta">${escapeHtml(lastStudyText)} · 누적 정답 ${number(group.correct_total)} · 누적 오답 ${number(group.wrong_total)}</p>
       </button>
