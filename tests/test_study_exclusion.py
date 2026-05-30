@@ -208,6 +208,37 @@ class StudyExclusionApiTest(unittest.TestCase):
         rounds = self.request_json(f"/api/rounds?group_id={group_id}")["rounds"]
         self.assertEqual(1, len(rounds))
 
+    def test_delete_group_cards_keeps_group_and_clears_history(self) -> None:
+        _collection_id, group_id = self.create_collection_and_group("전체 삭제")
+        first = self.create_card(group_id, "삭제 대상 1")
+        second = self.create_card(group_id, "삭제 대상 2")
+        _other_collection_id, other_group_id = self.create_collection_and_group("보존 그룹")
+        other = self.create_card(other_group_id, "보존 카드")
+
+        self.request_json(
+            "/api/rounds",
+            method="POST",
+            body={
+                "group_id": group_id,
+                "order_mode": "sequence",
+                "results": [
+                    {"card_id": first["id"], "result": "correct"},
+                    {"card_id": second["id"], "result": "wrong"},
+                ],
+            },
+            expected=HTTPStatus.CREATED,
+        )
+
+        deleted = self.request_json(f"/api/groups/{group_id}/cards", method="DELETE")
+        self.assertEqual(2, deleted["cards_deleted"])
+        self.assertEqual(1, deleted["rounds_deleted"])
+        self.assertEqual([], self.group_cards(group_id))
+        self.assertEqual([other["id"]], [card["id"] for card in self.group_cards(other_group_id)])
+        groups = self.request_json("/api/groups")["groups"]
+        target = next(group for group in groups if int(group["id"]) == group_id)
+        self.assertEqual(0, target["card_count"])
+        self.assertEqual([], self.request_json(f"/api/rounds?group_id={group_id}")["rounds"])
+
     def test_csv_and_backup_restore_preserve_exclusion(self) -> None:
         _collection_id, source_group_id = self.create_collection_and_group("CSV 원본")
         source_card = self.create_card(source_group_id, "CSV 제외", excluded=True)

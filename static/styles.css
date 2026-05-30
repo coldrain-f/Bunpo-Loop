@@ -1492,6 +1492,13 @@ h3 {
   background: var(--surface-strong);
 }
 
+.card-list-danger-actions {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
 .bulk-mode-note {
   display: grid;
   gap: 3px;

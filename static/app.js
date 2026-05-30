@@ -3188,6 +3188,18 @@ function renderDialog() {
     });
     return;
   }
+  if (state.activeDialog === "delete-group-cards") {
+    const target = state.groups.find((item) => item.id === Number(state.pendingAction?.id));
+    if (!target) return closeDialog();
+    renderConfirmDialog({
+      eyebrow: "삭제",
+      title: "소그룹의 모든 카드를 삭제할까요?",
+      message: `${target.name} 소그룹의 카드 ${number(target.card_count)}개와 연결된 예문, 이 소그룹의 회독 기록을 삭제합니다. 소그룹 자체는 유지되며, 이 작업은 되돌릴 수 없습니다.`,
+      confirmLabel: "전체 삭제",
+      confirmAction: "confirm-delete-group-cards",
+    });
+    return;
+  }
   if (state.activeDialog === "reset-history") {
     const target = state.groups.find((item) => item.id === Number(state.pendingAction?.id));
     if (!target) return closeDialog();
@@ -5107,6 +5119,7 @@ function renderCardEditorPanel(editing, formGroupId) {
 
 function renderCardListPanel(visibleCards, filteredCards = visibleCards) {
   const collectionGroups = getCardFilterGroups();
+  const selectedCardGroup = collectionGroups.find((group) => String(group.id) === String(state.cardFilterGroupId));
   const displayLimit = Math.max(CARD_LIST_PAGE_SIZE, number(state.cardListLimit));
   const displayCards = visibleCards.slice(0, displayLimit);
   const hiddenCount = Math.max(0, visibleCards.length - displayCards.length);
@@ -5159,6 +5172,15 @@ function renderCardListPanel(visibleCards, filteredCards = visibleCards) {
           : ""
       }
       ${renderCardFilterSummary(filteredCards.length, visibleCards.length)}
+      ${
+        selectedCardGroup && filteredCards.length
+          ? `<div class="card-list-danger-actions">
+              <button class="danger-button full" type="button" data-action="delete-group-cards" data-group-id="${
+                selectedCardGroup.id
+              }">${iconLabel("trash", "이 소그룹 카드 전체 삭제")}</button>
+            </div>`
+          : ""
+      }
       ${renderSearchInput({ id: "card-search", value: state.cardSearchQuery, placeholder: "카드 검색" })}
       <div class="card-list">
       ${
@@ -6010,14 +6032,9 @@ function renderGroupListItem(group) {
         <p class="meta">${escapeHtml(lastStudyText)} · 누적 정답 ${number(group.correct_total)} · 누적 오답 ${number(group.wrong_total)}</p>
       </div>
       <div class="subgroup-primary-actions">
-        ${
-          cardCount
-            ? ""
-            : `<button class="secondary-button full add-card-button" type="button" data-action="add-card-to-study-group" data-group-id="${group.id}">${iconLabel(
-                "plus",
-                "카드 등록",
-              )}</button>`
-        }
+        <button class="secondary-button full add-card-button" type="button" data-action="add-card-to-study-group" data-group-id="${
+          group.id
+        }">${iconLabel("plus", cardCount ? "카드 추가" : "카드 등록")}</button>
         <div class="subgroup-file-actions">
           <button class="ghost-button" type="button" data-action="export-group-csv" data-group-id="${group.id}">${iconLabel(
             "download",
@@ -6693,6 +6710,24 @@ async function deletePendingCard() {
   showToast("카드를 삭제했습니다.");
 }
 
+async function deletePendingGroupCards() {
+  const groupId = Number(state.pendingAction?.id);
+  if (!groupId) return;
+  const data = await request(`/api/groups/${groupId}/cards`, { method: "DELETE" });
+  if (state.session?.group?.id === groupId || state.session?.selectedGroups?.some((group) => Number(group.id) === groupId)) {
+    state.session = null;
+  }
+  state.pendingAction = null;
+  state.activeDialog = null;
+  state.editingCardId = null;
+  state.cardScreen = "list";
+  state.cardSearchQuery = "";
+  resetCardListLimit();
+  await loadData();
+  render();
+  showToast(`카드 ${number(data.cards_deleted)}개를 삭제했습니다.`);
+}
+
 async function toggleCardStudyExclusion(cardId) {
   const card = state.cards.find((item) => Number(item.id) === Number(cardId));
   if (!card) return showToast("카드를 찾을 수 없습니다.");
@@ -7171,6 +7206,7 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "close-dialog") closeDialog();
     if (action === "confirm-delete-card") await runDialogRequest(action, "삭제 중", deletePendingCard);
+    if (action === "confirm-delete-group-cards") await runDialogRequest(action, "삭제 중", deletePendingGroupCards);
     if (action === "confirm-reset-history") await runDialogRequest(action, "초기화 중", resetPendingHistory);
     if (action === "confirm-reset-collection-history")
       await runDialogRequest(action, "초기화 중", resetPendingCollectionHistory);
@@ -7450,6 +7486,14 @@ document.addEventListener("click", async (event) => {
       if (card) {
         state.pendingAction = { type: "delete-card", id: card.id };
         state.activeDialog = "delete-card";
+        renderDialog();
+      }
+    }
+    if (action === "delete-group-cards") {
+      const group = state.groups.find((item) => item.id === Number(actionEl.dataset.groupId));
+      if (group) {
+        state.pendingAction = { type: "delete-group-cards", id: group.id };
+        state.activeDialog = "delete-group-cards";
         renderDialog();
       }
     }

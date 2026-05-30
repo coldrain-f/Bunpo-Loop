@@ -2154,6 +2154,10 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.import_group_cards_csv(conn, user_id, group_id)
                     return
 
+            if len(parts) == 4 and parts[:2] == ["api", "groups"] and parts[3] == "cards" and method == "DELETE":
+                self.delete_group_cards(conn, user_id, int(parts[2]))
+                return
+
             if len(parts) == 3 and parts[:2] == ["api", "groups"]:
                 group_id = int(parts[2])
                 group = get_group(conn, user_id, group_id)
@@ -2651,6 +2655,21 @@ class AppHandler(BaseHTTPRequestHandler):
         body = parse_body(self)
         result = restore_backup(conn, user_id, body)
         self.send_json({"ok": True, "restored": result})
+
+    def delete_group_cards(self, conn: sqlite3.Connection, user_id: int, group_id: int) -> None:
+        if get_group(conn, user_id, group_id) is None:
+            self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+            return
+        rounds_deleted = delete_rounds_for_group(conn, user_id, group_id)
+        cards_deleted = conn.execute("DELETE FROM cards WHERE group_id = ?", (group_id,)).rowcount
+        delete_orphan_rounds(conn)
+        self.send_json(
+            {
+                "ok": True,
+                "cards_deleted": cards_deleted,
+                "rounds_deleted": rounds_deleted,
+            }
+        )
 
     def reset_group_history(self, conn: sqlite3.Connection, user_id: int, group_id: int) -> None:
         rounds_deleted = delete_rounds_for_group(conn, user_id, group_id)
