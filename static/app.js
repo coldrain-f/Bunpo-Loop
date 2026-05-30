@@ -2682,12 +2682,27 @@ async function handleStudyControllerAction(action) {
 async function handleStudyControllerInput(inputName) {
   const action = getControllerInputAction(inputName);
   if (action === "disabled") return false;
-  return handleStudyControllerAction(action);
+  const handled = await handleStudyControllerAction(action);
+  if (handled) focusStudyControllerInputSoon();
+  return handled;
+}
+
+function canFocusStudyControllerInput() {
+  return Boolean(state.activeTab === "study" && state.session && !state.session.savedRound && !state.activeDialog);
+}
+
+function blurFocusedStudyAction() {
+  const activeElement = document.activeElement;
+  if (activeElement instanceof HTMLElement && activeElement.closest(".study-action-bar")) {
+    activeElement.blur();
+  }
 }
 
 function focusStudyControllerInput() {
+  if (!canFocusStudyControllerInput()) return;
   const input = document.getElementById("study-controller-input");
   if (!(input instanceof HTMLElement)) return;
+  blurFocusedStudyAction();
   try {
     input.focus({ preventScroll: true });
   } catch {
@@ -2696,7 +2711,10 @@ function focusStudyControllerInput() {
 }
 
 function focusStudyControllerInputSoon() {
-  window.requestAnimationFrame(focusStudyControllerInput);
+  window.requestAnimationFrame(() => {
+    focusStudyControllerInput();
+    window.setTimeout(focusStudyControllerInput, 0);
+  });
 }
 
 function handleStudyControllerText(value) {
