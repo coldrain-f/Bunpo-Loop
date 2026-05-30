@@ -3785,7 +3785,7 @@ function renderStudyGroupChoiceItem(group) {
 }
 
 function renderStudySetup(selected) {
-  const selectedRounds = state.rounds.filter((round) => roundIncludesGroup(round, selected.id)).slice(0, 4);
+  const selectedRounds = state.rounds.filter((round) => roundIncludesGroup(round, selected.id));
   views.study.innerHTML = `
     <div class="panel stack">
       <div class="row">
@@ -4437,7 +4437,7 @@ function renderStudySession() {
       </div>
       <div class="progress" aria-hidden="true"><span style="width: ${progress}%"></span></div>
       <div class="study-quick-stats">
-        <span>남은 ${Math.max(0, total - session.index - 1)}개</span>
+        <span>남은 ${Math.max(0, total - session.index)}개</span>
         <span>이번 차수 오답 ${currentWrongCount}개</span>
         <span id="study-controller-status" class="study-controller-status ${
           studyGamepadConnected || hasRecentStudyControllerInput() ? "active" : ""
