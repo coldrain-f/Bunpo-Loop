@@ -3699,7 +3699,7 @@ function renderWeakCardItem(card) {
         isOpen
           ? `
             <div class="weak-card-detail">
-              ${card.memo ? `<p class="study-note">${escapeHtml(card.memo)}</p>` : ""}
+              ${card.memo ? `<p class="study-note">${renderMarkedText(card.memo)}</p>` : ""}
               ${
                 examples.length
                   ? `<ul class="review-examples">${examples
@@ -4859,7 +4859,7 @@ function renderWrongReviewCard(summary) {
       </section>
       ${
         summary.card.memo
-          ? `<section class="wrong-review-block"><span class="study-section-label">메모</span><p class="study-note">${escapeHtml(
+          ? `<section class="wrong-review-block"><span class="study-section-label">메모</span><p class="study-note">${renderMarkedText(
               summary.card.memo,
             )}</p></section>`
           : ""
@@ -4983,7 +4983,7 @@ function renderCardBack(card, examplesExpanded = false) {
       </section>
       ${
         card.memo
-          ? `<section class="study-back-section"><span class="study-section-label">메모</span><p class="study-note">${escapeHtml(
+          ? `<section class="study-back-section"><span class="study-section-label">메모</span><p class="study-note">${renderMarkedText(
               card.memo,
             )}</p></section>`
           : ""
