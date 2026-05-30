@@ -3565,6 +3565,49 @@ button:active,
   gap: 13px;
 }
 
+.front-example-hint {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 420px);
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+.front-example-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.front-example-hint .study-section-label {
+  color: var(--teal);
+}
+
+.front-examples {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.front-example {
+  min-width: 0;
+}
+
+.front-example-hint .example-jp {
+  color: var(--muted);
+  font-size: 0.94rem;
+  font-weight: 560;
+}
+
+.front-example-toggle {
+  min-height: 44px;
+  margin-top: 2px;
+}
+
 .study-back-content {
   gap: 16px;
 }
