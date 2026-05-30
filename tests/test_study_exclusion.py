@@ -29,10 +29,12 @@ class StudyExclusionApiTest(unittest.TestCase):
         self.old_data_dir = app.DATA_DIR
         self.old_app_user = app.APP_USER
         self.old_app_password = app.APP_PASSWORD
+        self.old_default_seed_data_dir = app.DEFAULT_SEED_DATA_DIR
         app.DATA_DIR = Path(self.tmp.name)
         app.DB_PATH = app.DATA_DIR / "test.sqlite3"
         app.APP_USER = None
         app.APP_PASSWORD = None
+        app.DEFAULT_SEED_DATA_DIR = app.DATA_DIR / "missing-default-data"
         app.init_db()
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
@@ -57,6 +59,7 @@ class StudyExclusionApiTest(unittest.TestCase):
         app.DATA_DIR = self.old_data_dir
         app.APP_USER = self.old_app_user
         app.APP_PASSWORD = self.old_app_password
+        app.DEFAULT_SEED_DATA_DIR = self.old_default_seed_data_dir
         self.tmp.cleanup()
 
     def auth_headers(self) -> dict[str, str]:
@@ -286,6 +289,92 @@ class StudyExclusionApiTest(unittest.TestCase):
         self.assertEqual(2, len(restored_matches))
         self.assertTrue(all(card["study_excluded"] == 1 for card in restored_matches))
         self.assertEqual(expected_settings, self.request_json("/api/settings")["settings"])
+
+
+class DefaultSeedTest(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp_root = Path(os.environ.get("BUNPO_LOOP_TEST_TMP") or tempfile.gettempdir()) / "bunpo-loop-tests"
+        tmp_root.mkdir(parents=True, exist_ok=True)
+        self.tmp = tempfile.TemporaryDirectory(dir=tmp_root)
+        self.old_db_path = app.DB_PATH
+        self.old_data_dir = app.DATA_DIR
+        self.old_app_user = app.APP_USER
+        self.old_app_password = app.APP_PASSWORD
+        self.old_default_seed_data_dir = app.DEFAULT_SEED_DATA_DIR
+        self.old_seed_enabled = os.environ.get("BUNPO_LOOP_SEED_DEFAULT_DATA")
+        app.DATA_DIR = Path(self.tmp.name)
+        app.DB_PATH = app.DATA_DIR / "test.sqlite3"
+        app.APP_USER = None
+        app.APP_PASSWORD = None
+        app.DEFAULT_SEED_DATA_DIR = app.ROOT / "default-data" / "jlpt-improved-reviewed"
+        os.environ["BUNPO_LOOP_SEED_DEFAULT_DATA"] = "1"
+
+    def tearDown(self) -> None:
+        gc.collect()
+        app.DB_PATH = self.old_db_path
+        app.DATA_DIR = self.old_data_dir
+        app.APP_USER = self.old_app_user
+        app.APP_PASSWORD = self.old_app_password
+        app.DEFAULT_SEED_DATA_DIR = self.old_default_seed_data_dir
+        if self.old_seed_enabled is None:
+            os.environ.pop("BUNPO_LOOP_SEED_DEFAULT_DATA", None)
+        else:
+            os.environ["BUNPO_LOOP_SEED_DEFAULT_DATA"] = self.old_seed_enabled
+        self.tmp.cleanup()
+
+    def test_fresh_database_seeds_bundled_jlpt_decks_once(self) -> None:
+        app.init_db()
+
+        with app.connect() as conn:
+            user = conn.execute("SELECT id FROM users WHERE nickname = ?", ("상운",)).fetchone()
+            self.assertIsNotNone(user)
+            user_id = int(user["id"])
+            counts = app.user_learning_counts(conn, user_id)
+            self.assertEqual(2, counts["collections"])
+            self.assertEqual(28, counts["groups"])
+            self.assertEqual(529, counts["cards"])
+            self.assertEqual(
+                "seeded:28:groups:529:cards",
+                app.get_app_metadata(conn, app.DEFAULT_SEED_META_KEY),
+            )
+            first_group = conn.execute(
+                """
+                SELECT g.name
+                FROM groups g
+                JOIN collections c ON c.id = g.collection_id
+                WHERE c.user_id = ?
+                ORDER BY g.id ASC
+                LIMIT 1
+                """,
+                (user_id,),
+            ).fetchone()
+            self.assertEqual("N3-N2-문형-01", first_group["name"])
+            seeded_card = conn.execute(
+                """
+                SELECT c.back, ex.japanese, ex.korean
+                FROM cards c
+                JOIN examples ex ON ex.card_id = c.id
+                JOIN groups g ON g.id = c.group_id
+                JOIN collections col ON col.id = g.collection_id
+                WHERE col.user_id = ?
+                  AND c.front = ?
+                ORDER BY ex.sort_order ASC
+                LIMIT 1
+                """,
+                (user_id, "~一方だ"),
+            ).fetchone()
+            self.assertIsNotNone(seeded_card)
+            self.assertEqual("계속 ~해지다", seeded_card["back"])
+            self.assertEqual("毎年客が増える[[一方だ]]", seeded_card["japanese"])
+
+        app.init_db()
+
+        with app.connect() as conn:
+            user = conn.execute("SELECT id FROM users WHERE nickname = ?", ("상운",)).fetchone()
+            counts = app.user_learning_counts(conn, int(user["id"]))
+            self.assertEqual(2, counts["collections"])
+            self.assertEqual(28, counts["groups"])
+            self.assertEqual(529, counts["cards"])
 
 
 if __name__ == "__main__":

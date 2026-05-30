@@ -14,6 +14,8 @@ docker compose up -d --build
 
 SQLite 데이터는 Docker named volume인 `bunpo-loop-data`에 저장됩니다. 컨테이너를 다시 만들어도 학습 데이터는 유지됩니다.
 
+새 SQLite DB에는 번들된 JLPT 기본 덱이 `상운` 계정으로 한 번 자동 등록됩니다. `docker compose down -v`로 볼륨을 삭제한 뒤 다시 `docker compose up -d --build`를 실행하면 문형덱과 예문덱이 들어간 상태로 시작합니다.
+
 포트나 기본 인증을 바꾸려면 `.env.example`을 복사해서 `.env`를 만듭니다.
 
 ```bash
@@ -27,6 +29,7 @@ BUNPO_LOOP_BIND=127.0.0.1
 BUNPO_LOOP_PORT=8000
 APP_USER=myname
 APP_PASSWORD=strong-password
+BUNPO_LOOP_SEED_DEFAULT_DATA=1
 ```
 
 Caddy나 Nginx 뒤에서 HTTPS로 공개할 때는 `BUNPO_LOOP_BIND=127.0.0.1`을 유지하세요. 예를 들어 `BUNPO_LOOP_PORT=8002`를 쓰면 프록시 대상은 `http://127.0.0.1:8002`입니다. 서버 IP와 포트로 직접 접속해야 할 때만 `BUNPO_LOOP_BIND=0.0.0.0`으로 바꿉니다.
@@ -61,6 +64,8 @@ docker compose down
 ```bash
 docker compose down -v
 ```
+
+완전히 빈 앱으로 시작하고 싶다면 `.env`에서 `BUNPO_LOOP_SEED_DEFAULT_DATA=0`으로 바꾼 뒤 새 볼륨으로 올리세요.
 
 ## 로컬 실행
 

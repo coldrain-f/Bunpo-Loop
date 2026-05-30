@@ -13,6 +13,7 @@ services:
       BYEORAKCHIGI_DB: /data/bunpo-loop.sqlite3
       APP_USER: ${APP_USER:-}
       APP_PASSWORD: ${APP_PASSWORD:-}
+      BUNPO_LOOP_SEED_DEFAULT_DATA: ${BUNPO_LOOP_SEED_DEFAULT_DATA:-1}
     volumes:
       - bunpo-loop-data:/data
 

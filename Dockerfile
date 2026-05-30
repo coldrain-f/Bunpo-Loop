@@ -14,6 +14,7 @@ RUN adduser --disabled-password --gecos "" --home /app appuser \
 
 COPY --chown=appuser:appuser app.py README.md ./
 COPY --chown=appuser:appuser static ./static
+COPY --chown=appuser:appuser default-data ./default-data
 
 USER appuser
 

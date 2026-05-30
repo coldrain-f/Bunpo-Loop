@@ -24,6 +24,12 @@ DB_ENV = os.environ.get("BYEORAKCHIGI_DB") or os.environ.get("BUNPO_LOOP_DB") or
 DB_PATH = Path(DB_ENV or DATA_DIR / "jlpt_cards.sqlite3")
 APP_USER = os.environ.get("APP_USER")
 APP_PASSWORD = os.environ.get("APP_PASSWORD")
+DEFAULT_SEED_DATA_DIR = Path(
+    os.environ.get("BUNPO_LOOP_DEFAULT_DATA_DIR")
+    or ROOT / "default-data" / "jlpt-improved-reviewed"
+)
+DEFAULT_SEED_USER_NICKNAME = os.environ.get("BUNPO_LOOP_DEFAULT_DATA_USER") or "상운"
+DEFAULT_SEED_META_KEY = "default_seed:jlpt_improved_reviewed_v1"
 DEFAULT_USERS = (
     ("상운", "960725"),
     ("GUEST1", "000000"),
@@ -61,6 +67,14 @@ CREATE TABLE IF NOT EXISTS users (
     controller_y_action TEXT NOT NULL DEFAULT 'disabled',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+APP_METADATA_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS app_metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 """
 
@@ -170,6 +184,7 @@ def connect() -> sqlite3.Connection:
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(USER_SCHEMA_SQL)
+        conn.executescript(APP_METADATA_SCHEMA_SQL)
         if learning_schema_needs_reset(conn):
             reset_learning_schema(conn)
             migrate_db(conn)
@@ -182,6 +197,7 @@ def init_db() -> None:
             else:
                 conn.executescript(LEARNING_SCHEMA_SQL)
         ensure_default_users(conn)
+        seed_default_learning_data(conn)
 
 
 def migrate_db(conn: sqlite3.Connection) -> None:
@@ -317,6 +333,134 @@ def ensure_default_users(conn: sqlite3.Connection) -> None:
                 DEFAULT_CONTROLLER_X_ACTION,
                 DEFAULT_CONTROLLER_Y_ACTION,
             ),
+        )
+
+
+def default_seed_enabled() -> bool:
+    text = os.environ.get("BUNPO_LOOP_SEED_DEFAULT_DATA", "1").strip().lower()
+    return text not in ("0", "false", "no", "n", "off")
+
+
+def get_app_metadata(conn: sqlite3.Connection, key: str) -> str | None:
+    row = conn.execute("SELECT value FROM app_metadata WHERE key = ?", (key,)).fetchone()
+    return str(row["value"]) if row else None
+
+
+def set_app_metadata(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        f"""
+        INSERT INTO app_metadata (key, value, updated_at)
+        VALUES (?, ?, {utc_now_sql()})
+        ON CONFLICT(key) DO UPDATE SET
+            value = excluded.value,
+            updated_at = excluded.updated_at
+        """,
+        (key, value),
+    )
+
+
+def default_seed_csv_sort_key(path: Path) -> tuple[int, int, str]:
+    name = path.stem
+    if name.startswith("N3-N2"):
+        level_order = 0
+    elif name.startswith("N1-1"):
+        level_order = 1
+    elif name.startswith("N1-2"):
+        level_order = 2
+    else:
+        level_order = 9
+    match = re.search(r"(\d+)$", name)
+    part_order = int(match.group(1)) if match else 0
+    return (level_order, part_order, name)
+
+
+def default_seed_collections() -> tuple[tuple[str, str, Path], ...]:
+    return (
+        (
+            "JLPT 시험용 핵심문형 N3~N1",
+            "먼저 학습할 문형덱입니다.",
+            DEFAULT_SEED_DATA_DIR / "grammar-csv",
+        ),
+        (
+            "JLPT 예문 2차 복습",
+            "문형 학습 후 예문 중심으로 복습하는 덱입니다.",
+            DEFAULT_SEED_DATA_DIR / "example-csv",
+        ),
+    )
+
+
+def insert_seed_cards(conn: sqlite3.Connection, group_id: int, items: list[dict]) -> int:
+    for item in items:
+        cur = conn.execute(
+            """
+            INSERT INTO cards (group_id, front, back, memo, study_excluded)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                group_id,
+                item["front"],
+                item["back"],
+                item["memo"],
+                item["study_excluded"],
+            ),
+        )
+        insert_examples(conn, int(cur.lastrowid), item["examples"])
+    return len(items)
+
+
+def seed_default_learning_data(conn: sqlite3.Connection) -> None:
+    if not default_seed_enabled():
+        return
+    if get_app_metadata(conn, DEFAULT_SEED_META_KEY) is not None:
+        return
+    if not DEFAULT_SEED_DATA_DIR.exists():
+        return
+
+    user = conn.execute(
+        "SELECT id FROM users WHERE nickname = ?",
+        (DEFAULT_SEED_USER_NICKNAME,),
+    ).fetchone()
+    if user is None:
+        return
+
+    user_id = int(user["id"])
+    counts = user_learning_counts(conn, user_id)
+    if counts["collections"] or counts["groups"] or counts["cards"]:
+        set_app_metadata(conn, DEFAULT_SEED_META_KEY, "skipped_existing_learning_data")
+        return
+
+    created_groups = 0
+    created_cards = 0
+    for collection_name, collection_description, csv_dir in default_seed_collections():
+        csv_files = sorted(csv_dir.glob("*.csv"), key=default_seed_csv_sort_key)
+        if not csv_files:
+            continue
+        collection_cur = conn.execute(
+            """
+            INSERT INTO collections (user_id, name, description)
+            VALUES (?, ?, ?)
+            """,
+            (user_id, collection_name, collection_description),
+        )
+        collection_id = int(collection_cur.lastrowid)
+        for csv_path in csv_files:
+            group_cur = conn.execute(
+                """
+                INSERT INTO groups (collection_id, name, description)
+                VALUES (?, ?, ?)
+                """,
+                (collection_id, csv_path.stem, "기본 데이터"),
+            )
+            group_id = int(group_cur.lastrowid)
+            items = parse_cards_csv(csv_path.read_text(encoding="utf-8-sig"))
+            created_cards += insert_seed_cards(conn, group_id, items)
+            created_groups += 1
+
+    if created_cards:
+        set_app_metadata(
+            conn,
+            DEFAULT_SEED_META_KEY,
+            f"seeded:{created_groups}:groups:{created_cards}:cards",
         )
 
 
