@@ -128,6 +128,7 @@ const CONTROLLER_BUTTON_LABELS = {
   y: "Y 버튼",
 };
 const CARD_LIST_PAGE_SIZE = 80;
+const CARD_PAGE_SIZE = 10;
 const GROUP_LIST_PAGE_SIZE = 60;
 const STATS_COLLECTION_LIST_PAGE_SIZE = 40;
 const ROUND_DETAIL_SECTION_PAGE_SIZE = 60;
@@ -178,6 +179,7 @@ const state = {
   cardFilterCollectionId: "",
   cardFilterGroupId: "",
   cardSearchQuery: "",
+  cardPage: 0,
   studyCollectionSearchQuery: "",
   studyGroupSearchQuery: "",
   collectionSearchQuery: "",
@@ -1390,6 +1392,7 @@ function handlePageShow(event) {
 
 function resetCardListLimit() {
   state.cardListLimit = CARD_LIST_PAGE_SIZE;
+  state.cardPage = 0;
 }
 
 function resetGroupListLimit() {
@@ -5219,9 +5222,9 @@ function renderCardEditorPanel(editing, formGroupId) {
 function renderCardListPanel(visibleCards, filteredCards = visibleCards) {
   const collectionGroups = getCardFilterGroups();
   const selectedCardGroup = collectionGroups.find((group) => String(group.id) === String(state.cardFilterGroupId));
-  const displayLimit = Math.max(CARD_LIST_PAGE_SIZE, number(state.cardListLimit));
-  const displayCards = visibleCards.slice(0, displayLimit);
-  const hiddenCount = Math.max(0, visibleCards.length - displayCards.length);
+  const totalPages = Math.max(1, Math.ceil(visibleCards.length / CARD_PAGE_SIZE));
+  const page = Math.min(state.cardPage, totalPages - 1);
+  const displayCards = visibleCards.slice(page * CARD_PAGE_SIZE, (page + 1) * CARD_PAGE_SIZE);
   const cardCreateDisabledReason = "카드는 소그룹에 저장됩니다. 먼저 소그룹을 만들어 주세요.";
   return `
     <div class="panel stack">
@@ -5288,19 +5291,7 @@ function renderCardListPanel(visibleCards, filteredCards = visibleCards) {
           : renderCardListEmptyState(filteredCards)
       }
       </div>
-      ${
-        hiddenCount
-          ? `<div class="list-footer">
-              <p>${number(displayCards.length)}/${number(visibleCards.length)}개 표시 중입니다.</p>
-              <button class="secondary-button full" type="button" data-action="show-more-cards">${iconLabel(
-                "chevron-down",
-                `${Math.min(CARD_LIST_PAGE_SIZE, hiddenCount)}개 더 보기`,
-              )}</button>
-            </div>`
-          : visibleCards.length > CARD_LIST_PAGE_SIZE
-            ? `<p class="list-performance-note">현재 범위의 카드 ${number(visibleCards.length)}개를 모두 표시했습니다.</p>`
-            : ""
-      }
+      ${visibleCards.length > CARD_PAGE_SIZE ? renderStudyPagination(page, totalPages, "card") : ""}
     </div>
   `;
 }
@@ -7052,13 +7043,15 @@ document.addEventListener("click", async (event) => {
       const target = actionEl.dataset.target;
       if (target === "collection") state.studyCollectionPage = Math.max(0, state.studyCollectionPage - 1);
       if (target === "group") state.studyGroupPage = Math.max(0, state.studyGroupPage - 1);
-      renderStudy();
+      if (target === "card") state.cardPage = Math.max(0, state.cardPage - 1);
+      target === "card" ? renderCards() : renderStudy();
     }
     if (action === "study-page-next") {
       const target = actionEl.dataset.target;
       if (target === "collection") state.studyCollectionPage += 1;
       if (target === "group") state.studyGroupPage += 1;
-      renderStudy();
+      if (target === "card") state.cardPage += 1;
+      target === "card" ? renderCards() : renderStudy();
     }
     if (action === "back-to-study-collections") {
       saveScrollPosition(`study:collection:${state.selectedCollectionId || "none"}`);
