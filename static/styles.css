@@ -2267,8 +2267,20 @@ button:active,
   min-height: 44px;
 }
 
+.card-item .card-actions {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 .card-item .card-actions .danger-button {
   grid-column: 1 / -1;
+}
+
+.card-starred-button {
+  color: #f59e0b;
+}
+
+.card-starred-button svg {
+  fill: #f59e0b;
 }
 
 .round-item-button {
@@ -3450,6 +3462,18 @@ button:active,
   padding: 0 10px;
   background: var(--surface);
   color: var(--muted);
+}
+
+.study-session-controls .starred-button {
+  color: #f59e0b;
+}
+
+.study-session-controls .starred-button svg {
+  fill: #f59e0b;
+}
+
+.study-starred-row {
+  margin-top: 8px;
 }
 
 .study-session-controls .pill,
