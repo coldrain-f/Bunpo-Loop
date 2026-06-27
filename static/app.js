@@ -876,6 +876,7 @@ function getHeaderContext() {
     if (state.session) {
       if (state.session.studyMode === "weak") return `${state.session.group.name} · 복습`;
       if (state.session.studyMode === "practice") return `${state.session.group.name} · 묶음 연습`;
+      if (state.session.studyMode === "starred") return `${state.session.group.name} · 별표 카드`;
       return `${state.session.group.name} · ${state.session.roundNo}회독`;
     }
     if (state.studyStep === "ready") {
@@ -4089,6 +4090,9 @@ function renderStudyStartPanel(group) {
   const studyCount = getGroupStudyCardCount(group);
   const excludedCount = getGroupExcludedCardCount(group);
   const canStart = studyCount > 0;
+  const starredCount = state.cards.filter(
+    (c) => Number(c.group_id) === Number(group.id) && c.starred && !c.study_excluded
+  ).length;
   const disabledReason = cardCount
     ? "모든 카드가 학습 제외 상태입니다. 카드 관리에서 다시 학습에 포함해 주세요."
     : "카드를 등록하면 회독과 미리보기를 사용할 수 있습니다.";
@@ -4117,6 +4121,12 @@ function renderStudyStartPanel(group) {
         }
       </div>
       ${canStart ? "" : renderDisabledReason(disabledReason)}
+      ${starredCount ? `
+      <div class="study-starred-row">
+        <button class="secondary-button full" type="button" data-action="start-starred-study" data-group-id="${group.id}">
+          ${iconLabel("star", `별표 카드만 학습 · ${starredCount}개`)}
+        </button>
+      </div>` : ""}
     </section>
   `;
 }
@@ -4493,6 +4503,7 @@ function shouldUseCjkCardMeta(value) {
 
 function getSessionTitle(session) {
   if (session.studyMode === "practice") return "묶음 연습";
+  if (session.studyMode === "starred") return "별표 카드 학습";
   return session.studyMode === "weak" ? "약점 복습" : `${session.roundNo}회독`;
 }
 
@@ -4600,6 +4611,7 @@ function renderStudySession() {
           <h2 id="study-title">${getSessionTitle(session)}</h2>
         </div>
         <div class="study-session-controls">
+          <button class="ghost-button small-button ${card.starred ? "starred-button" : ""}" type="button" data-action="toggle-star-card" data-card-id="${card.id}" aria-label="${card.starred ? "별표 해제" : "별표"}" aria-pressed="${card.starred ? "true" : "false"}">${icon("star")}</button>
           <button class="ghost-button small-button" type="button" data-action="edit-card-in-session" data-card-id="${card.id}" aria-label="카드 수정">${icon("pencil")}</button>
           <button class="ghost-button small-button" type="button" data-action="quit-study" ${
             session.isAnswering || session.saving ? "disabled" : ""
@@ -4703,13 +4715,14 @@ function getCompletionSummary(session) {
 
 function getCompletionModeLabel(session) {
   if (session.studyMode === "practice") return "기록 없는 연습";
+  if (session.studyMode === "starred") return "별표 카드 학습";
   if (session.studyMode === "weak") return "약점 복습";
   return "공식 회독";
 }
 
 function renderCompletionRecordBadge(session) {
   const label = getCompletionModeLabel(session);
-  const tone = session.studyMode === "practice" ? "muted" : session.studyMode === "weak" ? "review" : "done";
+  const tone = session.studyMode === "practice" || session.studyMode === "starred" ? "muted" : session.studyMode === "weak" ? "review" : "done";
   return `<span class="status-pill ${tone}">${label}</span>`;
 }
 
@@ -4719,6 +4732,14 @@ function renderCompletionRecordNote(session) {
       <section class="completion-record-note practice">
         <strong>공식 기록에 저장하지 않았습니다.</strong>
         <p>묶음 연습은 지금 선택한 소그룹 카드만 임시로 합쳐 본 결과입니다. 회독 수, 정답률, 학습 이력에는 반영되지 않습니다.</p>
+      </section>
+    `;
+  }
+  if (session.studyMode === "starred") {
+    return `
+      <section class="completion-record-note practice">
+        <strong>공식 기록에 저장하지 않았습니다.</strong>
+        <p>별표 카드 학습은 회독 수, 정답률, 학습 이력에 반영되지 않습니다.</p>
       </section>
     `;
   }
@@ -4758,7 +4779,7 @@ function renderCompletionScoreboard(summary, round, session) {
 }
 
 function getPreviousRoundForComparison(round, session) {
-  if (session.studyMode === "weak" || session.studyMode === "practice") return null;
+  if (session.studyMode === "weak" || session.studyMode === "practice" || session.studyMode === "starred") return null;
   if (session.previousRound) return session.previousRound;
   const previousRoundNo = number(round.round_no) - 1;
   if (round.collection_id) {
@@ -4778,7 +4799,7 @@ function getPreviousRoundForComparison(round, session) {
 
 function renderDurationComparison(round, session) {
   const previousRound = getPreviousRoundForComparison(round, session);
-  if (session.studyMode === "weak" || session.studyMode === "practice") return "";
+  if (session.studyMode === "weak" || session.studyMode === "practice" || session.studyMode === "starred") return "";
   if (!previousRound) {
     return `
       <section class="duration-comparison neutral">
@@ -4919,7 +4940,7 @@ function renderCompletionDetails(summary, session) {
 
 function renderCompletionFocus(summary, session) {
   const hardest = summary.wrongCardSummaries[0];
-  const sessionLabel = session.studyMode === "weak" ? "복습" : session.studyMode === "practice" ? "연습" : "회독";
+  const sessionLabel = session.studyMode === "weak" ? "복습" : (session.studyMode === "practice" || session.studyMode === "starred") ? "연습" : "회독";
   if (!hardest) {
     return `
       <section class="completion-focus good">
@@ -4941,7 +4962,7 @@ function renderCompletionFocus(summary, session) {
 }
 
 function renderWrongReview(summary, session) {
-  const sessionLabel = session.studyMode === "weak" ? "복습" : session.studyMode === "practice" ? "연습" : "회독";
+  const sessionLabel = session.studyMode === "weak" ? "복습" : (session.studyMode === "practice" || session.studyMode === "starred") ? "연습" : "회독";
   return `
     <section id="wrong-review" class="completion-section">
       <div class="completion-header">
@@ -5551,6 +5572,7 @@ function renderCardListItem(card) {
         <span>총 ${total}</span>
       </div>
       <div class="card-actions quiet-actions">
+        <button class="ghost-button ${card.starred ? "card-starred-button" : ""}" type="button" data-action="toggle-star-card" data-card-id="${card.id}" aria-label="${card.starred ? "별표 해제" : "별표"}" aria-pressed="${card.starred ? "true" : "false"}">${icon("star")}</button>
         <button class="ghost-button" type="button" data-action="toggle-card-exclusion" data-card-id="${card.id}">${iconLabel(
           excluded ? "check" : "x",
           excluded ? "학습 포함" : "학습 제외",
@@ -6199,6 +6221,47 @@ async function startStudy() {
   focusAfterRender(['.study-card[data-action="flip-card"]', '.reveal-button[data-action="flip-card"]']);
 }
 
+async function startStarredStudy(groupId) {
+  const group = state.groups.find((g) => Number(g.id) === Number(groupId));
+  if (!group) return showToast("소그룹을 찾을 수 없습니다.");
+  const starredCards = state.cards.filter(
+    (c) => Number(c.group_id) === Number(groupId) && c.starred && !c.study_excluded
+  );
+  if (!starredCards.length) return showToast("별표한 학습 대상 카드가 없습니다.");
+  const cards = prepareStudyCards(starredCards);
+  if (state.orderMode === "random") cards.sort(() => Math.random() - 0.5);
+  const collection = state.collections.find((col) => Number(col.id) === Number(group.collection_id));
+  state.session = {
+    studyMode: "starred",
+    group: { id: group.id, name: `${group.name} · 별표 카드` },
+    collection: collection || null,
+    selectedGroups: [group],
+    roundNo: null,
+    orderMode: state.orderMode,
+    exampleDisplayMode: state.exampleDisplayMode,
+    exampleOrderMode: state.exampleOrderMode,
+    frontExampleMode: state.frontExampleMode,
+    allCards: cards,
+    cards,
+    index: 0,
+    passNo: 1,
+    passResults: [],
+    startedAtIso: new Date().toISOString(),
+    startedAtMs: Date.now(),
+    showingBack: false,
+    expandedExamples: {},
+    frontExpandedExamples: {},
+    answerFeedback: null,
+    isAnswering: false,
+    results: [],
+    previousRound: null,
+    savedRound: null,
+  };
+  state.activeDialog = null;
+  render();
+  focusAfterRender(['.study-card[data-action="flip-card"]', '.reveal-button[data-action="flip-card"]']);
+}
+
 async function startBundleStudy() {
   const collection = getSelectedCollection();
   const selectedGroups = getSelectedStudyGroups();
@@ -6336,7 +6399,7 @@ async function answerCard(result) {
     showToast(`오답 카드 ${wrongAttempts.length}개를 다시 반복합니다.`);
     return;
   }
-  if (session.studyMode === "practice") {
+  if (session.studyMode === "practice" || session.studyMode === "starred") {
     session.previousRound = null;
     session.savedRound = buildPracticeRound(session);
     state.completionCorrectOpen = false;
@@ -6965,8 +7028,8 @@ document.addEventListener("click", async (event) => {
     }
     if (state.session?.savedRound && nextTab !== "study") {
       if (state.session.studyMode === "practice") state.selectedCollectionId = state.session.collection.id;
-      else if (state.session.studyMode !== "weak") state.selectedGroupId = state.session.group.id;
-      state.studyStep = state.session.studyMode === "practice" ? "collection" : state.session.studyMode === "weak" ? "select" : "ready";
+      else if (state.session.studyMode !== "weak" && state.session.studyMode !== "starred") state.selectedGroupId = state.session.group.id;
+      state.studyStep = state.session.studyMode === "practice" ? "collection" : (state.session.studyMode === "weak" || state.session.studyMode === "starred") ? "select" : "ready";
       state.session = null;
       state.completionCorrectOpen = false;
     }
@@ -7302,6 +7365,23 @@ document.addEventListener("click", async (event) => {
       focusAfterRender(['#card-form [name="front"]', '#card-form [name="collection_id"]']);
       scrollToTop();
     }
+    if (action === "toggle-star-card") {
+      const cardId = Number(actionEl.dataset.cardId);
+      const data = await request(`/api/cards/${cardId}/star`, { method: "PATCH" });
+      const starred = data.starred;
+      const updateCardStar = (arr) => {
+        const c = arr.find((x) => Number(x.id) === cardId);
+        if (c) c.starred = starred;
+      };
+      updateCardStar(state.cards);
+      if (state.session) {
+        updateCardStar(state.session.cards);
+        if (state.session.allCards) updateCardStar(state.session.allCards);
+        renderStudy();
+      } else {
+        renderCards();
+      }
+    }
     if (action === "edit-card-in-session") {
       state.editingCardId = Number(actionEl.dataset.cardId);
       state.activeDialog = "edit-card-in-session";
@@ -7355,6 +7435,7 @@ document.addEventListener("click", async (event) => {
       await startStudy();
     }
     if (action === "start-bundle-study") await startBundleStudy();
+    if (action === "start-starred-study") await startStarredStudy(actionEl.dataset.groupId);
     if (action === "confirm-start-weak-study") {
       state.activeDialog = null;
       renderDialog();
@@ -7394,7 +7475,7 @@ document.addEventListener("click", async (event) => {
       if (state.session) {
         if (state.session.studyMode === "practice") {
           restorePracticeReturnContext(state.session);
-        } else if (state.session.studyMode !== "weak") {
+        } else if (state.session.studyMode !== "weak" && state.session.studyMode !== "starred") {
           state.selectedGroupId = state.session.group.id;
           state.studyStep = "ready";
         } else {
@@ -7413,8 +7494,8 @@ document.addEventListener("click", async (event) => {
       const nextTab = state.pendingTab || "study";
       if (state.session) {
         if (state.session.studyMode === "practice") state.selectedCollectionId = state.session.collection.id;
-        else if (state.session.studyMode !== "weak") state.selectedGroupId = state.session.group.id;
-        state.studyStep = state.session.studyMode === "practice" ? "collection" : state.session.studyMode === "weak" ? "select" : "ready";
+        else if (state.session.studyMode !== "weak" && state.session.studyMode !== "starred") state.selectedGroupId = state.session.group.id;
+        state.studyStep = state.session.studyMode === "practice" ? "collection" : (state.session.studyMode === "weak" || state.session.studyMode === "starred") ? "select" : "ready";
         state.session = null;
       }
       state.activeDialog = null;
@@ -7480,11 +7561,11 @@ document.addEventListener("click", async (event) => {
       const completedMode = state.session?.studyMode;
       if (state.session) {
         if (state.session.studyMode === "practice") state.selectedCollectionId = state.session.collection.id;
-        else if (state.session.studyMode !== "weak") state.selectedGroupId = state.session.group.id;
+        else if (state.session.studyMode !== "weak" && state.session.studyMode !== "starred") state.selectedGroupId = state.session.group.id;
       }
       state.session = null;
       state.completionCorrectOpen = false;
-      state.studyStep = completedMode === "weak" ? "select" : completedMode === "practice" ? "collection" : "ready";
+      state.studyStep = (completedMode === "weak" || completedMode === "starred") ? "select" : completedMode === "practice" ? "collection" : "ready";
       state.activeDialog = null;
       render();
       scrollToTop();

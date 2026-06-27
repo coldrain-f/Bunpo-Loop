@@ -267,6 +267,8 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         }
         if "study_excluded" not in card_columns:
             conn.execute("ALTER TABLE cards ADD COLUMN study_excluded INTEGER NOT NULL DEFAULT 0")
+        if "starred" not in card_columns:
+            conn.execute("ALTER TABLE cards ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
         conn.execute(
             """
             UPDATE cards
@@ -1243,6 +1245,7 @@ def cards_payload(
             c.back,
             c.memo,
             c.study_excluded,
+            c.starred,
             c.correct_count,
             c.wrong_count,
             COALESCE((
@@ -2485,6 +2488,17 @@ class AppHandler(BaseHTTPRequestHandler):
 
             if parts == ["api", "cards", "bulk"] and method == "POST":
                 self.create_bulk_cards(conn, user_id)
+                return
+
+            if len(parts) == 4 and parts[:2] == ["api", "cards"] and parts[3] == "star" and method == "PATCH":
+                card_id = int(parts[2])
+                card = get_card(conn, user_id, card_id)
+                if card is None:
+                    self.send_json({"error": "카드를 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+                    return
+                new_starred = 0 if card["starred"] else 1
+                conn.execute("UPDATE cards SET starred = ? WHERE id = ?", (new_starred, card_id))
+                self.send_json({"starred": bool(new_starred)})
                 return
 
             if len(parts) == 3 and parts[:2] == ["api", "cards"]:
