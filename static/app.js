@@ -3194,7 +3194,7 @@ function renderDialog() {
   const previewTarget = getPreviewTarget();
   if (state.activeDialog === "preview" && previewTarget) {
     const previewMode = state.pendingAction ? "sequence" : state.orderMode;
-    const previewCards = getPreviewCards(previewTarget.groupIds, previewMode, previewTarget.includeExcluded);
+    const previewCards = getPreviewCards(previewTarget.groupIds, previewMode, previewTarget.includeExcluded, previewTarget.starredOnly);
     dialogRoot.innerHTML = `
       <div class="dialog-backdrop" role="presentation">
         <section class="dialog-panel preview-dialog" role="dialog" aria-modal="true" aria-labelledby="study-dialog-title" aria-describedby="preview-dialog-summary">
@@ -3381,6 +3381,12 @@ function renderDialog() {
 
 function closeDialog() {
   if (state.pendingRequest) return;
+  if (state.activeDialog === "preview" && state.pendingAction?.returnDialog === "starred-bundle-picker") {
+    state.activeDialog = "starred-bundle-picker";
+    state.pendingAction = null;
+    renderDialog();
+    return;
+  }
   if (state.activeDialog === "preview" && state.pendingAction?.returnDialog === "collection-study-picker") {
     const scrollTop = number(state.pendingAction.returnScrollTop);
     state.activeDialog = "collection-study-picker";
@@ -3449,13 +3455,18 @@ function getPreviewTarget() {
     const groupIds = state.pendingAction.groupIds || [];
     return collection ? { name: `${collection.name} 묶음 연습`, groupIds, includeExcluded: false } : null;
   }
+  if (state.pendingAction?.type === "preview-starred-bundle-cards") {
+    const collection = state.collections.find((item) => item.id === Number(state.pendingAction.id));
+    const groupIds = state.pendingAction.groupIds || [];
+    return collection ? { name: `${collection.name} 별표 학습`, groupIds, includeExcluded: false, starredOnly: true } : null;
+  }
   const group = getSelectedGroup();
   return group ? { name: getGroupLabel(group), groupIds: [group.id], includeExcluded: false } : null;
 }
 
-function getPreviewCards(groupIds, orderMode = state.orderMode, includeExcluded = true) {
+function getPreviewCards(groupIds, orderMode = state.orderMode, includeExcluded = true, starredOnly = false) {
   const groupIdSet = new Set((groupIds || []).map(Number));
-  const cards = state.cards.filter((card) => groupIdSet.has(Number(card.group_id)) && (includeExcluded || !isCardStudyExcluded(card)));
+  const cards = state.cards.filter((card) => groupIdSet.has(Number(card.group_id)) && (includeExcluded || !isCardStudyExcluded(card)) && (!starredOnly || card.starred));
   if (orderMode === "wrong") {
     return [...cards].sort((a, b) => {
       const aTotal = number(a.correct_count) + number(a.wrong_count);
@@ -4209,6 +4220,11 @@ function renderStarredBundleDialog() {
               canStart ? "" : 'disabled aria-describedby="starred-bundle-summary"'
             }>
               ${iconLabel("play", "학습 시작")}
+            </button>
+            <button class="ghost-button full" type="button" data-action="preview-starred-bundle-cards" ${
+              canStart ? "" : 'disabled aria-describedby="starred-bundle-summary"'
+            }>
+              ${iconLabel("eye", "미리보기")}
             </button>
           </div>
         </section>
@@ -7575,6 +7591,16 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "preview-study-cards") {
       state.pendingAction = null;
+      state.activeDialog = "preview";
+      renderDialog();
+    }
+    if (action === "preview-starred-bundle-cards") {
+      state.pendingAction = {
+        type: "preview-starred-bundle-cards",
+        id: state.selectedCollectionId,
+        groupIds: getSelectedStudyGroups().map((group) => group.id),
+        returnDialog: "starred-bundle-picker",
+      };
       state.activeDialog = "preview";
       renderDialog();
     }
