@@ -183,8 +183,10 @@ const state = {
   studyCollectionSearchQuery: "",
   studyGroupSearchQuery: "",
   collectionSearchQuery: "",
+  collectionPage: 0,
   studyGroupSortMode: "registered",
   groupSearchQuery: "",
+  groupDetailPage: 0,
   cardListLimit: CARD_LIST_PAGE_SIZE,
   groupListLimit: GROUP_LIST_PAGE_SIZE,
   scrollPositions: {},
@@ -1426,12 +1428,13 @@ function applySearchInput(target) {
   }
   if (target === "collection-search") {
     state.collectionSearchQuery = query;
+    state.collectionPage = 0;
     renderGroups();
     focusAfterRender("#collection-search");
   }
   if (target === "group-search") {
     state.groupSearchQuery = query;
-    resetGroupListLimit();
+    state.groupDetailPage = 0;
     renderGroups();
     focusAfterRender("#group-search");
   }
@@ -5712,6 +5715,10 @@ function renderGroupEmptyState(collection) {
 }
 
 function renderGroupListPanel(visibleCollections) {
+  const PAGE_SIZE = 5;
+  const totalPages = Math.max(1, Math.ceil(visibleCollections.length / PAGE_SIZE));
+  const page = Math.min(state.collectionPage, totalPages - 1);
+  const pageItems = visibleCollections.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   return `
     <div class="panel stack">
       <div class="groups-page-header">
@@ -5737,17 +5744,19 @@ function renderGroupListPanel(visibleCollections) {
           ? renderSearchInput({ id: "collection-search", value: state.collectionSearchQuery, placeholder: "대그룹 검색" })
           : ""
       }
-      <div class="group-list">
-        ${visibleCollections.length ? visibleCollections.map(renderCollectionListItem).join("") : renderCollectionEmptyState()}
+      <div class="study-group-list">
+        ${visibleCollections.length ? pageItems.map(renderCollectionListItem).join("") : renderCollectionEmptyState()}
       </div>
+      ${visibleCollections.length > PAGE_SIZE ? renderStudyPagination(page, totalPages, "collection-tab") : ""}
     </div>
   `;
 }
 
 function renderCollectionDetailPanel(collection, visibleGroups) {
-  const displayLimit = Math.max(GROUP_LIST_PAGE_SIZE, number(state.groupListLimit));
-  const displayGroups = visibleGroups.slice(0, displayLimit);
-  const hiddenCount = Math.max(0, visibleGroups.length - displayGroups.length);
+  const PAGE_SIZE = 5;
+  const totalPages = Math.max(1, Math.ceil(visibleGroups.length / PAGE_SIZE));
+  const page = Math.min(state.groupDetailPage, totalPages - 1);
+  const pageItems = visibleGroups.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const collectionStudyCount = getCollectionStudyCardCount(collection);
   const collectionExcludedCount = getCollectionExcludedCardCount(collection);
   const bundleDisabledReason = collectionExcludedCount
@@ -5791,26 +5800,10 @@ function renderCollectionDetailPanel(collection, visibleGroups) {
           : renderDisabledReason(bundleDisabledReason)
       }
       ${renderSearchInput({ id: "group-search", value: state.groupSearchQuery, placeholder: "소그룹 검색" })}
-      <div class="group-list">
-        ${
-          displayGroups.length
-            ? displayGroups.map(renderGroupListItem).join("")
-            : renderGroupEmptyState(collection)
-        }
+      <div class="study-group-list">
+        ${pageItems.length ? pageItems.map(renderGroupListItem).join("") : renderGroupEmptyState(collection)}
       </div>
-      ${
-        hiddenCount
-          ? `<div class="list-footer">
-              <p>${number(displayGroups.length)}/${number(visibleGroups.length)}개 소그룹을 표시 중입니다.</p>
-              <button class="secondary-button full" type="button" data-action="show-more-groups">${iconLabel(
-                "chevron-down",
-                `${Math.min(GROUP_LIST_PAGE_SIZE, hiddenCount)}개 더 보기`,
-              )}</button>
-            </div>`
-          : visibleGroups.length > GROUP_LIST_PAGE_SIZE
-            ? `<p class="list-performance-note">현재 조건의 소그룹 ${number(visibleGroups.length)}개를 모두 표시했습니다.</p>`
-            : ""
-      }
+      ${visibleGroups.length > PAGE_SIZE ? renderStudyPagination(page, totalPages, "group-detail") : ""}
     </div>
   `;
 }
@@ -6102,7 +6095,6 @@ function renderCollectionListItem(collection) {
           <span><strong>${number(collection.completed_rounds)}</strong>회독</span>
           <span><strong>${number(collection.wrong_total)}</strong>오답</span>
         </div>
-        <p class="collection-list-note">소그룹을 관리하려면 대그룹을 여세요. 묶음 연습은 공식 기록에서 제외됩니다.</p>
       </button>
       <div class="card-actions quiet-actions">
         <button class="ghost-button" type="button" data-action="edit-collection" data-collection-id="${
@@ -7086,14 +7078,26 @@ document.addEventListener("click", async (event) => {
       if (target === "collection") state.studyCollectionPage = Math.max(0, state.studyCollectionPage - 1);
       if (target === "group") state.studyGroupPage = Math.max(0, state.studyGroupPage - 1);
       if (target === "card") state.cardPage = Math.max(0, state.cardPage - 1);
-      target === "card" ? renderCards() : renderStudy();
+      if (target === "collection-tab") state.collectionPage = Math.max(0, state.collectionPage - 1);
+      if (target === "group-detail") state.groupDetailPage = Math.max(0, state.groupDetailPage - 1);
+      if (target === "card" || target === "collection-tab" || target === "group-detail") {
+        target === "card" ? renderCards() : renderGroups();
+      } else {
+        renderStudy();
+      }
     }
     if (action === "study-page-next") {
       const target = actionEl.dataset.target;
       if (target === "collection") state.studyCollectionPage += 1;
       if (target === "group") state.studyGroupPage += 1;
       if (target === "card") state.cardPage += 1;
-      target === "card" ? renderCards() : renderStudy();
+      if (target === "collection-tab") state.collectionPage += 1;
+      if (target === "group-detail") state.groupDetailPage += 1;
+      if (target === "card" || target === "collection-tab" || target === "group-detail") {
+        target === "card" ? renderCards() : renderGroups();
+      } else {
+        renderStudy();
+      }
     }
     if (action === "back-to-study-collections") {
       saveScrollPosition(`study:collection:${state.selectedCollectionId || "none"}`);
@@ -7534,7 +7538,7 @@ document.addEventListener("click", async (event) => {
       state.editingGroupId = null;
       state.editingCollectionId = null;
       state.groupSearchQuery = "";
-      resetGroupListLimit();
+      state.groupDetailPage = 0;
       render();
       scrollToTop();
     }
@@ -7544,6 +7548,7 @@ document.addEventListener("click", async (event) => {
       state.groupScreen = "list";
       state.editingGroupId = null;
       state.editingCollectionId = null;
+      state.collectionPage = 0;
       render();
       restoreScrollPosition("groups:collections");
     }
