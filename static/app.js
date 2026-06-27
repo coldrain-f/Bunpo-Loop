@@ -6439,6 +6439,22 @@ async function saveCard(form) {
   await loadData();
   if (state.activeDialog === "edit-card-in-session") {
     state.activeDialog = null;
+    const session = state.session;
+    if (session) {
+      const updatedCard = state.cards.find((c) => Number(c.id) === Number(state.editingCardId));
+      if (updatedCard) {
+        const prepared = prepareStudyCards([updatedCard])[0];
+        const replaceIn = (arr) => {
+          const idx = arr.findIndex((c) => Number(c.id) === Number(updatedCard.id));
+          if (idx !== -1) arr[idx] = prepared;
+        };
+        replaceIn(session.cards);
+        if (session.allCards) replaceIn(session.allCards);
+      }
+      session.showingBack = false;
+      session.answerFeedback = null;
+    }
+    state.editingCardId = null;
     render();
     renderDialog();
     showToast("카드를 저장했습니다.");
