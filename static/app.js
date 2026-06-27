@@ -267,7 +267,7 @@ const FOCUSABLE_SELECTOR = [
   "a[href]",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
-const DISMISSIBLE_DIALOGS = new Set(["preview", "round-detail", "collection-study-picker", "edit-card-in-session"]);
+const DISMISSIBLE_DIALOGS = new Set(["preview", "round-detail", "collection-study-picker", "starred-bundle-picker", "edit-card-in-session"]);
 
 function defaultSettings() {
   return {
@@ -3171,6 +3171,10 @@ function renderDialog() {
     renderEditCardInSessionDialog();
     return;
   }
+  if (state.activeDialog === "starred-bundle-picker") {
+    renderStarredBundleDialog();
+    return;
+  }
   if (state.activeDialog === "start-starred") {
     const groupId = state.starredStudyGroupId;
     const group = state.groups.find((g) => Number(g.id) === Number(groupId));
@@ -3610,9 +3614,12 @@ function renderStudySubgroupPicker(collection) {
         <div class="stat"><strong>${number(collection.completed_rounds)}</strong><span>소그룹 회독</span></div>
       </div>
       <p class="meta">${escapeHtml(studyCountText(number(collection.card_count), collectionStudyCount, collectionExcludedCount))} · 묶음 연습은 공식 기록에 저장되지 않습니다.</p>
-      <button class="secondary-button full" type="button" data-action="open-collection-study-dialog" ${
-        collectionStudyCount ? "" : `disabled aria-describedby="${getDisabledReasonId(bundleDisabledReason)}"`
-      }>${iconLabel("repeat-2", "묶음 연습")}</button>
+      <div class="study-bundle-row">
+        <button class="secondary-button full" type="button" data-action="open-collection-study-dialog" ${
+          collectionStudyCount ? "" : `disabled aria-describedby="${getDisabledReasonId(bundleDisabledReason)}"`
+        }>${iconLabel("repeat-2", "묶음 연습")}</button>
+        <button class="secondary-button full starred-button" type="button" data-action="open-starred-bundle-dialog">${iconLabel("star", "별표 카드 학습")}</button>
+      </div>
       ${
         collectionStudyCount
           ? ""
@@ -4091,6 +4098,117 @@ function renderCollectionStudyDialog() {
               canStart ? "" : 'disabled aria-describedby="collection-practice-summary"'
             }>
               ${iconLabel("eye", "미리보기")}
+            </button>
+          </div>
+        </section>
+      </section>
+    </div>
+  `;
+  finishDialogRender();
+}
+
+function getGroupStarredCardCount(group) {
+  return state.cards.filter(
+    (c) => Number(c.group_id) === Number(group.id) && c.starred && !c.study_excluded
+  ).length;
+}
+
+function renderStarredGroupSelection(groups) {
+  const selectableCount = groups.filter((g) => getGroupStarredCardCount(g) > 0).length;
+  if (!groups.length) {
+    return `
+      <section class="study-subgroup-panel">
+        ${renderActionEmptyState({
+          title: "이 대그룹에는 아직 소그룹이 없습니다.",
+          body: "소그룹을 만든 뒤 카드에 별표를 달면 별표 학습에 포함할 수 있습니다.",
+          action: "open-group-form-for-collection",
+          label: "소그룹 만들기",
+          attrs: `data-collection-id="${state.selectedCollectionId}"`,
+        })}
+      </section>
+    `;
+  }
+  const selectedIds = new Set(state.selectedStudyGroupIds.map(Number));
+  const selectedCount = groups.filter((g) => selectedIds.has(Number(g.id)) && getGroupStarredCardCount(g) > 0).length;
+  const allSelected = Boolean(selectableCount && selectedCount === selectableCount);
+  return `
+    <section class="study-subgroup-panel">
+      <div class="completion-header">
+        <h3>학습할 소그룹</h3>
+        <span class="pill">${selectedCount}/${selectableCount} 선택</span>
+      </div>
+      <div class="button-row">
+        <button class="secondary-button" type="button" data-action="select-all-study-subgroups" aria-pressed="${
+          allSelected ? "true" : "false"
+        }" ${selectableCount ? "" : "disabled"}>${iconLabel(allSelected ? "check" : "plus", allSelected ? "전체 선택됨" : "전체 선택")}</button>
+        <button class="ghost-button" type="button" data-action="clear-study-subgroups">${iconLabel("x", "선택 해제")}</button>
+      </div>
+      <div class="study-subgroup-list">
+        ${groups.map((group) => {
+          const starredCount = getGroupStarredCardCount(group);
+          const disabled = !starredCount;
+          const checked = !disabled && selectedIds.has(Number(group.id));
+          return `
+            <label class="study-subgroup-option ${checked ? "active" : ""} ${disabled ? "disabled" : ""}">
+              <input type="checkbox" data-action="toggle-study-subgroup" data-group-id="${group.id}" ${
+                checked ? "checked" : ""
+              } ${disabled ? "disabled" : ""} />
+              <span>
+                <strong>${escapeHtml(group.name)}</strong>
+                <small>${disabled ? "별표 카드 없음" : `별표 카드 ${starredCount}개`}</small>
+              </span>
+            </label>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderStarredBundleDialog() {
+  const collection = getSelectedCollection() || state.collections[0];
+  if (!collection) return closeDialog();
+  if (state.selectedCollectionId !== collection.id) state.selectedCollectionId = collection.id;
+  const groups = getGroupsForCollection(collection.id);
+  const selectedGroups = getSelectedStudyGroups();
+  const selectedStarredCount = selectedGroups.reduce((sum, g) => sum + getGroupStarredCardCount(g), 0);
+  const canStart = selectedStarredCount > 0;
+  const summaryText = canStart
+    ? `별표 카드 ${selectedStarredCount}개 · 공식 기록 제외`
+    : selectedGroups.length
+      ? "선택한 소그룹에 별표 카드가 없습니다."
+      : "별표 카드가 있는 소그룹을 하나 이상 선택하세요.";
+  dialogRoot.innerHTML = `
+    <div class="dialog-backdrop" role="presentation">
+      <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="starred-dialog-title">
+        <div class="row dialog-header">
+          <div>
+            <p class="eyebrow">별표 카드 학습</p>
+            <h2 id="starred-dialog-title">소그룹 선택 후 별표 카드 학습</h2>
+          </div>
+          <button class="ghost-button small-button" type="button" data-action="close-dialog">${iconLabel("x", "닫기")}</button>
+        </div>
+        <div class="collection-study-body">
+          <p class="meta collection-study-note">선택한 소그룹의 별표 카드만 모아 학습합니다. 공식 기록에 저장되지 않습니다.</p>
+          <label class="field">
+            <span>대그룹</span>
+            <select id="study-collection-select" class="select" aria-label="학습 대그룹 선택">
+              ${collectionOptions(collection.id)}
+            </select>
+          </label>
+          ${renderStarredGroupSelection(groups)}
+        </div>
+        <section class="study-start-panel practice-summary" aria-label="별표 카드 학습 요약" aria-live="polite">
+          <div>
+            <span class="today-action-label">별표 카드 학습</span>
+            <strong>${selectedGroups.length}개 소그룹 · 별표 카드 ${selectedStarredCount}개</strong>
+            <p id="starred-bundle-summary">${escapeHtml(summaryText)}</p>
+          </div>
+          <div class="study-start-actions">
+            <button class="primary-button full" type="button" data-action="start-starred-bundle-study" ${
+              canStart ? "" : 'disabled aria-describedby="starred-bundle-summary"'
+            }>
+              ${iconLabel("play", "학습 시작")}
             </button>
           </div>
         </section>
@@ -6278,6 +6396,47 @@ async function startStarredStudy(groupId) {
   focusAfterRender(['.study-card[data-action="flip-card"]', '.reveal-button[data-action="flip-card"]']);
 }
 
+async function startStarredBundleStudy() {
+  const collection = getSelectedCollection();
+  const selectedGroups = getSelectedStudyGroups();
+  if (!collection || !selectedGroups.length) return showToast("소그룹을 하나 이상 선택하세요.");
+  const starredCards = selectedGroups.flatMap((group) =>
+    state.cards.filter((c) => Number(c.group_id) === Number(group.id) && c.starred && !c.study_excluded)
+  );
+  if (!starredCards.length) return showToast("선택한 소그룹에 별표한 학습 대상 카드가 없습니다.");
+  const cards = prepareStudyCards(starredCards);
+  if (state.orderMode === "random") cards.sort(() => Math.random() - 0.5);
+  state.session = {
+    studyMode: "starred",
+    group: { id: null, name: `${collection.name} · 별표 카드 묶음` },
+    collection: collection || null,
+    selectedGroups,
+    roundNo: null,
+    orderMode: state.orderMode,
+    exampleDisplayMode: state.exampleDisplayMode,
+    exampleOrderMode: state.exampleOrderMode,
+    frontExampleMode: state.frontExampleMode,
+    allCards: cards,
+    cards,
+    index: 0,
+    passNo: 1,
+    passResults: [],
+    startedAtIso: new Date().toISOString(),
+    startedAtMs: Date.now(),
+    showingBack: false,
+    expandedExamples: {},
+    frontExpandedExamples: {},
+    answerFeedback: null,
+    isAnswering: false,
+    results: [],
+    previousRound: null,
+    savedRound: null,
+  };
+  state.activeDialog = null;
+  render();
+  focusAfterRender(['.study-card[data-action="flip-card"]', '.reveal-button[data-action="flip-card"]']);
+}
+
 async function startBundleStudy() {
   const collection = getSelectedCollection();
   const selectedGroups = getSelectedStudyGroups();
@@ -7461,6 +7620,21 @@ document.addEventListener("click", async (event) => {
       renderDialog();
       await startStarredStudy(state.starredStudyGroupId);
     }
+    if (action === "open-starred-bundle-dialog") {
+      const collectionId = state.selectedCollectionId || state.collections[0]?.id;
+      if (!collectionId) return showToast("대그룹을 먼저 만들어 주세요.");
+      state.selectedCollectionId = collectionId;
+      state.selectedStudyGroupIds = getGroupsForCollection(collectionId)
+        .filter((group) => getGroupStarredCardCount(group) > 0)
+        .map((group) => group.id);
+      state.activeDialog = "starred-bundle-picker";
+      renderDialog();
+    }
+    if (action === "start-starred-bundle-study") {
+      state.activeDialog = null;
+      renderDialog();
+      await startStarredBundleStudy();
+    }
     if (action === "confirm-start-weak-study") {
       state.activeDialog = null;
       renderDialog();
@@ -7864,9 +8038,15 @@ document.addEventListener("change", async (event) => {
     if (event.target.id === "study-collection-select") {
       const collectionId = Number(event.target.value);
       state.selectedCollectionId = collectionId;
-      state.selectedStudyGroupIds = getGroupsForCollection(collectionId)
-        .filter((group) => getGroupStudyCardCount(group) > 0)
-        .map((group) => group.id);
+      if (state.activeDialog === "starred-bundle-picker") {
+        state.selectedStudyGroupIds = getGroupsForCollection(collectionId)
+          .filter((group) => getGroupStarredCardCount(group) > 0)
+          .map((group) => group.id);
+      } else {
+        state.selectedStudyGroupIds = getGroupsForCollection(collectionId)
+          .filter((group) => getGroupStudyCardCount(group) > 0)
+          .map((group) => group.id);
+      }
       renderDialog();
     }
     if (event.target.id === "card-form-collection") {

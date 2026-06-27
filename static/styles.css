@@ -3476,6 +3476,19 @@ button:active,
   margin-top: 8px;
 }
 
+.study-bundle-row {
+  display: flex;
+  gap: 8px;
+}
+
+.study-bundle-row .starred-button {
+  color: #f59e0b;
+}
+
+.study-bundle-row .starred-button svg {
+  fill: #f59e0b;
+}
+
 .study-session-controls .pill,
 .study-session-controls .timer-pill {
   min-height: 28px;
