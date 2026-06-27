@@ -4361,6 +4361,10 @@ body.study-mode .toast {
   padding-right: 2px;
 }
 
+.edit-card-dialog .checkbox-field small {
+  display: none;
+}
+
 .edit-card-dialog .card-form-actions {
   position: sticky;
   bottom: 0;
