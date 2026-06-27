@@ -104,13 +104,14 @@ body.study-mode {
 
 body.study-mode .app-shell > main {
   display: grid;
+  grid-template-rows: 1fr;
   min-height: 0;
-  overflow-y: auto;
 }
 
 body.study-mode #view-study.view.active {
   display: grid;
   min-height: 0;
+  overflow-y: auto;
 }
 
 button,
