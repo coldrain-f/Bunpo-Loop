@@ -6424,6 +6424,7 @@ async function saveCard(form) {
     updateSingleDuplicateWarning(form);
     return;
   }
+  const editingCardIdSnapshot = state.editingCardId;
   await request(isEditing ? `/api/cards/${state.editingCardId}` : "/api/cards", {
     method: isEditing ? "PATCH" : "POST",
     body: JSON.stringify(payload),
@@ -6441,7 +6442,7 @@ async function saveCard(form) {
     state.activeDialog = null;
     const session = state.session;
     if (session) {
-      const updatedCard = state.cards.find((c) => Number(c.id) === Number(state.editingCardId));
+      const updatedCard = state.cards.find((c) => Number(c.id) === Number(editingCardIdSnapshot));
       if (updatedCard) {
         const prepared = prepareStudyCards([updatedCard])[0];
         const replaceIn = (arr) => {
