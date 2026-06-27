@@ -112,10 +112,10 @@ const DEFAULT_CONTROLLER_A_ACTION = "primary";
 const DEFAULT_CONTROLLER_B_ACTION = "wrong";
 const DEFAULT_CONTROLLER_X_ACTION = "disabled";
 const DEFAULT_CONTROLLER_Y_ACTION = "disabled";
-const DEFAULT_STUDY_ORDER_MODE = "sequence";
+const DEFAULT_STUDY_ORDER_MODE = "random";
 const DEFAULT_EXAMPLE_DISPLAY_MODE = "collapsed";
 const DEFAULT_EXAMPLE_ORDER_MODE = "sequence";
-const DEFAULT_FRONT_EXAMPLE_MODE = "hidden";
+const DEFAULT_FRONT_EXAMPLE_MODE = "shown";
 const CONTROLLER_ACTION_LABELS = {
   primary: "뒤집기/알맞음",
   wrong: "틀림",
