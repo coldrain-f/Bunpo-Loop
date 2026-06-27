@@ -102,7 +102,12 @@ body.study-mode {
   overflow: hidden;
 }
 
-body.study-mode .app-shell > main,
+body.study-mode .app-shell > main {
+  display: grid;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 body.study-mode #view-study.view.active {
   display: grid;
   min-height: 0;
