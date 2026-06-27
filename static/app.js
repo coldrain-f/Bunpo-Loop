@@ -112,6 +112,10 @@ const DEFAULT_CONTROLLER_A_ACTION = "primary";
 const DEFAULT_CONTROLLER_B_ACTION = "wrong";
 const DEFAULT_CONTROLLER_X_ACTION = "disabled";
 const DEFAULT_CONTROLLER_Y_ACTION = "disabled";
+const DEFAULT_STUDY_ORDER_MODE = "sequence";
+const DEFAULT_EXAMPLE_DISPLAY_MODE = "collapsed";
+const DEFAULT_EXAMPLE_ORDER_MODE = "sequence";
+const DEFAULT_FRONT_EXAMPLE_MODE = "hidden";
 const CONTROLLER_ACTION_LABELS = {
   primary: "뒤집기/알맞음",
   wrong: "틀림",
@@ -163,6 +167,10 @@ const state = {
     controller_b_action: DEFAULT_CONTROLLER_B_ACTION,
     controller_x_action: DEFAULT_CONTROLLER_X_ACTION,
     controller_y_action: DEFAULT_CONTROLLER_Y_ACTION,
+    study_order_mode: DEFAULT_STUDY_ORDER_MODE,
+    example_display_mode: DEFAULT_EXAMPLE_DISPLAY_MODE,
+    example_order_mode: DEFAULT_EXAMPLE_ORDER_MODE,
+    front_example_mode: DEFAULT_FRONT_EXAMPLE_MODE,
   },
   selectedCollectionId: null,
   selectedStudyGroupIds: [],
@@ -191,10 +199,10 @@ const state = {
   statsRangeMode: "all",
   statsCollectionId: "",
   statsCollectionListLimit: STATS_COLLECTION_LIST_PAGE_SIZE,
-  orderMode: "sequence",
-  exampleDisplayMode: "collapsed",
-  exampleOrderMode: "sequence",
-  frontExampleMode: "hidden",
+  orderMode: DEFAULT_STUDY_ORDER_MODE,
+  exampleDisplayMode: DEFAULT_EXAMPLE_DISPLAY_MODE,
+  exampleOrderMode: DEFAULT_EXAMPLE_ORDER_MODE,
+  frontExampleMode: DEFAULT_FRONT_EXAMPLE_MODE,
   studyStep: "select",
   studyOptionsOpen: false,
   weakPanelOpen: false,
@@ -242,6 +250,7 @@ let lastHistoryRouteKey = "";
 let isApplyingHistoryRoute = false;
 let lastHiddenAtMs = 0;
 let resumeRefreshPending = false;
+let studyOptionSaveSerial = 0;
 const ANSWER_FEEDBACK_MS = 230;
 const RESUME_REFRESH_AFTER_MS = 5 * 60 * 1000;
 const FOCUSABLE_SELECTOR = [
@@ -253,6 +262,78 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 const DISMISSIBLE_DIALOGS = new Set(["preview", "round-detail", "collection-study-picker"]);
+
+function defaultSettings() {
+  return {
+    target_name: "",
+    jlpt_exam_date: "",
+    weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
+    weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
+    weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
+    controller_a_action: DEFAULT_CONTROLLER_A_ACTION,
+    controller_b_action: DEFAULT_CONTROLLER_B_ACTION,
+    controller_x_action: DEFAULT_CONTROLLER_X_ACTION,
+    controller_y_action: DEFAULT_CONTROLLER_Y_ACTION,
+    study_order_mode: DEFAULT_STUDY_ORDER_MODE,
+    example_display_mode: DEFAULT_EXAMPLE_DISPLAY_MODE,
+    example_order_mode: DEFAULT_EXAMPLE_ORDER_MODE,
+    front_example_mode: DEFAULT_FRONT_EXAMPLE_MODE,
+  };
+}
+
+function hasOwnOption(options, value) {
+  return Object.prototype.hasOwnProperty.call(options, String(value || ""));
+}
+
+function normalizeStudyOrderMode(value) {
+  return hasOwnOption(ORDER_LABELS, value) ? String(value) : DEFAULT_STUDY_ORDER_MODE;
+}
+
+function normalizeExampleDisplayMode(value) {
+  return hasOwnOption(EXAMPLE_DISPLAY_LABELS, value) ? String(value) : DEFAULT_EXAMPLE_DISPLAY_MODE;
+}
+
+function normalizeExampleOrderMode(value) {
+  return hasOwnOption(EXAMPLE_ORDER_LABELS, value) ? String(value) : DEFAULT_EXAMPLE_ORDER_MODE;
+}
+
+function normalizeFrontExampleMode(value) {
+  return hasOwnOption(FRONT_EXAMPLE_LABELS, value) ? String(value) : DEFAULT_FRONT_EXAMPLE_MODE;
+}
+
+function normalizeSettings(settings = {}) {
+  const merged = { ...defaultSettings(), ...(settings || {}) };
+  return {
+    ...merged,
+    study_order_mode: normalizeStudyOrderMode(merged.study_order_mode),
+    example_display_mode: normalizeExampleDisplayMode(merged.example_display_mode),
+    example_order_mode: normalizeExampleOrderMode(merged.example_order_mode),
+    front_example_mode: normalizeFrontExampleMode(merged.front_example_mode),
+  };
+}
+
+function currentStudyOptionSettings() {
+  return {
+    study_order_mode: normalizeStudyOrderMode(state.orderMode),
+    example_display_mode: normalizeExampleDisplayMode(state.exampleDisplayMode),
+    example_order_mode: normalizeExampleOrderMode(state.exampleOrderMode),
+    front_example_mode: normalizeFrontExampleMode(state.frontExampleMode),
+  };
+}
+
+function applyStudyOptionSettings(settings = state.settings) {
+  state.orderMode = normalizeStudyOrderMode(settings?.study_order_mode);
+  state.exampleDisplayMode = normalizeExampleDisplayMode(settings?.example_display_mode);
+  state.exampleOrderMode = normalizeExampleOrderMode(settings?.example_order_mode);
+  state.frontExampleMode = normalizeFrontExampleMode(settings?.front_example_mode);
+}
+
+function syncStudyOptionSettings() {
+  state.settings = normalizeSettings({
+    ...state.settings,
+    ...currentStudyOptionSettings(),
+  });
+}
 
 function icon(name, extraClass = "") {
   return `<svg class="icon${extraClass ? ` ${extraClass}` : ""}" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
@@ -740,18 +821,8 @@ async function loadData() {
   state.groups = groupData.groups;
   state.cards = cardData.cards;
   state.rounds = roundData.rounds;
-  state.settings = {
-    target_name: "",
-    jlpt_exam_date: "",
-    weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
-    weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
-    weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
-    controller_a_action: DEFAULT_CONTROLLER_A_ACTION,
-    controller_b_action: DEFAULT_CONTROLLER_B_ACTION,
-    controller_x_action: DEFAULT_CONTROLLER_X_ACTION,
-    controller_y_action: DEFAULT_CONTROLLER_Y_ACTION,
-    ...(settingsData.settings || {}),
-  };
+  state.settings = normalizeSettings(settingsData.settings || {});
+  applyStudyOptionSettings();
   reconcileLoadedState();
 }
 
@@ -969,11 +1040,11 @@ function renderMarkedText(value) {
 }
 
 function renderJapaneseText(value) {
-  return `<span class="jp-text">${escapeHtml(value)}</span>`;
+  return `<span class="jp-text">${renderMarkedText(value)}</span>`;
 }
 
 function renderMarkedJapaneseText(value) {
-  return `<span class="jp-text">${renderMarkedText(value)}</span>`;
+  return renderJapaneseText(value);
 }
 
 function parseBulkExampleText(value) {
@@ -3391,7 +3462,7 @@ function renderPreviewCard(card) {
         <strong>${renderJapaneseText(card.front)}</strong>
         <span class="pill">${card.examples?.length || 0}예문</span>
       </div>
-      <p>${escapeHtml(card.back)}</p>
+      <p>${renderMarkedText(card.back)}</p>
       <p class="meta">정답 ${number(card.correct_count)} · 오답 ${number(card.wrong_count)}</p>
     </article>
   `;
@@ -3699,7 +3770,7 @@ function renderWeakCardItem(card) {
           <strong>${renderJapaneseText(card.front)}</strong>
           <span class="pill bad">최근 ${recentWrong} · 전체 ${totalWrong}</span>
         </div>
-        <p>${escapeHtml(card.back)}</p>
+        <p>${renderMarkedText(card.back)}</p>
         <div class="weak-card-meta">
           <span>${escapeHtml(card.group_name)}</span>
           <span>최근 ${getWeakRecentRounds()}회독 오답 ${recentWrong}</span>
@@ -4333,7 +4404,7 @@ function renderRoundDetailCard(card, tone) {
         <strong>${renderJapaneseText(card.front)}</strong>
         <span class="pill ${tone}">${escapeHtml(detail)}</span>
       </div>
-      <p>${escapeHtml(card.back)}</p>
+      <p>${renderMarkedText(card.back)}</p>
       <div class="attempt-timeline">${attempts.map(renderAttemptChip).join("")}</div>
     </article>
   `;
@@ -4509,7 +4580,7 @@ function renderStudySession() {
             : `<div class="study-front-content">${renderStudyCardMeta(
                 card.group_name,
                 card,
-              )}<div class="${frontClass}">${escapeHtml(card.front)}</div>${renderStudyFrontExamples(
+              )}<div class="${frontClass}">${renderMarkedText(card.front)}</div>${renderStudyFrontExamples(
                 card,
                 session,
                 frontExamplesExpanded,
@@ -4811,7 +4882,7 @@ function renderCompletionFocus(summary, session) {
     <section class="completion-focus bad">
       <p class="eyebrow">다시 볼 카드</p>
       <h3>${renderJapaneseText(hardest.card.front)}</h3>
-      <p>${escapeHtml(hardest.card.back)}</p>
+      <p>${renderMarkedText(hardest.card.back)}</p>
       <p class="meta">${hardest.wrongCount}번 오답 후 ${lastAttempt.passNo}차에서 통과했어요.</p>
     </section>
   `;
@@ -4861,7 +4932,7 @@ function renderWrongReviewCard(summary) {
       </div>
       <section class="wrong-review-block">
         <span class="study-section-label">뜻</span>
-        <p class="wrong-review-meaning">${escapeHtml(summary.card.back)}</p>
+        <p class="wrong-review-meaning">${renderMarkedText(summary.card.back)}</p>
       </section>
       <section class="wrong-review-block">
         <span class="study-section-label">시도 흐름</span>
@@ -4944,7 +5015,7 @@ function renderResultItem(item, tone) {
         <strong>${renderJapaneseText(item.card.front)}</strong>
         <span class="pill">${item.passNo}차 ${item.position}번</span>
       </div>
-      <p>${escapeHtml(item.card.back)}</p>
+      <p>${renderMarkedText(item.card.back)}</p>
     </article>
   `;
 }
@@ -4988,10 +5059,10 @@ function renderCardBack(card, examplesExpanded = false) {
   const visibleExamples = examplesExpanded ? examples : examples.slice(0, 1);
   return `
     <div class="study-back-content">
-      ${renderStudyCardMeta(card.front, card, shouldUseCjkCardMeta(card.front))}
+      ${renderStudyCardMeta(card.front, card, shouldUseCjkCardMeta(card.front), true)}
       <section class="study-back-section meaning-section">
         <span class="study-section-label">뜻</span>
-        <div class="meaning">${escapeHtml(card.back)}</div>
+        <div class="meaning">${renderMarkedText(card.back)}</div>
       </section>
       ${
         card.memo
@@ -5037,10 +5108,10 @@ function renderCardBack(card, examplesExpanded = false) {
   finishDialogRender();
 }
 
-function renderStudyCardMeta(label, card, japanese = false) {
+function renderStudyCardMeta(label, card, japanese = false, marked = false) {
   return `
     <div class="study-card-meta">
-      <p class="meta ${japanese ? "jp-text" : ""}">${escapeHtml(label)}</p>
+      <p class="meta ${japanese ? "jp-text" : ""}">${marked ? renderMarkedText(label) : escapeHtml(label)}</p>
       ${isWeakCard(card) ? `<span class="study-weak-badge">${icon("target")}<span>약점</span></span>` : ""}
     </div>
   `;
@@ -5242,7 +5313,7 @@ function renderCardForm(card, groupId) {
         </span>
       </label>
       <div class="field">
-        ${renderFieldLabel("예문", "강조할 조각은 [[ ]]로 감싸면 학습 화면에서 하이라이트됩니다.")}
+        ${renderFieldLabel("예문", "앞면, 뒷면, 메모, 예문에서 강조할 조각은 [[ ]]로 감싸면 학습 화면에서 하이라이트됩니다.")}
         <div id="example-editor-list" class="example-editor-list">${examples
           .map((example, index) => renderExampleEditorRow(example, index))
           .join("")}</div>
@@ -5288,7 +5359,7 @@ function renderBulkCardForm(groupId) {
           <label for="bulk-card-textarea">카드</label>
           ${renderHelpDisclosure(
             "대량 등록 형식 안내",
-            "한 줄에 한 장씩 입력합니다. 구분자는 | 또는 탭을 쓰고, 예문 번역은 => 뒤에 적습니다. 강조할 조각은 [[ ]]로 감쌉니다.",
+            "한 줄에 한 장씩 입력합니다. 구분자는 | 또는 탭을 쓰고, 예문 번역은 => 뒤에 적습니다. 앞면, 뒷면, 메모, 예문에서 강조할 조각은 [[ ]]로 감쌉니다.",
           )}
         </div>
         <textarea id="bulk-card-textarea" class="textarea bulk-textarea" name="bulk_text" aria-describedby="bulk-card-help" placeholder="〜あまり | ~한 나머지 | 메모 | 緊張の[[あまり]]、声が震えた。 => 긴장한 나머지 목소리가 떨렸다.&#10;〜に至っては | ~에 이르러서는">${escapeHtml(
@@ -5369,7 +5440,7 @@ function renderBulkPreviewItem(item) {
         <strong>${item.front ? renderJapaneseText(item.front) : "앞면 없음"}</strong>
         <span class="pill ${item.warnings.length ? "bad" : ""}">${item.lineNo}줄</span>
       </div>
-      <p class="meaning">${escapeHtml(item.back || "뒷면 없음")}</p>
+      <p class="meaning">${renderMarkedText(item.back || "뒷면 없음")}</p>
       <p class="meta">메모 ${item.memo ? "있음" : "없음"} · 예문 ${item.examples.length}개</p>
       ${
         item.examples[0]
@@ -5422,7 +5493,7 @@ function renderCardListItem(card) {
       <div class="card-item-main">
         <p class="card-path">${escapeHtml(getCardPath(card))}</p>
         <strong class="card-front">${renderJapaneseText(card.front)}</strong>
-        <p class="card-back">${escapeHtml(card.back)}</p>
+        <p class="card-back">${renderMarkedText(card.back)}</p>
       </div>
       ${
         card.examples?.[0]
@@ -6509,10 +6580,23 @@ async function saveSettings(form) {
       controller_y_action: controllerYAction,
     }),
   });
-  state.settings = data.settings;
+  state.settings = normalizeSettings(data.settings);
+  applyStudyOptionSettings();
   await loadData();
   render();
   showToast("설정을 저장했습니다.");
+}
+
+async function saveStudyOptionSettings() {
+  syncStudyOptionSettings();
+  const serial = ++studyOptionSaveSerial;
+  const data = await request("/api/settings", {
+    method: "PATCH",
+    body: JSON.stringify(currentStudyOptionSettings()),
+  });
+  if (serial !== studyOptionSaveSerial) return;
+  state.settings = normalizeSettings(data.settings);
+  applyStudyOptionSettings();
 }
 
 async function clearExamDate() {
@@ -6520,7 +6604,8 @@ async function clearExamDate() {
     method: "PATCH",
     body: JSON.stringify({ target_name: "", jlpt_exam_date: "" }),
   });
-  state.settings = data.settings;
+  state.settings = normalizeSettings(data.settings);
+  applyStudyOptionSettings();
   state.activeDialog = null;
   render();
   showToast("학습 목표를 미정으로 초기화했습니다.");
@@ -6561,17 +6646,7 @@ function logout() {
     groups: [],
     cards: [],
     rounds: [],
-    settings: {
-      target_name: "",
-      jlpt_exam_date: "",
-      weak_card_threshold: DEFAULT_WEAK_CARD_THRESHOLD,
-      weak_recent_rounds: DEFAULT_WEAK_RECENT_ROUNDS,
-      weak_recent_wrong_threshold: DEFAULT_WEAK_RECENT_WRONG_THRESHOLD,
-      controller_a_action: DEFAULT_CONTROLLER_A_ACTION,
-      controller_b_action: DEFAULT_CONTROLLER_B_ACTION,
-      controller_x_action: DEFAULT_CONTROLLER_X_ACTION,
-      controller_y_action: DEFAULT_CONTROLLER_Y_ACTION,
-    },
+    settings: defaultSettings(),
     selectedCollectionId: null,
     selectedStudyGroupIds: [],
     selectedGroupId: null,
@@ -6589,8 +6664,9 @@ function logout() {
     studyGroupSearchQuery: "",
     collectionSearchQuery: "",
     studyGroupSortMode: "recent",
-    exampleOrderMode: "sequence",
-    frontExampleMode: "hidden",
+    orderMode: DEFAULT_STUDY_ORDER_MODE,
+    exampleOrderMode: DEFAULT_EXAMPLE_ORDER_MODE,
+    frontExampleMode: DEFAULT_FRONT_EXAMPLE_MODE,
     groupSearchQuery: "",
     cardListLimit: CARD_LIST_PAGE_SIZE,
     groupListLimit: GROUP_LIST_PAGE_SIZE,
@@ -6604,7 +6680,7 @@ function logout() {
     bulkPreview: null,
     dataPanelOpen: false,
     recentRoundsOpen: false,
-    exampleDisplayMode: "collapsed",
+    exampleDisplayMode: DEFAULT_EXAMPLE_DISPLAY_MODE,
     studyStep: "select",
     studyOptionsOpen: false,
     weakPanelOpen: false,
@@ -7067,34 +7143,46 @@ document.addEventListener("click", async (event) => {
       renderDialog();
     }
     if (action === "set-order") {
-      state.orderMode = actionEl.dataset.order;
+      const nextMode = normalizeStudyOrderMode(actionEl.dataset.order);
+      state.orderMode = nextMode;
+      syncStudyOptionSettings();
       state.activeDialog === "collection-study-picker"
-        ? rerenderCollectionStudyDialog({ anchorSelector: `[data-action="set-order"][data-order="${actionEl.dataset.order}"]` })
+        ? rerenderCollectionStudyDialog({ anchorSelector: `[data-action="set-order"][data-order="${nextMode}"]` })
         : render();
+      await saveStudyOptionSettings();
     }
     if (action === "set-example-display") {
-      state.exampleDisplayMode = actionEl.dataset.exampleDisplay;
+      const nextMode = normalizeExampleDisplayMode(actionEl.dataset.exampleDisplay);
+      state.exampleDisplayMode = nextMode;
+      syncStudyOptionSettings();
       state.activeDialog === "collection-study-picker"
         ? rerenderCollectionStudyDialog({
-            anchorSelector: `[data-action="set-example-display"][data-example-display="${actionEl.dataset.exampleDisplay}"]`,
+            anchorSelector: `[data-action="set-example-display"][data-example-display="${nextMode}"]`,
           })
         : render();
+      await saveStudyOptionSettings();
     }
     if (action === "set-example-order") {
-      state.exampleOrderMode = actionEl.dataset.exampleOrder;
+      const nextMode = normalizeExampleOrderMode(actionEl.dataset.exampleOrder);
+      state.exampleOrderMode = nextMode;
+      syncStudyOptionSettings();
       state.activeDialog === "collection-study-picker"
         ? rerenderCollectionStudyDialog({
-            anchorSelector: `[data-action="set-example-order"][data-example-order="${actionEl.dataset.exampleOrder}"]`,
+            anchorSelector: `[data-action="set-example-order"][data-example-order="${nextMode}"]`,
           })
         : render();
+      await saveStudyOptionSettings();
     }
     if (action === "set-front-example") {
-      state.frontExampleMode = actionEl.dataset.frontExample;
+      const nextMode = normalizeFrontExampleMode(actionEl.dataset.frontExample);
+      state.frontExampleMode = nextMode;
+      syncStudyOptionSettings();
       state.activeDialog === "collection-study-picker"
         ? rerenderCollectionStudyDialog({
-            anchorSelector: `[data-action="set-front-example"][data-front-example="${actionEl.dataset.frontExample}"]`,
+            anchorSelector: `[data-action="set-front-example"][data-front-example="${nextMode}"]`,
           })
         : render();
+      await saveStudyOptionSettings();
     }
     if (action === "toggle-study-options") {
       state.studyOptionsOpen = !state.studyOptionsOpen;

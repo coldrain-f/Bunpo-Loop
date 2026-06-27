@@ -44,6 +44,14 @@ DEFAULT_CONTROLLER_B_ACTION = "wrong"
 DEFAULT_CONTROLLER_X_ACTION = "disabled"
 DEFAULT_CONTROLLER_Y_ACTION = "disabled"
 CONTROLLER_ACTIONS = ("primary", "wrong", "disabled")
+DEFAULT_STUDY_ORDER_MODE = "sequence"
+DEFAULT_EXAMPLE_DISPLAY_MODE = "collapsed"
+DEFAULT_EXAMPLE_ORDER_MODE = "sequence"
+DEFAULT_FRONT_EXAMPLE_MODE = "hidden"
+STUDY_ORDER_MODES = ("sequence", "random", "wrong")
+EXAMPLE_DISPLAY_MODES = ("collapsed", "expanded")
+EXAMPLE_ORDER_MODES = ("sequence", "random")
+FRONT_EXAMPLE_MODES = ("hidden", "shown")
 BACKUP_VERSION = 3
 CSV_FRONT_HEADERS = ("front", "앞면", "카드앞면", "표현", "문법", "질문")
 CSV_BACK_HEADERS = ("back", "뒷면", "뜻", "의미", "해석", "답")
@@ -65,6 +73,10 @@ CREATE TABLE IF NOT EXISTS users (
     controller_b_action TEXT NOT NULL DEFAULT 'wrong',
     controller_x_action TEXT NOT NULL DEFAULT 'disabled',
     controller_y_action TEXT NOT NULL DEFAULT 'disabled',
+    study_order_mode TEXT NOT NULL DEFAULT 'sequence',
+    example_display_mode TEXT NOT NULL DEFAULT 'collapsed',
+    example_order_mode TEXT NOT NULL DEFAULT 'sequence',
+    front_example_mode TEXT NOT NULL DEFAULT 'hidden',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -240,6 +252,14 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN controller_x_action TEXT NOT NULL DEFAULT 'disabled'")
     if "controller_y_action" not in user_columns:
         conn.execute("ALTER TABLE users ADD COLUMN controller_y_action TEXT NOT NULL DEFAULT 'disabled'")
+    if "study_order_mode" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN study_order_mode TEXT NOT NULL DEFAULT 'sequence'")
+    if "example_display_mode" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN example_display_mode TEXT NOT NULL DEFAULT 'collapsed'")
+    if "example_order_mode" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN example_order_mode TEXT NOT NULL DEFAULT 'sequence'")
+    if "front_example_mode" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN front_example_mode TEXT NOT NULL DEFAULT 'hidden'")
     if table_exists(conn, "cards"):
         card_columns = {
             row["name"]
@@ -284,6 +304,38 @@ def migrate_db(conn: sqlite3.Connection) -> None:
         WHERE controller_y_action NOT IN (?, ?, ?)
         """,
         (DEFAULT_CONTROLLER_Y_ACTION, *CONTROLLER_ACTIONS),
+    )
+    conn.execute(
+        """
+        UPDATE users
+        SET study_order_mode = ?
+        WHERE study_order_mode NOT IN (?, ?, ?)
+        """,
+        (DEFAULT_STUDY_ORDER_MODE, *STUDY_ORDER_MODES),
+    )
+    conn.execute(
+        """
+        UPDATE users
+        SET example_display_mode = ?
+        WHERE example_display_mode NOT IN (?, ?)
+        """,
+        (DEFAULT_EXAMPLE_DISPLAY_MODE, *EXAMPLE_DISPLAY_MODES),
+    )
+    conn.execute(
+        """
+        UPDATE users
+        SET example_order_mode = ?
+        WHERE example_order_mode NOT IN (?, ?)
+        """,
+        (DEFAULT_EXAMPLE_ORDER_MODE, *EXAMPLE_ORDER_MODES),
+    )
+    conn.execute(
+        """
+        UPDATE users
+        SET front_example_mode = ?
+        WHERE front_example_mode NOT IN (?, ?)
+        """,
+        (DEFAULT_FRONT_EXAMPLE_MODE, *FRONT_EXAMPLE_MODES),
     )
     conn.execute(
         """
@@ -808,6 +860,50 @@ def validate_controller_action(value: object) -> str:
     return text
 
 
+def normalize_setting_choice(value: object, allowed: tuple[str, ...], default: str) -> str:
+    text = str(value or "").strip()
+    return text if text in allowed else default
+
+
+def validate_setting_choice(value: object, allowed: tuple[str, ...], field: str) -> str:
+    text = str(value or "").strip()
+    if text not in allowed:
+        raise ValueError(f"{field} setting is not supported.")
+    return text
+
+
+def normalize_study_order_mode(value: object) -> str:
+    return normalize_setting_choice(value, STUDY_ORDER_MODES, DEFAULT_STUDY_ORDER_MODE)
+
+
+def validate_study_order_mode(value: object) -> str:
+    return validate_setting_choice(value, STUDY_ORDER_MODES, "study_order_mode")
+
+
+def normalize_example_display_mode(value: object) -> str:
+    return normalize_setting_choice(value, EXAMPLE_DISPLAY_MODES, DEFAULT_EXAMPLE_DISPLAY_MODE)
+
+
+def validate_example_display_mode(value: object) -> str:
+    return validate_setting_choice(value, EXAMPLE_DISPLAY_MODES, "example_display_mode")
+
+
+def normalize_example_order_mode(value: object) -> str:
+    return normalize_setting_choice(value, EXAMPLE_ORDER_MODES, DEFAULT_EXAMPLE_ORDER_MODE)
+
+
+def validate_example_order_mode(value: object) -> str:
+    return validate_setting_choice(value, EXAMPLE_ORDER_MODES, "example_order_mode")
+
+
+def normalize_front_example_mode(value: object) -> str:
+    return normalize_setting_choice(value, FRONT_EXAMPLE_MODES, DEFAULT_FRONT_EXAMPLE_MODE)
+
+
+def validate_front_example_mode(value: object) -> str:
+    return validate_setting_choice(value, FRONT_EXAMPLE_MODES, "front_example_mode")
+
+
 def normalize_bool(value: object, default: bool = False) -> int:
     if value is None:
         return 1 if default else 0
@@ -1231,6 +1327,10 @@ def user_settings_payload(user: sqlite3.Row | None) -> dict:
             user["controller_y_action"] if user else "",
             DEFAULT_CONTROLLER_Y_ACTION,
         ),
+        "study_order_mode": normalize_study_order_mode(user["study_order_mode"] if user else ""),
+        "example_display_mode": normalize_example_display_mode(user["example_display_mode"] if user else ""),
+        "example_order_mode": normalize_example_order_mode(user["example_order_mode"] if user else ""),
+        "front_example_mode": normalize_front_example_mode(user["front_example_mode"] if user else ""),
     }
 
 
@@ -1423,6 +1523,30 @@ def normalize_backup_settings(value: object, current_user: sqlite3.Row) -> dict 
                 normalize_controller_action(current_user["controller_y_action"], DEFAULT_CONTROLLER_Y_ACTION),
             )
         ),
+        "study_order_mode": validate_study_order_mode(
+            value.get(
+                "study_order_mode",
+                normalize_study_order_mode(current_user["study_order_mode"]),
+            )
+        ),
+        "example_display_mode": validate_example_display_mode(
+            value.get(
+                "example_display_mode",
+                normalize_example_display_mode(current_user["example_display_mode"]),
+            )
+        ),
+        "example_order_mode": validate_example_order_mode(
+            value.get(
+                "example_order_mode",
+                normalize_example_order_mode(current_user["example_order_mode"]),
+            )
+        ),
+        "front_example_mode": validate_front_example_mode(
+            value.get(
+                "front_example_mode",
+                normalize_front_example_mode(current_user["front_example_mode"]),
+            )
+        ),
     }
 
 
@@ -1440,7 +1564,11 @@ def restore_backup_settings(conn: sqlite3.Connection, user_id: int, settings: di
             controller_a_action = ?,
             controller_b_action = ?,
             controller_x_action = ?,
-            controller_y_action = ?
+            controller_y_action = ?,
+            study_order_mode = ?,
+            example_display_mode = ?,
+            example_order_mode = ?,
+            front_example_mode = ?
         WHERE id = ?
         """,
         (
@@ -1453,6 +1581,10 @@ def restore_backup_settings(conn: sqlite3.Connection, user_id: int, settings: di
             settings["controller_b_action"],
             settings["controller_x_action"],
             settings["controller_y_action"],
+            settings["study_order_mode"],
+            settings["example_display_mode"],
+            settings["example_order_mode"],
+            settings["front_example_mode"],
             user_id,
         ),
     )
@@ -2371,7 +2503,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
             if parts == ["api", "study"] and method == "GET":
                 order_mode = query.get("order", ["sequence"])[0]
-                if order_mode not in ("sequence", "random", "wrong"):
+                if order_mode not in STUDY_ORDER_MODES:
                     raise ValueError("지원하지 않는 학습 순서입니다.")
                 collection_id = int(query.get("collection_id", ["0"])[0])
                 if collection_id:
@@ -2622,6 +2754,26 @@ class AppHandler(BaseHTTPRequestHandler):
             if "controller_y_action" in body
             else normalize_controller_action(user["controller_y_action"], DEFAULT_CONTROLLER_Y_ACTION)
         )
+        study_order_mode = (
+            validate_study_order_mode(body.get("study_order_mode"))
+            if "study_order_mode" in body
+            else normalize_study_order_mode(user["study_order_mode"])
+        )
+        example_display_mode = (
+            validate_example_display_mode(body.get("example_display_mode"))
+            if "example_display_mode" in body
+            else normalize_example_display_mode(user["example_display_mode"])
+        )
+        example_order_mode = (
+            validate_example_order_mode(body.get("example_order_mode"))
+            if "example_order_mode" in body
+            else normalize_example_order_mode(user["example_order_mode"])
+        )
+        front_example_mode = (
+            validate_front_example_mode(body.get("front_example_mode"))
+            if "front_example_mode" in body
+            else normalize_front_example_mode(user["front_example_mode"])
+        )
         conn.execute(
             """
             UPDATE users
@@ -2633,7 +2785,11 @@ class AppHandler(BaseHTTPRequestHandler):
                 controller_a_action = ?,
                 controller_b_action = ?,
                 controller_x_action = ?,
-                controller_y_action = ?
+                controller_y_action = ?,
+                study_order_mode = ?,
+                example_display_mode = ?,
+                example_order_mode = ?,
+                front_example_mode = ?
             WHERE id = ?
             """,
             (
@@ -2646,6 +2802,10 @@ class AppHandler(BaseHTTPRequestHandler):
                 controller_b_action,
                 controller_x_action,
                 controller_y_action,
+                study_order_mode,
+                example_display_mode,
+                example_order_mode,
+                front_example_mode,
                 user["id"],
             ),
         )
@@ -2869,7 +3029,7 @@ class AppHandler(BaseHTTPRequestHandler):
         started_at = normalize_timestamp(body.get("started_at"))
         duration_seconds = normalize_duration(body.get("duration_seconds"))
         results = body.get("results") or []
-        if order_mode not in ("sequence", "random", "wrong"):
+        if order_mode not in STUDY_ORDER_MODES:
             raise ValueError("지원하지 않는 학습 순서입니다.")
         if not isinstance(results, list) or not results:
             raise ValueError("저장할 학습 결과가 없습니다.")

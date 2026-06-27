@@ -258,6 +258,10 @@ class StudyExclusionApiTest(unittest.TestCase):
                 "controller_b_action": "primary",
                 "controller_x_action": "disabled",
                 "controller_y_action": "wrong",
+                "study_order_mode": "random",
+                "example_display_mode": "expanded",
+                "example_order_mode": "random",
+                "front_example_mode": "shown",
             },
         )["settings"]
         csv_text = self.request_text(f"/api/groups/{source_group_id}/cards.csv")
