@@ -3171,6 +3171,22 @@ function renderDialog() {
     renderEditCardInSessionDialog();
     return;
   }
+  if (state.activeDialog === "start-starred") {
+    const groupId = state.starredStudyGroupId;
+    const group = state.groups.find((g) => Number(g.id) === Number(groupId));
+    const starredCount = group
+      ? state.cards.filter((c) => Number(c.group_id) === Number(groupId) && c.starred && !c.study_excluded).length
+      : 0;
+    renderConfirmDialog({
+      eyebrow: "별표 카드 학습",
+      title: `별표 카드 ${starredCount}개를 학습할까요?`,
+      message: `${group ? group.name : ""} · 공식 기록에 저장되지 않습니다.`,
+      confirmLabel: "시작",
+      confirmAction: "confirm-start-starred-study",
+      tone: "primary",
+    });
+    return;
+  }
   const previewTarget = getPreviewTarget();
   if (state.activeDialog === "preview" && previewTarget) {
     const previewMode = state.pendingAction ? "sequence" : state.orderMode;
@@ -7435,7 +7451,16 @@ document.addEventListener("click", async (event) => {
       await startStudy();
     }
     if (action === "start-bundle-study") await startBundleStudy();
-    if (action === "start-starred-study") await startStarredStudy(actionEl.dataset.groupId);
+    if (action === "start-starred-study") {
+      state.starredStudyGroupId = Number(actionEl.dataset.groupId);
+      state.activeDialog = "start-starred";
+      renderDialog();
+    }
+    if (action === "confirm-start-starred-study") {
+      state.activeDialog = null;
+      renderDialog();
+      await startStarredStudy(state.starredStudyGroupId);
+    }
     if (action === "confirm-start-weak-study") {
       state.activeDialog = null;
       renderDialog();
