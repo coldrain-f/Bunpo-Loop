@@ -1835,6 +1835,25 @@ button:active,
   scrollbar-gutter: stable;
 }
 
+.study-group-list {
+  display: grid;
+  gap: 10px;
+}
+
+.study-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.study-pagination-label {
+  min-width: 48px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
 .study-group-tools {
   position: sticky;
   top: 0;

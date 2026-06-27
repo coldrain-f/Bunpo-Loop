@@ -204,6 +204,8 @@ const state = {
   exampleOrderMode: DEFAULT_EXAMPLE_ORDER_MODE,
   frontExampleMode: DEFAULT_FRONT_EXAMPLE_MODE,
   studyStep: "select",
+  studyCollectionPage: 0,
+  studyGroupPage: 0,
   studyOptionsOpen: false,
   weakPanelOpen: false,
   weakCardOpenId: null,
@@ -1409,11 +1411,13 @@ function applySearchInput(target) {
   }
   if (target === "study-collection-search") {
     state.studyCollectionSearchQuery = query;
+    state.studyCollectionPage = 0;
     renderStudy();
     focusAfterRender("#study-collection-search");
   }
   if (target === "study-group-search") {
     state.studyGroupSearchQuery = query;
+    state.studyGroupPage = 0;
     renderStudy();
     focusAfterRender("#study-group-search");
   }
@@ -3501,6 +3505,10 @@ function renderStudyGroupPicker() {
   const visibleCollections = state.collections.filter((collection) =>
     matchesQuery([collection.name, collection.description], state.studyCollectionSearchQuery),
   );
+  const PAGE_SIZE = 5;
+  const totalPages = Math.max(1, Math.ceil(visibleCollections.length / PAGE_SIZE));
+  const page = Math.min(state.studyCollectionPage, totalPages - 1);
+  const pageItems = visibleCollections.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   views.study.innerHTML = `
     <div class="panel stack">
       <div class="row">
@@ -3521,10 +3529,10 @@ function renderStudyGroupPicker() {
         <div class="study-group-tools">
           ${renderSearchInput({ id: "study-collection-search", value: state.studyCollectionSearchQuery, placeholder: "대그룹 검색" })}
         </div>
-        <div class="study-group-scroll">
+        <div class="study-group-list">
           ${
             visibleCollections.length
-              ? visibleCollections.map(renderStudyCollectionChoiceItem).join("")
+              ? pageItems.map(renderStudyCollectionChoiceItem).join("")
               : renderActionEmptyState({
                   title: "검색된 대그룹이 없습니다.",
                   body: "검색어를 지우면 전체 대그룹을 다시 볼 수 있습니다.",
@@ -3536,6 +3544,7 @@ function renderStudyGroupPicker() {
                 })
           }
         </div>
+        ${visibleCollections.length > PAGE_SIZE ? renderStudyPagination(page, totalPages, "collection") : ""}
       </section>
     </div>
   `;
@@ -3552,6 +3561,10 @@ function renderStudySubgroupPicker(collection) {
       matchesQuery([group.name, group.description, group.collection_name], state.studyGroupSearchQuery),
     ),
   );
+  const PAGE_SIZE = 5;
+  const totalPages = Math.max(1, Math.ceil(collectionGroups.length / PAGE_SIZE));
+  const page = Math.min(state.studyGroupPage, totalPages - 1);
+  const pageItems = collectionGroups.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   views.study.innerHTML = `
     <div class="panel stack">
       <div class="row">
@@ -3591,10 +3604,10 @@ function renderStudySubgroupPicker(collection) {
           ${renderSearchInput({ id: "study-group-search", value: state.studyGroupSearchQuery, placeholder: "소그룹 검색" })}
           ${renderStudyGroupSortOptions()}
         </div>
-        <div class="study-group-scroll">
+        <div class="study-group-list">
           ${
             collectionGroups.length
-              ? collectionGroups.map(renderStudyGroupChoiceItem).join("")
+              ? pageItems.map(renderStudyGroupChoiceItem).join("")
               : getGroupsForCollection(collection.id).length
                 ? renderActionEmptyState({
                     title: "검색된 소그룹이 없습니다.",
@@ -3614,7 +3627,22 @@ function renderStudySubgroupPicker(collection) {
                   })
           }
         </div>
+        ${collectionGroups.length > PAGE_SIZE ? renderStudyPagination(page, totalPages, "group") : ""}
       </section>
+    </div>
+  `;
+}
+
+function renderStudyPagination(page, totalPages, target) {
+  return `
+    <div class="study-pagination">
+      <button class="ghost-button small-button" type="button" data-action="study-page-prev" data-target="${target}" ${page === 0 ? "disabled" : ""} aria-label="이전">
+        ${icon("chevron-left")}
+      </button>
+      <span class="study-pagination-label">${page + 1} / ${totalPages}</span>
+      <button class="ghost-button small-button" type="button" data-action="study-page-next" data-target="${target}" ${page >= totalPages - 1 ? "disabled" : ""} aria-label="다음">
+        ${icon("chevron-right")}
+      </button>
     </div>
   `;
 }
@@ -7005,6 +7033,7 @@ document.addEventListener("click", async (event) => {
       state.selectedGroupId = null;
       state.studyStep = "collection";
       state.studyGroupSearchQuery = "";
+      state.studyGroupPage = 0;
       state.recentRoundsOpen = false;
       state.studyOptionsOpen = false;
       render();
@@ -7018,6 +7047,18 @@ document.addEventListener("click", async (event) => {
       window.requestAnimationFrame(() => {
         scrollIntoViewSafely(document.getElementById("study-collection-browser"), { block: "start" });
       });
+    }
+    if (action === "study-page-prev") {
+      const target = actionEl.dataset.target;
+      if (target === "collection") state.studyCollectionPage = Math.max(0, state.studyCollectionPage - 1);
+      if (target === "group") state.studyGroupPage = Math.max(0, state.studyGroupPage - 1);
+      renderStudy();
+    }
+    if (action === "study-page-next") {
+      const target = actionEl.dataset.target;
+      if (target === "collection") state.studyCollectionPage += 1;
+      if (target === "group") state.studyGroupPage += 1;
+      renderStudy();
     }
     if (action === "back-to-study-collections") {
       saveScrollPosition(`study:collection:${state.selectedCollectionId || "none"}`);
