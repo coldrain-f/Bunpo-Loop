@@ -3637,7 +3637,7 @@ function renderStudyPagination(page, totalPages, target) {
   return `
     <div class="study-pagination">
       <button class="ghost-button small-button" type="button" data-action="study-page-prev" data-target="${target}" ${page === 0 ? "disabled" : ""} aria-label="이전">
-        ${icon("chevron-left")}
+        ${icon("arrow-left")}
       </button>
       <span class="study-pagination-label">${page + 1} / ${totalPages}</span>
       <button class="ghost-button small-button" type="button" data-action="study-page-next" data-target="${target}" ${page >= totalPages - 1 ? "disabled" : ""} aria-label="다음">
