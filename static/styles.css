@@ -1830,8 +1830,9 @@ button:active,
   max-height: min(58vh, 520px);
   gap: 10px;
   overflow-y: auto;
-  padding: 3px 4px 3px 0;
+  padding: 3px 4px 10px 0;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .study-group-tools {
