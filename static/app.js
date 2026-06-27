@@ -3618,7 +3618,7 @@ function renderStudySubgroupPicker(collection) {
         <button class="secondary-button full" type="button" data-action="open-collection-study-dialog" ${
           collectionStudyCount ? "" : `disabled aria-describedby="${getDisabledReasonId(bundleDisabledReason)}"`
         }>${iconLabel("repeat-2", "묶음 연습")}</button>
-        <button class="secondary-button full starred-button" type="button" data-action="open-starred-bundle-dialog">${iconLabel("star", "별표 카드 학습")}</button>
+        <button class="secondary-button full starred-button" type="button" data-action="open-starred-bundle-dialog">${iconLabel("star", "별표 학습")}</button>
       </div>
       ${
         collectionStudyCount
@@ -4184,7 +4184,7 @@ function renderStarredBundleDialog() {
         <div class="row dialog-header">
           <div>
             <p class="eyebrow">별표 카드 학습</p>
-            <h2 id="starred-dialog-title">소그룹 선택 후 별표 카드 학습</h2>
+            <h2 id="starred-dialog-title">소그룹 단위 별표 학습</h2>
           </div>
           <button class="ghost-button small-button" type="button" data-action="close-dialog">${iconLabel("x", "닫기")}</button>
         </div>
