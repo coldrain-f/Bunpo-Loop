@@ -50,7 +50,7 @@ const FRONT_EXAMPLE_DESCRIPTIONS = {
 };
 
 const STUDY_GROUP_SORT_LABELS = {
-  recent: "최근순",
+  registered: "등록순",
   wrong: "오답순",
   cards: "카드순",
   name: "이름순",
@@ -183,7 +183,7 @@ const state = {
   studyCollectionSearchQuery: "",
   studyGroupSearchQuery: "",
   collectionSearchQuery: "",
-  studyGroupSortMode: "recent",
+  studyGroupSortMode: "registered",
   groupSearchQuery: "",
   cardListLimit: CARD_LIST_PAGE_SIZE,
   groupListLimit: GROUP_LIST_PAGE_SIZE,
@@ -1906,11 +1906,7 @@ function sortStudyGroups(groups) {
     if (state.studyGroupSortMode === "name") {
       return compareGroupName(left, right);
     }
-    return (
-      dateMs(right.last_studied_at) - dateMs(left.last_studied_at) ||
-      number(right.completed_rounds) - number(left.completed_rounds) ||
-      compareGroupName(left, right)
-    );
+    return number(left.id) - number(right.id);
   });
 }
 
@@ -6728,7 +6724,7 @@ function logout() {
     studyCollectionSearchQuery: "",
     studyGroupSearchQuery: "",
     collectionSearchQuery: "",
-    studyGroupSortMode: "recent",
+    studyGroupSortMode: "registered",
     orderMode: DEFAULT_STUDY_ORDER_MODE,
     exampleOrderMode: DEFAULT_EXAMPLE_ORDER_MODE,
     frontExampleMode: DEFAULT_FRONT_EXAMPLE_MODE,
