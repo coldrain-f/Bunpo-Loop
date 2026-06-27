@@ -265,7 +265,7 @@ const FOCUSABLE_SELECTOR = [
   "a[href]",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
-const DISMISSIBLE_DIALOGS = new Set(["preview", "round-detail", "collection-study-picker"]);
+const DISMISSIBLE_DIALOGS = new Set(["preview", "round-detail", "collection-study-picker", "edit-card-in-session"]);
 
 function defaultSettings() {
   return {
@@ -3167,6 +3167,10 @@ function renderDialog() {
     renderCollectionStudyDialog();
     return;
   }
+  if (state.activeDialog === "edit-card-in-session") {
+    renderEditCardInSessionDialog();
+    return;
+  }
   const previewTarget = getPreviewTarget();
   if (state.activeDialog === "preview" && previewTarget) {
     const previewMode = state.pendingAction ? "sequence" : state.orderMode;
@@ -4004,6 +4008,23 @@ function renderStudyGroupSelection(groups) {
   `;
 }
 
+function renderEditCardInSessionDialog() {
+  const card = state.cards.find((c) => Number(c.id) === Number(state.editingCardId));
+  if (!card) return closeDialog();
+  dialogRoot.innerHTML = `
+    <div class="dialog-backdrop" role="presentation">
+      <section class="dialog-panel edit-card-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-card-dialog-title">
+        <div class="row">
+          <h2 id="edit-card-dialog-title" class="edit-card-dialog-title">카드 수정</h2>
+          <button class="ghost-button small-button" type="button" data-action="close-dialog" aria-label="닫기">${icon("x")}</button>
+        </div>
+        ${renderCardForm(card, card.group_id)}
+      </section>
+    </div>
+  `;
+  finishDialogRender();
+}
+
 function renderCollectionStudyDialog() {
   const collection = getSelectedCollection() || state.collections[0];
   if (!collection) return closeDialog();
@@ -4580,6 +4601,7 @@ function renderStudySession() {
           <h2 id="study-title">${getSessionTitle(session)}</h2>
         </div>
         <div class="study-session-controls">
+          <button class="ghost-button small-button" type="button" data-action="edit-card-in-session" data-card-id="${card.id}" aria-label="카드 수정">${icon("pencil")}</button>
           <button class="ghost-button small-button" type="button" data-action="quit-study" ${
             session.isAnswering || session.saving ? "disabled" : ""
           }>${iconLabel("x", "포기")}</button>
@@ -6415,6 +6437,13 @@ async function saveCard(form) {
   state.cardFilterGroupId = String(payload.group_id);
   resetCardListLimit();
   await loadData();
+  if (state.activeDialog === "edit-card-in-session") {
+    state.activeDialog = null;
+    render();
+    renderDialog();
+    showToast("카드를 저장했습니다.");
+    return;
+  }
   state.cardScreen = isEditing ? "list" : "form";
   render();
   if (isEditing) {
@@ -7256,7 +7285,16 @@ document.addEventListener("click", async (event) => {
       focusAfterRender(['#card-form [name="front"]', '#card-form [name="collection_id"]']);
       scrollToTop();
     }
+    if (action === "edit-card-in-session") {
+      state.editingCardId = Number(actionEl.dataset.cardId);
+      state.activeDialog = "edit-card-in-session";
+      renderDialog();
+    }
     if (action === "show-card-list") {
+      if (state.activeDialog === "edit-card-in-session") {
+        closeDialog();
+        return;
+      }
       state.editingCardId = null;
       state.cardScreen = "list";
       renderCards();
