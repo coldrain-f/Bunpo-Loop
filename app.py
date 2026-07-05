@@ -10,7 +10,7 @@ import os
 import random
 import re
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -169,6 +169,36 @@ CREATE INDEX IF NOT EXISTS idx_round_groups_group_id ON study_round_groups(group
 CREATE INDEX IF NOT EXISTS idx_reviews_round_id ON reviews(round_id);
 """
 
+# Leitner system: a fully independent, additive study mode. It never reads or
+# writes study_rounds / study_round_groups / reviews / cards.correct_count /
+# cards.wrong_count -- those remain owned entirely by the existing study mode.
+LEITNER_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS leitner_states (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id INTEGER NOT NULL UNIQUE REFERENCES cards(id) ON DELETE CASCADE,
+    box INTEGER NOT NULL DEFAULT 1,
+    due_at TEXT NOT NULL,
+    last_result TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS leitner_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+    box_before INTEGER NOT NULL,
+    box_after INTEGER NOT NULL,
+    result TEXT NOT NULL CHECK (result IN ('correct', 'wrong')),
+    reviewed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_leitner_states_card_id ON leitner_states(card_id);
+CREATE INDEX IF NOT EXISTS idx_leitner_states_due_at ON leitner_states(due_at);
+CREATE INDEX IF NOT EXISTS idx_leitner_reviews_card_id ON leitner_reviews(card_id);
+"""
+
+LEITNER_MAX_BOX = 5
+LEITNER_BOX_INTERVAL_DAYS = {1: 1, 2: 4, 3: 7, 4: 14, 5: 30}
+
 
 def utc_now_sql() -> str:
     return "datetime('now')"
@@ -209,6 +239,7 @@ def init_db() -> None:
             else:
                 conn.executescript(LEARNING_SCHEMA_SQL)
         ensure_default_users(conn)
+        conn.executescript(LEITNER_SCHEMA_SQL)
         seed_default_learning_data(conn)
 
 
@@ -1292,6 +1323,91 @@ def cards_payload(
     if order_mode == "random":
         random.shuffle(cards)
     return cards
+
+
+def today_date_str() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def leitner_due_at_for_box(box: int, from_date: str | None = None) -> str:
+    base = from_date or today_date_str()
+    interval_days = LEITNER_BOX_INTERVAL_DAYS.get(box, LEITNER_BOX_INTERVAL_DAYS[LEITNER_MAX_BOX])
+    base_date = datetime.strptime(base, "%Y-%m-%d")
+    due = base_date + timedelta(days=interval_days)
+    return due.strftime("%Y-%m-%d")
+
+
+def ensure_leitner_states(conn: sqlite3.Connection, card_ids: list[int]) -> None:
+    """Lazily create box-1/due-today rows for cards that have never entered Leitner mode."""
+    if not card_ids:
+        return
+    today = today_date_str()
+    conn.executemany(
+        """
+        INSERT INTO leitner_states (card_id, box, due_at)
+        VALUES (?, 1, ?)
+        ON CONFLICT(card_id) DO NOTHING
+        """,
+        [(card_id, today) for card_id in card_ids],
+    )
+
+
+def leitner_cards_payload(
+    conn: sqlite3.Connection,
+    user_id: int,
+    group_id: int | None = None,
+    group_ids: list[int] | None = None,
+) -> list[dict]:
+    cards = cards_payload(
+        conn,
+        user_id,
+        group_id=group_id,
+        group_ids=group_ids,
+        order_mode="sequence",
+        include_excluded=False,
+    )
+    if not cards:
+        return []
+    ensure_leitner_states(conn, [int(card["id"]) for card in cards])
+    card_ids = [int(card["id"]) for card in cards]
+    placeholders = ",".join("?" for _ in card_ids)
+    states = {
+        int(row["card_id"]): row_to_dict(row)
+        for row in conn.execute(
+            f"SELECT * FROM leitner_states WHERE card_id IN ({placeholders})",
+            card_ids,
+        ).fetchall()
+    }
+    today = today_date_str()
+    due_cards = []
+    for card in cards:
+        state = states.get(int(card["id"]))
+        if state is None:
+            continue
+        card["leitner_box"] = int(state["box"])
+        card["leitner_due_at"] = state["due_at"]
+        if str(state["due_at"]) <= today:
+            due_cards.append(card)
+    return due_cards
+
+
+def leitner_box_distribution(conn: sqlite3.Connection, card_ids: list[int]) -> dict[str, int]:
+    distribution = {str(box): 0 for box in range(1, LEITNER_MAX_BOX + 1)}
+    if not card_ids:
+        return distribution
+    placeholders = ",".join("?" for _ in card_ids)
+    rows = conn.execute(
+        f"""
+        SELECT box, COUNT(*) AS box_count
+        FROM leitner_states
+        WHERE card_id IN ({placeholders})
+        GROUP BY box
+        """,
+        card_ids,
+    ).fetchall()
+    for row in rows:
+        distribution[str(int(row["box"]))] = int(row["box_count"])
+    return distribution
 
 
 def table_payload(conn: sqlite3.Connection, table: str, order_by: str) -> list[dict]:
@@ -2604,6 +2720,67 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.complete_weak_round(conn, user_id)
                 return
 
+            if parts == ["api", "leitner", "study"] and method == "GET":
+                collection_id = int(query.get("collection_id", ["0"])[0])
+                if collection_id:
+                    collection = get_collection(conn, user_id, collection_id)
+                    if collection is None:
+                        self.send_json({"error": "대그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+                        return
+                    group_ids = parse_id_list(query.get("group_ids", [""])[0])
+                    if not group_ids:
+                        raise ValueError("학습할 소그룹을 하나 이상 선택하세요.")
+                    selected_groups = groups_for_collection(conn, user_id, collection_id, group_ids)
+                    selected_group_ids = [int(group["id"]) for group in selected_groups]
+                    if len(selected_group_ids) != len(group_ids):
+                        raise ValueError("선택한 소그룹을 찾을 수 없습니다.")
+                    all_scope_cards = cards_payload(
+                        conn,
+                        user_id,
+                        group_ids=selected_group_ids,
+                        include_excluded=False,
+                    )
+                    due_cards = leitner_cards_payload(conn, user_id, group_ids=selected_group_ids)
+                    self.send_json(
+                        {
+                            "scope_type": "collection",
+                            "collection": row_to_dict(collection),
+                            "groups": [row_to_dict(group) for group in selected_groups],
+                            "cards": due_cards,
+                            "total_scope_cards": len(all_scope_cards),
+                            "box_distribution": leitner_box_distribution(
+                                conn, [int(card["id"]) for card in all_scope_cards]
+                            ),
+                        }
+                    )
+                    return
+                group_id = int(query.get("group_id", ["0"])[0])
+                group = get_group(conn, user_id, group_id)
+                if group is None:
+                    self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+                    return
+                collection = get_collection(conn, user_id, int(group["collection_id"]))
+                all_scope_cards = cards_payload(conn, user_id, group_id=group_id, include_excluded=False)
+                due_cards = leitner_cards_payload(conn, user_id, group_id=group_id)
+                self.send_json(
+                    {
+                        "scope_type": "group",
+                        "collection": row_to_dict(collection) if collection else None,
+                        "group": row_to_dict(group),
+                        "groups": [row_to_dict(group)],
+                        "cards": due_cards,
+                        "total_scope_cards": len(all_scope_cards),
+                        "box_distribution": leitner_box_distribution(
+                            conn, [int(card["id"]) for card in all_scope_cards]
+                        ),
+                    }
+                )
+                return
+
+            if parts == ["api", "leitner", "review"] and method == "POST":
+                self.complete_leitner_review(conn, user_id)
+                return
+
             if parts == ["api", "backup"]:
                 if method == "GET":
                     self.send_json({"backup": backup_payload(conn, user_id)})
@@ -3253,6 +3430,61 @@ class AppHandler(BaseHTTPRequestHandler):
                     "duration_seconds": duration_seconds,
                     "completed_at": completed_at,
                 }
+            },
+            HTTPStatus.CREATED,
+        )
+
+    def complete_leitner_review(self, conn: sqlite3.Connection, user_id: int) -> None:
+        """Record a single Leitner-mode answer. Independent of study_rounds/reviews/
+        cards.correct_count/cards.wrong_count -- those belong solely to the existing
+        study mode and are never touched here."""
+        body = parse_body(self)
+        card_id = int(body.get("card_id") or 0)
+        result = str(body.get("result") or "")
+        if result not in ("correct", "wrong"):
+            raise ValueError("결과는 correct 또는 wrong이어야 합니다.")
+        card = get_card(conn, user_id, card_id)
+        if card is None:
+            self.send_json({"error": "카드를 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+            return
+
+        ensure_leitner_states(conn, [card_id])
+        state = conn.execute(
+            "SELECT * FROM leitner_states WHERE card_id = ?",
+            (card_id,),
+        ).fetchone()
+        box_before = int(state["box"])
+        if result == "correct":
+            box_after = min(LEITNER_MAX_BOX, box_before + 1)
+        else:
+            box_after = 1
+        due_at = leitner_due_at_for_box(box_after)
+
+        conn.execute(
+            """
+            UPDATE leitner_states
+            SET box = ?,
+                due_at = ?,
+                last_result = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE card_id = ?
+            """,
+            (box_after, due_at, result, card_id),
+        )
+        conn.execute(
+            """
+            INSERT INTO leitner_reviews (card_id, box_before, box_after, result)
+            VALUES (?, ?, ?, ?)
+            """,
+            (card_id, box_before, box_after, result),
+        )
+        self.send_json(
+            {
+                "card_id": card_id,
+                "box_before": box_before,
+                "box_after": box_after,
+                "due_at": due_at,
+                "result": result,
             },
             HTTPStatus.CREATED,
         )
