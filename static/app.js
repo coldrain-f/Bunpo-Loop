@@ -4297,6 +4297,15 @@ function renderStudyStartPanel(group) {
           ${iconLabel("star", `별표 카드만 학습 · ${starredCount}개`)}
         </button>
       </div>` : ""}
+      ${canStart ? `
+      <div class="study-starred-row button-row">
+        <button class="ghost-button" type="button" data-action="view-leitner-status-for-group" data-group-id="${group.id}">
+          ${iconLabel("chart-column", "라이트너 현황")}
+        </button>
+        <button class="secondary-button" type="button" data-action="start-leitner-study-for-group" data-group-id="${group.id}">
+          ${iconLabel("target", "라이트너로 학습")}
+        </button>
+      </div>` : ""}
     </section>
   `;
 }
@@ -6684,13 +6693,7 @@ function renderLeitnerPickerDialog() {
   finishDialogRender();
 }
 
-async function showLeitnerStatus() {
-  const collection = state.collections.find((item) => item.id === state.leitnerSelectedCollectionId);
-  const groupIds = state.leitnerSelectedGroupIds;
-  if (!collection || !groupIds.length) return showToast("소그룹을 하나 이상 선택하세요.");
-  const data = await request(
-    `/api/leitner/status?collection_id=${collection.id}&group_ids=${encodeURIComponent(groupIds.join(","))}`,
-  );
+function beginLeitnerStatusView(data) {
   state.leitnerStatusView = {
     collection: data.collection,
     groups: data.groups,
@@ -6699,6 +6702,21 @@ async function showLeitnerStatus() {
   state.leitnerStatusExpandedBoxes = [1];
   state.activeDialog = "leitner-status";
   renderDialog();
+}
+
+async function showLeitnerStatus() {
+  const collection = state.collections.find((item) => item.id === state.leitnerSelectedCollectionId);
+  const groupIds = state.leitnerSelectedGroupIds;
+  if (!collection || !groupIds.length) return showToast("소그룹을 하나 이상 선택하세요.");
+  const data = await request(
+    `/api/leitner/status?collection_id=${collection.id}&group_ids=${encodeURIComponent(groupIds.join(","))}`,
+  );
+  beginLeitnerStatusView(data);
+}
+
+async function showLeitnerStatusForGroup(groupId) {
+  const data = await request(`/api/leitner/status?group_id=${groupId}`);
+  beginLeitnerStatusView(data);
 }
 
 function renderLeitnerStatusDialog() {
@@ -6767,13 +6785,7 @@ function renderLeitnerStatusDialog() {
   finishDialogRender();
 }
 
-async function startLeitnerStudy() {
-  const collection = state.collections.find((item) => item.id === state.leitnerSelectedCollectionId);
-  const groupIds = state.leitnerSelectedGroupIds;
-  if (!collection || !groupIds.length) return showToast("소그룹을 하나 이상 선택하세요.");
-  const data = await request(
-    `/api/leitner/study?collection_id=${collection.id}&group_ids=${encodeURIComponent(groupIds.join(","))}`,
-  );
+function beginLeitnerSession(data) {
   state.leitnerSession = {
     collection: data.collection,
     groups: data.groups,
@@ -6796,6 +6808,21 @@ async function startLeitnerStudy() {
   render();
   scrollToTop();
   focusAfterRender(['.study-card[data-action="leitner-flip-card"]', '.reveal-button[data-action="leitner-flip-card"]']);
+}
+
+async function startLeitnerStudy() {
+  const collection = state.collections.find((item) => item.id === state.leitnerSelectedCollectionId);
+  const groupIds = state.leitnerSelectedGroupIds;
+  if (!collection || !groupIds.length) return showToast("소그룹을 하나 이상 선택하세요.");
+  const data = await request(
+    `/api/leitner/study?collection_id=${collection.id}&group_ids=${encodeURIComponent(groupIds.join(","))}`,
+  );
+  beginLeitnerSession(data);
+}
+
+async function startLeitnerStudyForGroup(groupId) {
+  const data = await request(`/api/leitner/study?group_id=${groupId}`);
+  beginLeitnerSession(data);
 }
 
 function closeLeitnerSession() {
@@ -8507,6 +8534,8 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "start-leitner-study") await startLeitnerStudy();
     if (action === "view-leitner-status") await showLeitnerStatus();
+    if (action === "start-leitner-study-for-group") await startLeitnerStudyForGroup(Number(actionEl.dataset.groupId));
+    if (action === "view-leitner-status-for-group") await showLeitnerStatusForGroup(Number(actionEl.dataset.groupId));
     if (action === "toggle-leitner-status-box") {
       const box = Number(actionEl.dataset.box);
       const expanded = new Set(state.leitnerStatusExpandedBoxes.map(Number));
