@@ -1462,6 +1462,27 @@ def leitner_box_status_payload(
     return boxes
 
 
+def leitner_due_counts_by_group(conn: sqlite3.Connection, user_id: int) -> dict[str, int]:
+    """How many cards are due for Leitner review today, per group, across the whole
+    user -- for showing a due-count badge on the study picker without opening a
+    dialog. A card counts as due if it has no leitner_states row yet (never
+    reviewed, so it defaults to box 1 / due today) or its due_at has passed."""
+    today = today_date_str()
+    rows = conn.execute(
+        """
+        SELECT g.id AS group_id, COUNT(c.id) AS due_count
+        FROM groups g
+        JOIN collections col ON col.id = g.collection_id AND col.user_id = ?
+        JOIN cards c ON c.group_id = g.id AND c.study_excluded = 0
+        LEFT JOIN leitner_states ls ON ls.card_id = c.id
+        WHERE ls.card_id IS NULL OR ls.due_at <= ?
+        GROUP BY g.id
+        """,
+        (user_id, today),
+    ).fetchall()
+    return {str(int(row["group_id"])): int(row["due_count"]) for row in rows}
+
+
 def table_payload(conn: sqlite3.Connection, table: str, order_by: str) -> list[dict]:
     rows = conn.execute(f"SELECT * FROM {table} ORDER BY {order_by}").fetchall()
     return [row_to_dict(row) for row in rows]
@@ -2770,6 +2791,10 @@ class AppHandler(BaseHTTPRequestHandler):
 
             if parts == ["api", "weak-rounds"] and method == "POST":
                 self.complete_weak_round(conn, user_id)
+                return
+
+            if parts == ["api", "leitner", "summary"] and method == "GET":
+                self.send_json({"due_counts_by_group": leitner_due_counts_by_group(conn, user_id)})
                 return
 
             if parts == ["api", "leitner", "study"] and method == "GET":
