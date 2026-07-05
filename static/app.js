@@ -228,6 +228,8 @@ const state = {
   leitnerSelectedCollectionId: null,
   leitnerSelectedGroupIds: [],
   leitnerSession: null,
+  leitnerStatusView: null,
+  leitnerStatusExpandedBoxes: [1],
 };
 
 const views = {
@@ -271,7 +273,7 @@ const FOCUSABLE_SELECTOR = [
   "a[href]",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
-const DISMISSIBLE_DIALOGS = new Set(["preview", "round-detail", "collection-study-picker", "starred-bundle-picker", "edit-card-in-session", "leitner-picker"]);
+const DISMISSIBLE_DIALOGS = new Set(["preview", "round-detail", "collection-study-picker", "starred-bundle-picker", "edit-card-in-session", "leitner-picker", "leitner-status"]);
 
 function defaultSettings() {
   return {
@@ -3181,6 +3183,10 @@ function renderDialog() {
   }
   if (state.activeDialog === "leitner-picker") {
     renderLeitnerPickerDialog();
+    return;
+  }
+  if (state.activeDialog === "leitner-status") {
+    renderLeitnerStatusDialog();
     return;
   }
   if (state.activeDialog === "start-starred") {
@@ -6656,6 +6662,11 @@ function renderLeitnerPickerDialog() {
             <p>${canStart ? "선택한 소그룹에서 오늘 복습할 카드만 시작합니다." : "소그룹을 하나 이상 선택하세요."}</p>
           </div>
           <div class="study-start-actions">
+            <button class="ghost-button" type="button" data-action="view-leitner-status" ${
+              canStart ? "" : "disabled"
+            }>
+              ${iconLabel("chart-column", "현황 보기")}
+            </button>
             <button class="primary-button full" type="button" data-action="start-leitner-study" ${
               canStart ? "" : "disabled"
             }>
@@ -6663,6 +6674,87 @@ function renderLeitnerPickerDialog() {
             </button>
           </div>
         </section>
+      </section>
+    </div>
+  `;
+  finishDialogRender();
+}
+
+async function showLeitnerStatus() {
+  const collection = state.collections.find((item) => item.id === state.leitnerSelectedCollectionId);
+  const groupIds = state.leitnerSelectedGroupIds;
+  if (!collection || !groupIds.length) return showToast("소그룹을 하나 이상 선택하세요.");
+  const data = await request(
+    `/api/leitner/status?collection_id=${collection.id}&group_ids=${encodeURIComponent(groupIds.join(","))}`,
+  );
+  state.leitnerStatusView = {
+    collection: data.collection,
+    groups: data.groups,
+    boxes: data.boxes,
+  };
+  state.leitnerStatusExpandedBoxes = [1];
+  state.activeDialog = "leitner-status";
+  renderDialog();
+}
+
+function renderLeitnerStatusDialog() {
+  const view = state.leitnerStatusView;
+  if (!view) return closeDialog();
+  const expanded = new Set(state.leitnerStatusExpandedBoxes.map(Number));
+  const groupNames = view.groups.map((group) => group.name).join(", ");
+  const boxSections = Array.from({ length: LEITNER_MAX_BOX }, (_, index) => index + 1)
+    .map((box) => {
+      const boxData = view.boxes[String(box)] || { count: 0, cards: [] };
+      const isOpen = expanded.has(box);
+      const cardRows = boxData.cards
+        .map((card) => {
+          const dueLabel =
+            card.days_until_due <= 0
+              ? "오늘 복습"
+              : card.days_until_due === 1
+              ? "내일 복습"
+              : `${card.days_until_due}일 후 복습`;
+          return `
+            <li class="leitner-status-card">
+              <span class="leitner-status-card-front">${escapeHtml(card.front)}</span>
+              <span class="meta leitner-status-card-due">${escapeHtml(dueLabel)} · ${escapeHtml(card.due_at)}</span>
+            </li>
+          `;
+        })
+        .join("");
+      return `
+        <section class="leitner-status-box">
+          <button class="leitner-status-box-header" type="button" data-action="toggle-leitner-status-box" data-box="${box}" aria-expanded="${
+            isOpen ? "true" : "false"
+          }">
+            <strong>박스 ${box}</strong>
+            <span class="pill">${boxData.count}개</span>
+            ${iconLabel(isOpen ? "chevron-up" : "chevron-down", "")}
+          </button>
+          ${
+            isOpen
+              ? boxData.count
+                ? `<ul class="leitner-status-card-list">${cardRows}</ul>`
+                : `<p class="meta leitner-status-empty">이 박스에는 카드가 없습니다.</p>`
+              : ""
+          }
+        </section>
+      `;
+    })
+    .join("");
+  dialogRoot.innerHTML = `
+    <div class="dialog-backdrop" role="presentation">
+      <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="leitner-status-title">
+        <div class="row dialog-header">
+          <div>
+            <p class="eyebrow">라이트너 현황</p>
+            <h2 id="leitner-status-title">${escapeHtml(view.collection?.name || "")} · ${escapeHtml(groupNames)}</h2>
+          </div>
+          <button class="ghost-button small-button" type="button" data-action="close-dialog">${iconLabel("x", "닫기")}</button>
+        </div>
+        <div class="collection-study-body leitner-status-body">
+          ${boxSections}
+        </div>
       </section>
     </div>
   `;
@@ -8408,6 +8500,15 @@ document.addEventListener("click", async (event) => {
       renderDialog();
     }
     if (action === "start-leitner-study") await startLeitnerStudy();
+    if (action === "view-leitner-status") await showLeitnerStatus();
+    if (action === "toggle-leitner-status-box") {
+      const box = Number(actionEl.dataset.box);
+      const expanded = new Set(state.leitnerStatusExpandedBoxes.map(Number));
+      if (expanded.has(box)) expanded.delete(box);
+      else expanded.add(box);
+      state.leitnerStatusExpandedBoxes = [...expanded];
+      renderDialog();
+    }
     if (action === "leitner-flip-card") flipLeitnerCard();
     if (action === "leitner-answer") await answerLeitnerCard(actionEl.dataset.result);
     if (action === "close-leitner-session") closeLeitnerSession();

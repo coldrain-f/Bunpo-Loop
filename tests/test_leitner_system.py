@@ -284,6 +284,34 @@ class LeitnerSystemApiTest(unittest.TestCase):
         self.assertEqual(1, after_official_round["correct_count"])
         self.assertEqual(0, after_official_round["wrong_count"])
 
+    def test_status_endpoint_groups_cards_by_box_with_due_dates(self) -> None:
+        _collection_id, group_id = self.create_collection_and_group()
+        box1_card = self.create_card(group_id, "走る")
+        box2_card = self.create_card(group_id, "泳ぐ")
+        self.request_json(f"/api/leitner/study?group_id={group_id}")
+
+        review = self.request_json(
+            "/api/leitner/review",
+            method="POST",
+            body={"card_id": box2_card["id"], "result": "correct"},
+            expected=HTTPStatus.CREATED,
+        )
+
+        status = self.request_json(f"/api/leitner/status?group_id={group_id}")
+        boxes = status["boxes"]
+        self.assertEqual(1, boxes["1"]["count"])
+        self.assertEqual([box1_card["id"]], [c["id"] for c in boxes["1"]["cards"]])
+        self.assertEqual(1, boxes["2"]["count"])
+        self.assertEqual([box2_card["id"]], [c["id"] for c in boxes["2"]["cards"]])
+        self.assertEqual(review["due_at"], boxes["2"]["cards"][0]["due_at"])
+        self.assertGreater(boxes["2"]["cards"][0]["days_until_due"], 0)
+        self.assertEqual(0, boxes["3"]["count"])
+
+        by_collection = self.request_json(
+            f"/api/leitner/status?collection_id={_collection_id}&group_ids={group_id}"
+        )
+        self.assertEqual(status["boxes"], by_collection["boxes"])
+
     def test_review_rejects_unknown_result_and_card(self) -> None:
         _collection_id, group_id = self.create_collection_and_group()
         card = self.create_card(group_id, "泳ぐ")

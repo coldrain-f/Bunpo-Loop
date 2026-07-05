@@ -1410,6 +1410,58 @@ def leitner_box_distribution(conn: sqlite3.Connection, card_ids: list[int]) -> d
     return distribution
 
 
+def leitner_box_status_payload(
+    conn: sqlite3.Connection,
+    user_id: int,
+    group_id: int | None = None,
+    group_ids: list[int] | None = None,
+) -> dict[str, dict]:
+    """Full box-by-box breakdown (which cards, which box, when due) for a scope,
+    independent of whether each card is due today. Used for the Leitner status view."""
+    boxes: dict[str, dict] = {str(box): {"count": 0, "cards": []} for box in range(1, LEITNER_MAX_BOX + 1)}
+    cards = cards_payload(
+        conn,
+        user_id,
+        group_id=group_id,
+        group_ids=group_ids,
+        order_mode="sequence",
+        include_excluded=False,
+    )
+    if not cards:
+        return boxes
+    card_ids = [int(card["id"]) for card in cards]
+    ensure_leitner_states(conn, card_ids)
+    placeholders = ",".join("?" for _ in card_ids)
+    states = {
+        int(row["card_id"]): row_to_dict(row)
+        for row in conn.execute(
+            f"SELECT * FROM leitner_states WHERE card_id IN ({placeholders})",
+            card_ids,
+        ).fetchall()
+    }
+    today = datetime.strptime(today_date_str(), "%Y-%m-%d")
+    for card in cards:
+        state = states.get(int(card["id"]))
+        if state is None:
+            continue
+        box_key = str(int(state["box"]))
+        due_at = str(state["due_at"])
+        days_until_due = (datetime.strptime(due_at, "%Y-%m-%d") - today).days
+        boxes[box_key]["cards"].append(
+            {
+                "id": card["id"],
+                "front": card["front"],
+                "back": card["back"],
+                "due_at": due_at,
+                "days_until_due": days_until_due,
+            }
+        )
+    for box_status in boxes.values():
+        box_status["cards"].sort(key=lambda entry: entry["due_at"])
+        box_status["count"] = len(box_status["cards"])
+    return boxes
+
+
 def table_payload(conn: sqlite3.Connection, table: str, order_by: str) -> list[dict]:
     rows = conn.execute(f"SELECT * FROM {table} ORDER BY {order_by}").fetchall()
     return [row_to_dict(row) for row in rows]
@@ -2773,6 +2825,46 @@ class AppHandler(BaseHTTPRequestHandler):
                         "box_distribution": leitner_box_distribution(
                             conn, [int(card["id"]) for card in all_scope_cards]
                         ),
+                    }
+                )
+                return
+
+            if parts == ["api", "leitner", "status"] and method == "GET":
+                collection_id = int(query.get("collection_id", ["0"])[0])
+                if collection_id:
+                    collection = get_collection(conn, user_id, collection_id)
+                    if collection is None:
+                        self.send_json({"error": "대그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+                        return
+                    group_ids = parse_id_list(query.get("group_ids", [""])[0])
+                    if not group_ids:
+                        raise ValueError("현황을 볼 소그룹을 하나 이상 선택하세요.")
+                    selected_groups = groups_for_collection(conn, user_id, collection_id, group_ids)
+                    selected_group_ids = [int(group["id"]) for group in selected_groups]
+                    if len(selected_group_ids) != len(group_ids):
+                        raise ValueError("선택한 소그룹을 찾을 수 없습니다.")
+                    self.send_json(
+                        {
+                            "scope_type": "collection",
+                            "collection": row_to_dict(collection),
+                            "groups": [row_to_dict(group) for group in selected_groups],
+                            "boxes": leitner_box_status_payload(conn, user_id, group_ids=selected_group_ids),
+                        }
+                    )
+                    return
+                group_id = int(query.get("group_id", ["0"])[0])
+                group = get_group(conn, user_id, group_id)
+                if group is None:
+                    self.send_json({"error": "소그룹을 찾을 수 없습니다."}, HTTPStatus.NOT_FOUND)
+                    return
+                collection = get_collection(conn, user_id, int(group["collection_id"]))
+                self.send_json(
+                    {
+                        "scope_type": "group",
+                        "collection": row_to_dict(collection) if collection else None,
+                        "group": row_to_dict(group),
+                        "groups": [row_to_dict(group)],
+                        "boxes": leitner_box_status_payload(conn, user_id, group_id=group_id),
                     }
                 )
                 return
