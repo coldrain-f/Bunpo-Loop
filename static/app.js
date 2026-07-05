@@ -6729,7 +6729,7 @@ function renderLeitnerStatusDialog() {
           }">
             <strong>박스 ${box}</strong>
             <span class="pill">${boxData.count}개</span>
-            ${iconLabel(isOpen ? "chevron-up" : "chevron-down", "")}
+            ${icon(isOpen ? "chevron-up" : "chevron-down")}
           </button>
           ${
             isOpen
@@ -6745,12 +6745,14 @@ function renderLeitnerStatusDialog() {
   dialogRoot.innerHTML = `
     <div class="dialog-backdrop" role="presentation">
       <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="leitner-status-title">
-        <div class="row dialog-header">
-          <div>
+        <div class="row dialog-header leitner-status-header">
+          <div class="leitner-status-header-text">
             <p class="eyebrow">라이트너 현황</p>
-            <h2 id="leitner-status-title">${escapeHtml(view.collection?.name || "")} · ${escapeHtml(groupNames)}</h2>
+            <h2 id="leitner-status-title" title="${escapeHtml(`${view.collection?.name || ""} · ${groupNames}`)}">${escapeHtml(
+              view.collection?.name || "",
+            )} · ${escapeHtml(groupNames)}</h2>
           </div>
-          <button class="ghost-button small-button" type="button" data-action="close-dialog">${iconLabel("x", "닫기")}</button>
+          <button class="ghost-button small-button" type="button" data-action="close-dialog" aria-label="닫기">${icon("x")}</button>
         </div>
         <div class="collection-study-body leitner-status-body">
           ${boxSections}
