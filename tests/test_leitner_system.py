@@ -222,6 +222,28 @@ class LeitnerSystemApiTest(unittest.TestCase):
         self.assertEqual([due_card["id"]], [c["id"] for c in study["cards"]])
         self.assertEqual(2, study["total_scope_cards"])
 
+    def test_summary_counts_due_cards_per_group_without_requiring_a_visit(self) -> None:
+        _collection_id, group_id = self.create_collection_and_group()
+        due_card = self.create_card(group_id, "泳ぐ")
+        future_card = self.create_card(group_id, "走る")
+
+        # Note: no /api/leitner/study call here -- the summary must count a
+        # never-visited card as due (box 1 defaults to due today) without
+        # requiring leitner_states to already exist for it.
+        summary = self.request_json("/api/leitner/summary")
+        self.assertEqual(2, summary["due_counts_by_group"][str(group_id)])
+
+        future_date = (datetime.now(timezone.utc) + timedelta(days=5)).strftime("%Y-%m-%d")
+        self.request_json(f"/api/leitner/study?group_id={group_id}")
+        with app.connect() as conn:
+            conn.execute(
+                "UPDATE leitner_states SET due_at = ? WHERE card_id = ?",
+                (future_date, future_card["id"]),
+            )
+
+        summary_after = self.request_json("/api/leitner/summary")
+        self.assertEqual(1, summary_after["due_counts_by_group"][str(group_id)])
+
     def test_collection_scope_with_group_ids_matches_group_scope(self) -> None:
         collection_id, group_id = self.create_collection_and_group()
         card = self.create_card(group_id, "書く")

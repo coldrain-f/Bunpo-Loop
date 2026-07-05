@@ -230,6 +230,7 @@ const state = {
   leitnerSession: null,
   leitnerStatusView: null,
   leitnerStatusExpandedBoxes: [1],
+  leitnerDueCountsByGroup: {},
 };
 
 const views = {
@@ -822,20 +823,30 @@ function resetDataScopedUiState() {
 }
 
 async function loadData() {
-  const [collectionData, groupData, cardData, roundData, settingsData] = await Promise.all([
+  const [collectionData, groupData, cardData, roundData, settingsData, leitnerSummaryData] = await Promise.all([
     request("/api/collections"),
     request("/api/groups"),
     request("/api/cards"),
     request("/api/rounds?limit=500"),
     request("/api/settings"),
+    request("/api/leitner/summary"),
   ]);
   state.collections = collectionData.collections;
   state.groups = groupData.groups;
   state.cards = cardData.cards;
   state.rounds = roundData.rounds;
   state.settings = normalizeSettings(settingsData.settings || {});
+  state.leitnerDueCountsByGroup = leitnerSummaryData.due_counts_by_group || {};
   applyStudyOptionSettings();
   reconcileLoadedState();
+}
+
+function getLeitnerDueCount(groupId) {
+  return number(state.leitnerDueCountsByGroup[String(groupId)]);
+}
+
+function getLeitnerDueCountForCollection(collectionId) {
+  return getGroupsForCollection(collectionId).reduce((total, group) => total + getLeitnerDueCount(group.id), 0);
 }
 
 function handleLoadDataError(error) {
@@ -3899,6 +3910,7 @@ function renderStudyCollectionChoiceItem(collection) {
   const studyCount = getCollectionStudyCardCount(collection);
   const excludedCount = getCollectionExcludedCardCount(collection);
   const groupCount = number(collection.group_count);
+  const leitnerDueCount = getLeitnerDueCountForCollection(collection.id);
   return `
     <article class="group-item group-choice ${studyCount ? "" : "empty"}">
       <button class="group-choice-main" type="button" data-action="choose-study-collection" data-collection-id="${collection.id}">
@@ -3909,6 +3921,7 @@ function renderStudyCollectionChoiceItem(collection) {
         <div class="group-choice-footer">
           <span>소그룹 ${groupCount}개</span>
           <span>${escapeHtml(studyCountText(cardCount, studyCount, excludedCount))}</span>
+          ${leitnerDueCount ? `<span class="pill good leitner-due-badge">라이트너 ${leitnerDueCount}개</span>` : ""}
         </div>
       </button>
       ${
@@ -3934,11 +3947,13 @@ function renderStudyGroupChoiceItem(group) {
   const cardCount = number(group.card_count);
   const active = Number(group.id) === Number(state.selectedGroupId);
   const lastStudyText = getGroupLastStudyLabel(group);
+  const leitnerDueCount = getLeitnerDueCount(group.id);
   return `
     <article class="group-item group-choice subgroup-choice ${active ? "active" : ""} ${cardCount ? "" : "empty"}">
       <button class="group-choice-main" type="button" data-action="choose-study-group" data-group-id="${group.id}" aria-pressed="${active ? "true" : "false"}">
         <div class="item-title">
           <strong>${escapeHtml(group.name)}</strong>
+          ${leitnerDueCount ? `<span class="pill good leitner-due-badge">라이트너 ${leitnerDueCount}개</span>` : ""}
         </div>
         ${renderGroupStatusPills(group, { showRounds: true, showAccuracy: true })}
         ${renderGroupMetricRow(group)}
@@ -4303,7 +4318,7 @@ function renderStudyStartPanel(group) {
           ${iconLabel("chart-column", "라이트너 현황")}
         </button>
         <button class="secondary-button" type="button" data-action="start-leitner-study-for-group" data-group-id="${group.id}">
-          ${iconLabel("target", "라이트너로 학습")}
+          ${iconLabel("target", getLeitnerDueCount(group.id) ? `라이트너로 학습 · ${getLeitnerDueCount(group.id)}개` : "라이트너로 학습")}
         </button>
       </div>` : ""}
     </section>
@@ -6861,6 +6876,10 @@ async function answerLeitnerCard(result) {
     session.answerFeedback = result;
     session.index += 1;
     session.showingBack = false;
+    const groupId = String(card.group_id);
+    if (state.leitnerDueCountsByGroup[groupId]) {
+      state.leitnerDueCountsByGroup[groupId] = Math.max(0, state.leitnerDueCountsByGroup[groupId] - 1);
+    }
   } catch (error) {
     showRequestError(error);
   } finally {
