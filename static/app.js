@@ -12,6 +12,7 @@ const { clearStoredUser, loadStoredUser, saveStoredUser } = window.ByeorakchigiS
 const { downloadBlob, downloadJson, readTextFile } = window.ByeorakchigiFiles || window.JLPTFiles;
 const reducedMotionQuery =
   typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+const LEITNER_MAX_BOX = 5;
 
 const ORDER_DESCRIPTIONS = {
   sequence: "등록한 순서 그대로 차분히 봅니다.",
@@ -224,6 +225,9 @@ const state = {
   editingCardId: null,
   editingGroupId: null,
   editingCollectionId: null,
+  leitnerSelectedCollectionId: null,
+  leitnerSelectedGroupIds: [],
+  leitnerSession: null,
 };
 
 const views = {
@@ -267,7 +271,7 @@ const FOCUSABLE_SELECTOR = [
   "a[href]",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
-const DISMISSIBLE_DIALOGS = new Set(["preview", "round-detail", "collection-study-picker", "starred-bundle-picker", "edit-card-in-session"]);
+const DISMISSIBLE_DIALOGS = new Set(["preview", "round-detail", "collection-study-picker", "starred-bundle-picker", "edit-card-in-session", "leitner-picker"]);
 
 function defaultSettings() {
   return {
@@ -3175,6 +3179,10 @@ function renderDialog() {
     renderStarredBundleDialog();
     return;
   }
+  if (state.activeDialog === "leitner-picker") {
+    renderLeitnerPickerDialog();
+    return;
+  }
   if (state.activeDialog === "start-starred") {
     const groupId = state.starredStudyGroupId;
     const group = state.groups.find((g) => Number(g.id) === Number(groupId));
@@ -3511,6 +3519,7 @@ function renderPreviewCard(card) {
 }
 
 function renderStudy() {
+  if (state.leitnerSession) return renderLeitnerSession();
   if (state.session) return renderStudySession();
   const selected = getSelectedGroup();
   const selectedCollection = getSelectedCollection();
@@ -3557,6 +3566,11 @@ function renderStudyGroupPicker() {
         <span class="pill">대그룹 ${number(state.collections.length)}개</span>
       </div>
       <p class="meta">${escapeHtml(studyCountText(totalCards, totalStudyCards, totalExcludedCards))} · 오늘은 먼저 이어서 회독할 소그룹을 고릅니다.</p>
+      <div class="study-bundle-row">
+        <button class="secondary-button full" type="button" data-action="open-leitner-picker-dialog" ${
+          state.collections.length ? "" : "disabled"
+        }>${iconLabel("target", "라이트너로 학습")}</button>
+      </div>
       ${renderTodayStudyPanel(recentGroup, weakCards)}
       ${renderWeakCardsPanel()}
       <section id="study-collection-browser" class="group-browser-block">
@@ -6539,6 +6553,335 @@ function startWeakStudy() {
   focusAfterRender(['.study-card[data-action="flip-card"]', '.reveal-button[data-action="flip-card"]']);
 }
 
+// ---------------------------------------------------------------------------
+// Leitner system: a fully independent study mode. It never reads or writes
+// state.session / state.studyStep, and never calls /api/study, /api/rounds,
+// or /api/weak-rounds -- those remain the existing study mode's alone. Its own
+// state lives in state.leitnerSelectedCollectionId / leitnerSelectedGroupIds /
+// leitnerSession.
+// ---------------------------------------------------------------------------
+
+function renderLeitnerGroupSelection(groups) {
+  if (!groups.length) {
+    return `
+      <section class="study-subgroup-panel">
+        ${renderActionEmptyState({
+          title: "이 대그룹에는 아직 소그룹이 없습니다.",
+          body: "소그룹을 만든 뒤 라이트너 학습을 시작할 수 있습니다.",
+          action: "open-group-form-for-collection",
+          label: "소그룹 만들기",
+          attrs: `data-collection-id="${state.leitnerSelectedCollectionId}"`,
+        })}
+      </section>
+    `;
+  }
+  const selectedIds = new Set(state.leitnerSelectedGroupIds.map(Number));
+  const selectableCount = groups.filter((g) => getGroupStudyCardCount(g) > 0).length;
+  const selectedCount = groups.filter((g) => selectedIds.has(Number(g.id)) && getGroupStudyCardCount(g) > 0).length;
+  const allSelected = Boolean(selectableCount && selectedCount === selectableCount);
+  return `
+    <section class="study-subgroup-panel">
+      <div class="completion-header">
+        <h3>학습할 소그룹</h3>
+        <span class="pill">${selectedCount}/${selectableCount} 선택</span>
+      </div>
+      <div class="button-row">
+        <button class="secondary-button" type="button" data-action="select-all-leitner-groups" aria-pressed="${
+          allSelected ? "true" : "false"
+        }" ${selectableCount ? "" : "disabled"}>${iconLabel(allSelected ? "check" : "plus", allSelected ? "전체 선택됨" : "전체 선택")}</button>
+        <button class="ghost-button" type="button" data-action="clear-leitner-groups">${iconLabel("x", "선택 해제")}</button>
+      </div>
+      <div class="study-subgroup-list">
+        ${groups
+          .map((group) => {
+            const studyCount = getGroupStudyCardCount(group);
+            const disabled = !studyCount;
+            const checked = !disabled && selectedIds.has(Number(group.id));
+            return `
+              <label class="study-subgroup-option ${checked ? "active" : ""} ${disabled ? "disabled" : ""}">
+                <input type="checkbox" data-action="toggle-leitner-group" data-group-id="${group.id}" ${
+                  checked ? "checked" : ""
+                } ${disabled ? "disabled" : ""} />
+                <span>
+                  <strong>${escapeHtml(group.name)}</strong>
+                  <small>${disabled ? "학습 대상 카드 없음" : `학습 대상 ${studyCount}개`}</small>
+                </span>
+              </label>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderLeitnerPickerDialog() {
+  if (!state.collections.length) return closeDialog();
+  const collection =
+    state.collections.find((item) => item.id === state.leitnerSelectedCollectionId) || state.collections[0];
+  if (state.leitnerSelectedCollectionId !== collection.id) {
+    state.leitnerSelectedCollectionId = collection.id;
+    state.leitnerSelectedGroupIds = getGroupsForCollection(collection.id)
+      .filter((group) => getGroupStudyCardCount(group) > 0)
+      .map((group) => group.id);
+  }
+  const groups = getGroupsForCollection(collection.id);
+  const selectedIds = new Set(state.leitnerSelectedGroupIds.map(Number));
+  const selectedGroups = groups.filter((group) => selectedIds.has(Number(group.id)));
+  const canStart = selectedGroups.length > 0;
+  dialogRoot.innerHTML = `
+    <div class="dialog-backdrop" role="presentation">
+      <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="leitner-dialog-title" aria-describedby="leitner-dialog-help">
+        <div class="row dialog-header">
+          <div>
+            <p class="eyebrow">라이트너 학습</p>
+            <h2 id="leitner-dialog-title">오늘 복습할 소그룹 고르기</h2>
+          </div>
+          <button class="ghost-button small-button" type="button" data-action="close-dialog">${iconLabel("x", "닫기")}</button>
+        </div>
+        <div class="collection-study-body">
+          <p id="leitner-dialog-help" class="meta collection-study-note">라이트너 학습은 기존 회독 기록과 완전히 별개로 저장됩니다. 정답이면 다음 박스로, 오답이면 1번 박스로 돌아가며, 오늘 복습할 카드만 모아 보여줍니다.</p>
+          <label class="field">
+            <span>대그룹</span>
+            <select id="leitner-collection-select" class="select" aria-label="라이트너 학습 대그룹 선택">
+              ${collectionOptions(collection.id)}
+            </select>
+          </label>
+          ${renderLeitnerGroupSelection(groups)}
+        </div>
+        <section class="study-start-panel practice-summary" aria-label="라이트너 학습 요약" aria-live="polite">
+          <div>
+            <span class="today-action-label">라이트너 학습</span>
+            <strong>${selectedGroups.length}개 소그룹 선택</strong>
+            <p>${canStart ? "선택한 소그룹에서 오늘 복습할 카드만 시작합니다." : "소그룹을 하나 이상 선택하세요."}</p>
+          </div>
+          <div class="study-start-actions">
+            <button class="primary-button full" type="button" data-action="start-leitner-study" ${
+              canStart ? "" : "disabled"
+            }>
+              ${iconLabel("play", "학습 시작")}
+            </button>
+          </div>
+        </section>
+      </section>
+    </div>
+  `;
+  finishDialogRender();
+}
+
+async function startLeitnerStudy() {
+  const collection = state.collections.find((item) => item.id === state.leitnerSelectedCollectionId);
+  const groupIds = state.leitnerSelectedGroupIds;
+  if (!collection || !groupIds.length) return showToast("소그룹을 하나 이상 선택하세요.");
+  const data = await request(
+    `/api/leitner/study?collection_id=${collection.id}&group_ids=${encodeURIComponent(groupIds.join(","))}`,
+  );
+  state.leitnerSession = {
+    collection: data.collection,
+    groups: data.groups,
+    cards: data.cards,
+    totalScopeCards: number(data.total_scope_cards),
+    boxDistribution: data.box_distribution || {},
+    index: 0,
+    reviewedCount: 0,
+    movedUpCount: 0,
+    resetCount: 0,
+    masteredCount: 0,
+    showingBack: false,
+    isAnswering: false,
+    answerFeedback: null,
+    lastReview: null,
+    startedAtMs: Date.now(),
+  };
+  state.activeDialog = null;
+  state.activeTab = "study";
+  render();
+  scrollToTop();
+  focusAfterRender(['.study-card[data-action="leitner-flip-card"]', '.reveal-button[data-action="leitner-flip-card"]']);
+}
+
+function closeLeitnerSession() {
+  state.leitnerSession = null;
+  render();
+  scrollToTop();
+}
+
+function flipLeitnerCard() {
+  const session = state.leitnerSession;
+  if (!session || session.showingBack) return;
+  session.showingBack = true;
+  render();
+}
+
+async function answerLeitnerCard(result) {
+  const session = state.leitnerSession;
+  if (!session || session.isAnswering) return;
+  const card = session.cards[session.index];
+  if (!card) return;
+  session.isAnswering = true;
+  render();
+  try {
+    const data = await request("/api/leitner/review", {
+      method: "POST",
+      body: JSON.stringify({ card_id: card.id, result }),
+    });
+    session.reviewedCount += 1;
+    if (result === "correct") {
+      if (data.box_after >= LEITNER_MAX_BOX) session.masteredCount += 1;
+      else session.movedUpCount += 1;
+    } else {
+      session.resetCount += 1;
+    }
+    session.lastReview = data;
+    session.answerFeedback = result;
+    session.index += 1;
+    session.showingBack = false;
+  } catch (error) {
+    showRequestError(error);
+  } finally {
+    session.isAnswering = false;
+    render();
+    setTimeout(() => {
+      if (state.leitnerSession === session) {
+        session.answerFeedback = null;
+        render();
+      }
+    }, ANSWER_FEEDBACK_MS);
+  }
+}
+
+function renderLeitnerSummary() {
+  const session = state.leitnerSession;
+  views.study.innerHTML = `
+    <div id="leitner-completion-summary" class="panel stack completion-panel">
+      <div class="completion-title-row">
+        <div>
+          <p class="eyebrow">완료</p>
+          <h2 id="study-title">라이트너 학습 완료</h2>
+        </div>
+        <span class="status-pill review">라이트너</span>
+      </div>
+      <p class="meta">${escapeHtml(session.collection?.name || "")} · ${escapeHtml(
+        (session.groups || []).map((group) => group.name).join(", "),
+      )}</p>
+      <div class="stat-grid">
+        <div class="stat"><strong>${number(session.reviewedCount)}</strong><span>복습한 카드</span></div>
+        <div class="stat"><strong>${number(session.movedUpCount)}</strong><span>박스 상승</span></div>
+        <div class="stat"><strong>${number(session.resetCount)}</strong><span>1번 박스로</span></div>
+        <div class="stat"><strong>${number(session.masteredCount)}</strong><span>5번 박스 유지</span></div>
+      </div>
+      <p class="meta">이 결과는 기존 학습의 회독 기록·정답률에는 반영되지 않습니다.</p>
+      <button class="primary-button full" type="button" data-action="close-leitner-session">${iconLabel(
+        "check",
+        "확인",
+      )}</button>
+    </div>
+  `;
+}
+
+function renderLeitnerEmptyState() {
+  const session = state.leitnerSession;
+  views.study.innerHTML = `
+    <div class="panel stack">
+      <div class="row">
+        <div>
+          <p class="eyebrow">라이트너 학습</p>
+          <h2 id="study-title">${escapeHtml(session.collection?.name || "")}</h2>
+        </div>
+        <button class="ghost-button small-button" type="button" data-action="close-leitner-session">${iconLabel(
+          "x",
+          "닫기",
+        )}</button>
+      </div>
+      ${renderActionEmptyState({
+        title: "오늘 복습할 카드가 없어요.",
+        body: `선택한 범위의 카드 ${number(session.totalScopeCards)}개는 모두 다음 복습일이 아직 되지 않았습니다. 내일 다시 확인해 보세요.`,
+        action: "close-leitner-session",
+        label: "확인",
+        iconName: "check",
+      })}
+    </div>
+  `;
+}
+
+function renderLeitnerSession() {
+  const session = state.leitnerSession;
+  if (session.index >= session.cards.length) return renderLeitnerSummary();
+  if (!session.cards.length) return renderLeitnerEmptyState();
+  const card = session.cards[session.index];
+  const total = session.cards.length;
+  const progress = Math.round(((session.index + 1) / total) * 100);
+  const feedbackClass = session.answerFeedback ? `answer-feedback-${session.answerFeedback}` : "";
+  const feedbackLabel = session.answerFeedback === "correct" ? "정답" : "오답";
+  const frontClass = `grammar ${getStudyTextScriptClass(card.front)} ${getStudyTextDensityClass(card.front)}`;
+  const box = number(card.leitner_box) || 1;
+  views.study.innerHTML = `
+    <div class="stack study-shell">
+      <div class="row">
+        <div>
+          <p class="eyebrow">${escapeHtml(session.collection?.name || "")} · 라이트너 학습</p>
+          <h2 id="study-title">박스 ${box} 카드</h2>
+        </div>
+        <div class="study-session-controls">
+          <button class="ghost-button small-button" type="button" data-action="close-leitner-session" ${
+            session.isAnswering ? "disabled" : ""
+          }>${iconLabel("x", "종료")}</button>
+          <span class="pill">${session.index + 1}/${total}</span>
+        </div>
+      </div>
+      <div class="progress" aria-hidden="true"><span style="width: ${progress}%"></span></div>
+      <div class="study-quick-stats">
+        <span>남은 ${Math.max(0, total - session.index)}개</span>
+        <span>박스 ${box}/${LEITNER_MAX_BOX}</span>
+      </div>
+      <div class="study-card ${session.showingBack ? "back" : "front"} ${feedbackClass}" ${
+        session.showingBack
+          ? ""
+          : `data-action="leitner-flip-card" role="button" tabindex="0" aria-label="카드 앞면. 탭해서 뜻 보기"`
+      }>
+        ${
+          session.answerFeedback
+            ? `<div class="answer-feedback-label ${feedbackClass}" role="status" aria-live="polite" aria-atomic="true">${feedbackLabel}</div>`
+            : ""
+        }
+        ${
+          session.showingBack
+            ? renderCardBack(card, false)
+            : `<div class="study-front-content">${renderStudyCardMeta(
+                card.group_name,
+                card,
+              )}<div class="${frontClass}">${renderMarkedText(card.front)}</div><p class="study-hint">탭해서 뜻 보기</p></div>`
+        }
+      </div>
+      <div class="study-action-bar ${feedbackClass}">
+        ${
+          session.isAnswering
+            ? `<button class="primary-button full" type="button" disabled>${iconLabel("save", "저장 중")}</button>`
+            : session.showingBack
+              ? `<div class="study-actions"><button class="answer-wrong" type="button" data-action="leitner-answer" data-result="wrong">${iconLabel(
+                  "x",
+                  "틀림",
+                )}</button><button class="answer-correct" type="button" data-action="leitner-answer" data-result="correct">${iconLabel(
+                  "check",
+                  "맞음",
+                )}</button></div>`
+              : `<button class="secondary-button full reveal-button" type="button" data-action="leitner-flip-card">${iconLabel(
+                  "eye",
+                  "뜻 보기",
+                )}</button>`
+        }
+      </div>
+      ${
+        session.lastReview && !session.showingBack
+          ? `<p class="meta leitner-last-feedback">직전 카드: 박스 ${session.lastReview.box_before} → ${session.lastReview.box_after}, 다음 복습 ${escapeHtml(
+              session.lastReview.due_at,
+            )}</p>`
+          : ""
+      }
+    </div>
+  `;
+}
+
 function buildPracticeRound(session) {
   const correctCount = session.results.filter((item) => item.result === "correct").length;
   const wrongCount = session.results.filter((item) => item.result === "wrong").length;
@@ -8036,6 +8379,38 @@ document.addEventListener("click", async (event) => {
         renderDialog();
       }
     }
+    if (action === "open-leitner-picker-dialog") {
+      if (!state.collections.length) return showToast("대그룹을 먼저 만들어 주세요.");
+      const collectionId = state.leitnerSelectedCollectionId || state.collections[0]?.id;
+      state.leitnerSelectedCollectionId = collectionId;
+      state.leitnerSelectedGroupIds = getGroupsForCollection(collectionId)
+        .filter((group) => getGroupStudyCardCount(group) > 0)
+        .map((group) => group.id);
+      state.activeDialog = "leitner-picker";
+      renderDialog();
+    }
+    if (action === "toggle-leitner-group") {
+      const groupId = Number(actionEl.dataset.groupId);
+      const selected = new Set(state.leitnerSelectedGroupIds.map(Number));
+      if (actionEl.checked) selected.add(groupId);
+      else selected.delete(groupId);
+      state.leitnerSelectedGroupIds = [...selected];
+      renderDialog();
+    }
+    if (action === "select-all-leitner-groups") {
+      state.leitnerSelectedGroupIds = getGroupsForCollection(state.leitnerSelectedCollectionId)
+        .filter((group) => getGroupStudyCardCount(group) > 0)
+        .map((group) => group.id);
+      renderDialog();
+    }
+    if (action === "clear-leitner-groups") {
+      state.leitnerSelectedGroupIds = [];
+      renderDialog();
+    }
+    if (action === "start-leitner-study") await startLeitnerStudy();
+    if (action === "leitner-flip-card") flipLeitnerCard();
+    if (action === "leitner-answer") await answerLeitnerCard(actionEl.dataset.result);
+    if (action === "close-leitner-session") closeLeitnerSession();
   } catch (error) {
     showRequestError(error);
   }
@@ -8073,6 +8448,14 @@ document.addEventListener("change", async (event) => {
           .filter((group) => getGroupStudyCardCount(group) > 0)
           .map((group) => group.id);
       }
+      renderDialog();
+    }
+    if (event.target.id === "leitner-collection-select") {
+      const collectionId = Number(event.target.value);
+      state.leitnerSelectedCollectionId = collectionId;
+      state.leitnerSelectedGroupIds = getGroupsForCollection(collectionId)
+        .filter((group) => getGroupStudyCardCount(group) > 0)
+        .map((group) => group.id);
       renderDialog();
     }
     if (event.target.id === "card-form-collection") {
