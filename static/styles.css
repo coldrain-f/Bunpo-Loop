@@ -4501,6 +4501,70 @@ body.study-mode .toast {
   padding-left: 8px;
 }
 
+.leitner-status-body {
+  gap: 8px;
+}
+
+.leitner-status-box {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.leitner-status-box-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.leitner-status-box-header strong {
+  flex: 1;
+}
+
+.leitner-status-card-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0 12px 12px;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.leitner-status-card {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.leitner-status-card:first-child {
+  border-top: none;
+}
+
+.leitner-status-card-front {
+  font-weight: 600;
+}
+
+.leitner-status-card-due {
+  white-space: nowrap;
+}
+
+.leitner-status-empty {
+  margin: 0;
+  padding: 0 12px 12px;
+}
+
 .round-detail-dialog {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
