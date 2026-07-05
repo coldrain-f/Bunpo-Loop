@@ -6621,17 +6621,21 @@ function renderLeitnerGroupSelection(groups) {
   `;
 }
 
+function getGroupsForCollectionSortedByName(collectionId) {
+  return getGroupsForCollection(collectionId).sort((a, b) => a.name.localeCompare(b.name, "ko"));
+}
+
 function renderLeitnerPickerDialog() {
   if (!state.collections.length) return closeDialog();
   const collection =
     state.collections.find((item) => item.id === state.leitnerSelectedCollectionId) || state.collections[0];
   if (state.leitnerSelectedCollectionId !== collection.id) {
     state.leitnerSelectedCollectionId = collection.id;
-    state.leitnerSelectedGroupIds = getGroupsForCollection(collection.id)
+    state.leitnerSelectedGroupIds = getGroupsForCollectionSortedByName(collection.id)
       .filter((group) => getGroupStudyCardCount(group) > 0)
       .map((group) => group.id);
   }
-  const groups = getGroupsForCollection(collection.id);
+  const groups = getGroupsForCollectionSortedByName(collection.id);
   const selectedIds = new Set(state.leitnerSelectedGroupIds.map(Number));
   const selectedGroups = groups.filter((group) => selectedIds.has(Number(group.id)));
   const canStart = selectedGroups.length > 0;
@@ -6716,7 +6720,7 @@ function renderLeitnerStatusDialog() {
               : `${card.days_until_due}일 후 복습`;
           return `
             <li class="leitner-status-card">
-              <span class="leitner-status-card-front">${escapeHtml(card.front)}</span>
+              <span class="leitner-status-card-front">${renderJapaneseText(card.front)}</span>
               <span class="meta leitner-status-card-due">${escapeHtml(dueLabel)} · ${escapeHtml(card.due_at)}</span>
             </li>
           `;
@@ -6729,7 +6733,7 @@ function renderLeitnerStatusDialog() {
           }">
             <strong>박스 ${box}</strong>
             <span class="pill">${boxData.count}개</span>
-            ${iconLabel(isOpen ? "chevron-up" : "chevron-down", "")}
+            ${icon(isOpen ? "chevron-up" : "chevron-down")}
           </button>
           ${
             isOpen
@@ -6745,12 +6749,14 @@ function renderLeitnerStatusDialog() {
   dialogRoot.innerHTML = `
     <div class="dialog-backdrop" role="presentation">
       <section class="dialog-panel collection-study-dialog" role="dialog" aria-modal="true" aria-labelledby="leitner-status-title">
-        <div class="row dialog-header">
-          <div>
+        <div class="row dialog-header leitner-status-header">
+          <div class="leitner-status-header-text">
             <p class="eyebrow">라이트너 현황</p>
-            <h2 id="leitner-status-title">${escapeHtml(view.collection?.name || "")} · ${escapeHtml(groupNames)}</h2>
+            <h2 id="leitner-status-title" title="${escapeHtml(`${view.collection?.name || ""} · ${groupNames}`)}">${escapeHtml(
+              view.collection?.name || "",
+            )} · ${escapeHtml(groupNames)}</h2>
           </div>
-          <button class="ghost-button small-button" type="button" data-action="close-dialog">${iconLabel("x", "닫기")}</button>
+          <button class="ghost-button small-button" type="button" data-action="close-dialog" aria-label="닫기">${icon("x")}</button>
         </div>
         <div class="collection-study-body leitner-status-body">
           ${boxSections}

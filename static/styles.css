@@ -4501,6 +4501,27 @@ body.study-mode .toast {
   padding-left: 8px;
 }
 
+.leitner-status-header {
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.leitner-status-header-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.leitner-status-header-text h2 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.leitner-status-header .small-button {
+  flex-shrink: 0;
+}
+
 .leitner-status-body {
   gap: 8px;
 }
